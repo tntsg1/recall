@@ -50,7 +50,7 @@ func _process(_dt: float) -> bool:
 			_ok(b.lv.split == 2 and b.lv.chain == 1, "school levels restored")
 			_ok(b.cracks == 3 and b.kills == 77, "cracks and stats restored")
 			_ok(Meta.resume == null, "the snapshot is used once")
-		200:
+		260:   # the chapter opening plays out before the wave title
 			_ok(b.wave_ctl.index == 3 and b.wave_ctl.phase in [Waves.TITLE, Waves.FIGHT], "starts wave 4 again (index %d phase %d)" % [b.wave_ctl.index, b.wave_ctl.phase])
 			# cloud merge: the later run wins, an ended run (null) newer than ours clears it
 			Meta.data = {"runs": 1, "wins": 0, "best_chapter": 0, "best_wave": 0, "best_time": 0.0, "kills": 0, "ach": {}, "unlocks": {}, "stake_won": -1, "gun_wins": {}, "beat": 0, "crit": 0, "cross": 0, "run": {"chapter": 0, "wave": 2}, "run_at": 100}
