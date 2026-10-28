@@ -128,6 +128,13 @@ func _draw() -> void:
 			_draw_notice(Vector2(1500, 70), dim)
 		if worker_t >= 0.0 and game.wave_ctl.index <= 0:
 			_draw_worker(dim)
+	elif story == 2:
+		_draw_queue(dim)
+		_draw_gates(Vector2(420, 70), dim)
+		_draw_terminal(Vector2(80, 300), dim, "w2_terminal")
+		_draw_terminal(Vector2(80, 760), dim, "")
+		if shows.get("w2_retire", 0.0) <= 0.01:
+			_draw_wall_notice(Vector2(1840, 300), dim)
 	for w in Lore.walls(story):
 		var id := "w%d_%s" % [story, w[0]]
 		var k: float = shows.get(id, 0.0)
@@ -179,8 +186,12 @@ func _draw_remnant(w: Array, k: float, dim: float) -> void:
 	match w[3]:
 		"plate":
 			_remnant_stencil(w, shown, k, dim)
-		"screen":
-			pass      # the screen shows it on its own glass (_draw_screen)
+		"screen", "terminal":
+			pass      # screens show it on their own glass
+		"plaque":
+			_remnant_plaque(w, shown, k, dim)
+		"floor":
+			_remnant_floor(w, shown, full, k, dim)
 		"scrawl":
 			_remnant_hand(w, shown, k, dim)
 		_:
@@ -229,8 +240,12 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	var at: Vector2 = w[1]
 	var size := 16
 	var tw := font.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	var r := Rect2(at.x - 60.0, at.y + 22.0, 120.0 + (tw + 30.0 - 120.0) * Pal.ease_out(k), 72.0)
+	var wide := 120.0 + (tw + 30.0 - 120.0) * Pal.ease_out(k)
+	var r := Rect2(at.x - 60.0, at.y + 22.0, wide, 72.0)
 	r.position.x = minf(r.position.x, Arena.ROOM.end.x - r.size.x - 8.0)
+	if (w[2] as Vector2).x < -0.5:
+		# on the right wall the paper unfolds leftward from where it hangs
+		r = Rect2(at.x - 24.0 - wide, at.y - 36.0, wide, 72.0)
 	draw_rect(r, Color(0.08, 0.08, 0.085, 1.0))
 	draw_rect(r, Pal.ink(0.6 * dim), false, 1.5)
 	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
@@ -241,6 +256,109 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	var sw := Txt.t("notice_stamp")
 	draw_string(Fonts.get_font("SemiBold"), Vector2(-Fonts.get_font("SemiBold").get_string_size(sw, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x / 2.0, 6.0), sw, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.red(0.9 * k * dim, 1.5))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+# ---------------------------------------------------------------- the asset centre
+
+# Stencilled under the ID gates along the top wall, letters spaced wide.
+func _remnant_plaque(w: Array, shown: String, k: float, dim: float) -> void:
+	var at: Vector2 = (w[1] as Vector2) + Vector2(0, 92.0)
+	var sf := Fonts.get_font("SemiBold")
+	var full: String = w[4] if Txt.zh else w[5]
+	var step := 22.0
+	var x := at.x - full.length() * step / 2.0
+	draw_rect(Rect2(x - 14.0, at.y - 22.0, full.length() * step + 28.0, 32.0), Color(0, 0, 0, 0.55 * k))
+	for ch in shown:
+		draw_string(sf, Vector2(x, at.y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.85 * k * dim, 1.2))
+		x += step
+
+
+# Painted on the floor by the queue, worn, in big flat letters.
+func _remnant_floor(w: Array, shown: String, full: String, k: float, dim: float) -> void:
+	var at: Vector2 = (w[1] as Vector2) + Vector2(0, -36.0)
+	var sf := Fonts.get_font("SemiBold")
+	var tw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
+	draw_string(sf, Vector2(at.x - tw / 2.0, at.y), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Pal.ink(0.55 * k * dim, 1.1))
+
+
+# A row of ID gates against the top wall: posts, arms, a scanner light each.
+func _draw_gates(c: Vector2, dim: float) -> void:
+	var n := 4
+	var gap := 76.0
+	var x0 := c.x - gap * (n - 1) / 2.0
+	var y := c.y + 4.0
+	draw_line(Vector2(x0 - 50.0, y + 50.0), Vector2(x0 + gap * (n - 1) + 50.0, y + 50.0), Pal.ink(0.3 * dim), 1.5)
+	for i in n + 1:
+		var px := x0 - gap / 2.0 + i * gap
+		draw_rect(Rect2(px - 6.0, y, 12.0, 48.0), Color(0.06, 0.06, 0.065, 1.0))
+		draw_rect(Rect2(px - 6.0, y, 12.0, 48.0), Pal.ink(0.5 * dim), false, 1.5)
+	for i in n:
+		var gx := x0 + i * gap
+		# the arm across the lane, and the scanner's eye that blinks red on refusal
+		draw_line(Vector2(gx - gap / 2.0 + 8.0, y + 30.0), Vector2(gx + gap / 2.0 - 8.0, y + 30.0), Pal.ink(0.4 * dim), 2.0)
+		var on := int(t * 1.5 + i * 0.7) % 4 == 0
+		draw_circle(Vector2(gx - gap / 2.0, y + 12.0), 3.0, Pal.red(0.8 * dim, 2.0) if on else Pal.ink(0.35 * dim))
+		draw_line(Vector2(gx - gap / 2.0 + 6.0, y + 12.0), Vector2(gx - gap / 2.0 + 6.0 + 20.0 * (0.5 + 0.5 * sin(t * 3.0 + i)), y + 12.0), Pal.ink(0.25 * dim), 1.0)
+
+
+# A registration terminal on the left wall: a kiosk with a screen that
+# shows its remnant when a recall sweeps it, "REGISTERING..." otherwise.
+func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
+	var body := Rect2(c.x + 4.0, c.y - 80.0, 130.0, 160.0)
+	draw_rect(body, Color(0.05, 0.05, 0.055, 1.0))
+	draw_rect(body, Pal.ink(0.55 * dim), false, 2.0)
+	var scr := Rect2(body.position + Vector2(10, 12), Vector2(110, 86))
+	draw_rect(scr, Color(0.03, 0.03, 0.035, 1.0))
+	draw_rect(scr, Pal.ink(0.35 * dim), false, 1.0)
+	# keypad and a card slot under the screen
+	for j in 3:
+		for i in 4:
+			draw_rect(Rect2(body.position + Vector2(14 + i * 14, 108 + j * 12), Vector2(9, 7)), Pal.ink(0.22 * dim), false, 1.0)
+	draw_line(body.position + Vector2(84, 116), body.position + Vector2(118, 116), Pal.ink(0.45 * dim), 3.0)
+	var wake: float = shows.get(id, 0.0) if id != "" else 0.0
+	if wake > 0.01:
+		var full := ""
+		for w in Lore.walls(story):
+			if "w%d_%s" % [story, w[0]] == id:
+				full = w[4] if Txt.zh else w[5]
+		var rows := _rows(full, scr.size.x - 12.0, 15)
+		var budget := int(ceil(full.length() * clampf(wake * 1.6, 0.0, 1.0)))
+		var yy := scr.position.y + 24.0
+		for row in rows:
+			draw_string(font, Vector2(scr.position.x + 6.0, yy), String(row).substr(0, clampi(budget, 0, String(row).length())), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.92 * wake * dim, 1.4))
+			budget -= String(row).length()
+			yy += 21.0
+	elif id != "" or int(t * 2.0) % 3 != 0:
+		var dots := ".".repeat(int(t * 2.0) % 4)
+		draw_string(font, scr.position + Vector2(8, 30), Txt.t("term_idle") + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
+
+
+# The queue: posts with a rope slung between them, and the waiting line.
+func _draw_queue(dim: float) -> void:
+	var y := 920.0
+	var xs := [1000.0, 1100.0, 1200.0, 1300.0, 1400.0, 1500.0]
+	for i in xs.size():
+		var x: float = xs[i]
+		draw_line(Vector2(x, y - 26.0), Vector2(x, y + 8.0), Pal.ink(0.5 * dim), 3.0)
+		draw_circle(Vector2(x, y - 26.0), 4.0, Pal.ink(0.5 * dim))
+		if i + 1 < xs.size():
+			var x2: float = xs[i + 1]
+			draw_polyline(PackedVector2Array([Vector2(x, y - 22.0), Vector2((x + x2) / 2.0, y - 12.0), Vector2(x2, y - 22.0)]), Pal.ink(0.4 * dim), 2.0)
+	var lx := 990.0
+	while lx < 1500.0:
+		draw_line(Vector2(lx, y + 30.0), Vector2(lx + 24.0, y + 30.0), Pal.ink(0.25 * dim), 3.0)
+		lx += 40.0
+
+
+# A notice pinned to the right wall.
+func _draw_wall_notice(c: Vector2, dim: float) -> void:
+	var r := Rect2(c.x - 130.0, c.y - 36.0, 110.0, 72.0)
+	draw_rect(r, Color(0.07, 0.07, 0.075, 1.0))
+	draw_rect(r, Pal.ink(0.5 * dim), false, 1.5)
+	draw_line(r.position + Vector2(10, 14), r.position + Vector2(70, 14), Pal.ink(0.45 * dim), 2.0)
+	for j in 4:
+		draw_line(r.position + Vector2(10, 28 + j * 9), r.position + Vector2(96 - (j % 2) * 24, 28 + j * 9), Pal.ink(0.22 * dim), 1.0)
+	draw_circle(r.position + Vector2(55, 3), 3.0, Pal.ink(0.6 * dim))
 
 
 # The old-era door R-0 came out of: two heavy panels, one slid half open,

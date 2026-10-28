@@ -77,6 +77,7 @@ func start() -> void:
 	lunge_cd = 6.0
 	game.sfx.play("horn", 1.5, -4.0)
 	game.cam.add_trauma(0.3)
+	game.hud.radio(Txt.t("radio_warden"))
 
 
 func reset() -> void:
