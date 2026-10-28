@@ -270,10 +270,10 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	if (w[2] as Vector2).x < -0.5:
 		# on the right wall the paper unfolds leftward from where it hangs
 		# (clear of the target sheet when it is the sheet's own words)
-		r = Rect2(at.x - (106.0 if w[3] == "sheet" else 24.0) - wide, at.y - 36.0, wide, 72.0)
+		r = Rect2(at.x - (128.0 if w[3] == "sheet" else 24.0) - wide, at.y - 36.0, wide, 72.0)
 	elif (w[2] as Vector2).y < -0.5:
 		# on the bottom wall it unfolds upward and leftward of its board
-		r = Rect2(minf(at.x - wide * 0.5, at.x + 70.0 - wide), at.y - 150.0, wide, 72.0)
+		r = Rect2(minf(at.x - wide * 0.5, at.x + 50.0 - wide), at.y - 150.0, wide, 72.0)
 	draw_rect(r, Color(0.08, 0.08, 0.085, 1.0))
 	draw_rect(r, Pal.ink(0.6 * dim), false, 1.5)
 	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
@@ -612,6 +612,23 @@ func _draw_lanes(dim: float) -> void:
 		draw_string(sf, Vector2(600.0 + i * 220.0, 990.0), "%02d" % (i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 40, Color(1, 1, 1, 0.05 * dim))
 	for m in [[732.0, "25 m"], [452.0, "50 m"]]:
 		draw_string(sf, Vector2(250.0, m[0]), m[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 1, 0.08 * dim))
+	# what the tests leave on the floor: scorch, holes, a spent casing or two
+	for sc in [[Vector2(640, 820), 34.0], [Vector2(1290, 880), 26.0], [Vector2(880, 470), 30.0], [Vector2(1460, 560), 22.0], [Vector2(330, 620), 28.0]]:
+		var sp: Vector2 = sc[0]
+		var sr: float = sc[1]
+		# scorch: a few overlapping dark blots, no rim
+		for j in 4:
+			draw_circle(sp + Vector2.from_angle(j * 1.9) * sr * 0.4, sr * (0.75 - j * 0.1), Color(0, 0, 0, 0.22 * dim))
+	var holes := PackedVector2Array()
+	for j in 26:
+		var hp := Vector2(560.0 + fmod(j * 377.0, 820.0), 760.0 + fmod(j * 131.0, 210.0))
+		holes.append(hp - Vector2(2, 2))
+		holes.append(hp + Vector2(2, 2))
+		holes.append(hp + Vector2(-2, 2))
+		holes.append(hp + Vector2(2, -2))
+	draw_multiline(holes, Pal.ink(0.16 * dim), 1.0)
+	for cs: Vector2 in [Vector2(700, 905), Vector2(712, 914), Vector2(1135, 948), Vector2(1020, 780)]:
+		draw_line(cs, cs + Vector2(7, 3), Pal.ink(0.3 * dim), 2.0)
 	# the test zone: a hatched band across the floor under the platform
 	var y0 := 330.0
 	var x := 700.0
@@ -622,7 +639,7 @@ func _draw_lanes(dim: float) -> void:
 	# while the testbed vents, its guide marks take this spot
 	var zk := 1.0
 	if game.boss is Testbed and game.boss.alive():
-		zk = 1.0 - game.boss.core_open
+		zk = 0.0
 	if zk <= 0.01:
 		return
 	var tz := Txt.t("range_zone")
@@ -643,7 +660,10 @@ func _draw_weapon_crates(dim: float) -> void:
 			draw_rect(r.grow(-6.0), Pal.ink(0.3 * dim), false, 1.0)
 			draw_rect(Rect2(r.position.x + 6.0, r.get_center().y - 3.0, r.size.x - 12.0, 6.0), Pal.ink(0.3 * dim))
 			continue
-		# an arms crate stack: two lids, a seam, its stencil and a seal
+		# an arms crate stack: a shadow off its lower right, two lids, a seam,
+		# its stencil and a seal
+		draw_colored_polygon(PackedVector2Array([Vector2(r.end.x, r.position.y + 8.0), Vector2(r.end.x + 12.0, r.position.y + 20.0), Vector2(r.end.x + 12.0, r.end.y + 12.0),
+			Vector2(r.position.x + 12.0, r.end.y + 12.0), Vector2(r.position.x + 8.0, r.end.y), Vector2(r.end.x, r.end.y)]), Color(0, 0, 0, 0.45 * dim))
 		var ins := r.grow(-6.0)
 		draw_line(Vector2(ins.get_center().x, ins.position.y), Vector2(ins.get_center().x, ins.end.y), Pal.ink(0.35 * dim), 1.5)
 		for half in 2:

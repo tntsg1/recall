@@ -81,7 +81,8 @@ func _run() -> void:
 	bs.missiles.clear()
 	bs._announce()
 	game.player.pos = Vector2(700, 800)
-	while not (bs.stage == Testbed.TEST and bs.flame_t > 1.6):
+	# the fan sweeping onto the left crate stack, splashing on its face
+	while not (bs.stage == Testbed.TEST and bs.flame_t > 1.95):
 		await process_frame
 	await shot("6_flames")
 	bs.tests_run = 2

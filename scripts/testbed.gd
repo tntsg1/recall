@@ -386,9 +386,11 @@ func _run(dt: float) -> void:
 			puff_cd -= dt
 			if puff_cd <= 0.0:
 				# steam off the deck, either side of the turret
-				puff_cd = 0.28
+				puff_cd = 0.2
 				for side2: float in [-1.0, 1.0]:
-					game.fx.ring(TURRET + _off() + Vector2(side2 * 90.0, 10.0), 6.0, 46.0, 0.6, Pal.ink(0.22, 1.0), 4.0)
+					var pa := Vector2(SLOT.get_center().x + side2 * (SLOT.size.x * 0.5 + 24.0), SLOT.end.y - 6.0) + _off()
+					game.fx.flash(pa + Vector2(side2 * randf_range(4, 18), randf_range(0, 14)), randf_range(30.0, 46.0), 0.5, Pal.ink(0.22, 1.2))
+					game.fx.sparks(pa, Vector2(side2 * 0.3, 1.0).normalized(), 2, Pal.ink(0.5, 1.2), 180.0, 0.6, 0.8)
 			if stage_t >= VENT_TIME[phase]:
 				_announce()
 
@@ -503,6 +505,12 @@ func _step_flames(dt: float, pl: Vector2) -> bool:
 
 func _flame_angle(f: Array, k: float) -> float:
 	return lerpf(f[1], f[2], Pal.ease_io(k))
+
+
+# does cover (not the room's walls) stop the flame along this angle?
+func _flame_cover(noz: Vector2, a: float) -> bool:
+	var h: Dictionary = game.arena.raycast(noz + Vector2.from_angle(a) * 4.0, noz + Vector2.from_angle(a) * FLAME_REACH)
+	return not h.is_empty() and int(h.rect) >= 4
 
 
 func _flame_reach(noz: Vector2, a: float) -> float:
@@ -666,7 +674,7 @@ func _draw_screen(o: Vector2, dim: float) -> void:
 			sub = Txt.t("tb_pass")
 		VENT:
 			head = Txt.t("tb_vent")
-			sub = "%.1f" % maxf(0.0, VENT_TIME[phase] - stage_t)
+			sub = ""
 	if state == DYING:
 		head = Txt.t("tb_fail")
 		sub = ""
@@ -679,6 +687,10 @@ func _draw_screen(o: Vector2, dim: float) -> void:
 		draw_string(font, r.position + Vector2(10, 27), head, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.foe(0.95 * dim, 1.6))
 	if sub != "":
 		draw_string(font, r.position + Vector2(10, 52), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, sub_col)
+	if stage == VENT and state == RUN:
+		# the cooling count, big, beside its label
+		var cnt := "%.1f" % maxf(0.0, VENT_TIME[phase] - stage_t)
+		draw_string(font, r.position + Vector2(10, 59), cnt, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Pal.foe(0.95 * dim, 1.8))
 	# scan lines, in one batch
 	var sl := PackedVector2Array()
 	var y := r.position.y + 3.0
@@ -692,9 +704,16 @@ func _draw_screen(o: Vector2, dim: float) -> void:
 		var sa := minf(1.0, stamp * 2.0)
 		var sc := r.position + Vector2(r.size.x - 48.0, r.size.y * 0.5)
 		draw_set_transform(sc, -0.2, Vector2.ONE * (1.0 + 0.4 * maxf(0.0, stamp - 0.85) / 0.15))
-		var tw := font.get_string_size(Txt.t("tb_ok"), HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-		draw_rect(Rect2(-tw / 2.0 - 7.0, -15.0, tw + 14.0, 26.0), Pal.red(0.9 * sa * dim, 2.0), false, 2.0)
-		draw_string(font, Vector2(-tw / 2.0, 5.0), Txt.t("tb_ok"), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.red(sa * dim, 2.2))
+		var tw := font.get_string_size(Txt.t("tb_ok"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+		var box := Rect2(-tw / 2.0 - 8.0, -17.0, tw + 16.0, 30.0)
+		draw_rect(box, Color(0.08, 0.0, 0.0, 0.85 * sa))
+		draw_rect(box, Pal.red(sa * dim, 2.2), false, 3.0)
+		draw_rect(box.grow(-4.0), Pal.red(0.5 * sa * dim, 1.6), false, 1.0)
+		draw_string(font, Vector2(-tw / 2.0, 6.0), Txt.t("tb_ok"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.red(sa * dim, 2.4))
+		# ink thrown off the edge where it struck
+		for j in 7:
+			var ip := Vector2(cos(j * 2.4) * (box.size.x * 0.5 + 6.0 + (j % 3) * 4.0), sin(j * 2.4) * (box.size.y * 0.5 + 4.0))
+			draw_circle(ip, 1.5 + (j % 2), Pal.red(0.8 * sa * dim, 1.8))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -823,7 +842,7 @@ func _draw_dangers(dim: float) -> void:
 		var at: Vector2 = m[1]
 		var k: float = m[2] / MIS_FALL
 		# the fill is the timer: it reaches the rim as the round lands
-		draw_circle(at, MIS_R * k, Pal.red(0.08 + 0.14 * k, 1.0))
+		draw_circle(at, MIS_R * k, Pal.ink(0.03 + 0.09 * k))
 		var dash := PackedVector2Array()
 		for j in 16:
 			var a0 := TAU * j / 16.0 + t * 0.9
@@ -875,7 +894,26 @@ func _draw_dangers(dim: float) -> void:
 			# its heart: a narrow white-hot tongue
 			var core := PackedVector2Array([noz, noz + Vector2.from_angle(a - FLAME_HALF * 0.35) * reach_mid * 0.5,
 				noz + Vector2.from_angle(a) * reach_mid * 0.72, noz + Vector2.from_angle(a + FLAME_HALF * 0.35) * reach_mid * 0.5])
-			draw_polygon(core, PackedColorArray([Pal.ink(0.95 * dim, 2.6), Pal.red(0.5 * dim, 2.0), Pal.red(0.1 * dim, 1.6), Pal.red(0.5 * dim, 2.0)]))
+			draw_polygon(core, PackedColorArray([Pal.ink(0.75 * dim, 1.7), Pal.red(0.45 * dim, 1.8), Pal.red(0.1 * dim, 1.4), Pal.red(0.45 * dim, 1.8)]))
+			# tongues of flame running outward along the fan
+			var tongues := PackedVector2Array()
+			var splash := PackedVector2Array()
+			for j in 7:
+				var aj2 := a + lerpf(-FLAME_HALF * 0.8, FLAME_HALF * 0.8, j / 6.0)
+				var rch := _flame_reach(noz, aj2)
+				var s4 := fmod(t * 900.0 + j * 57.0, 120.0) + 40.0
+				while s4 < rch - 20.0:
+					tongues.append(noz + Vector2.from_angle(aj2) * s4)
+					tongues.append(noz + Vector2.from_angle(aj2 + 0.02 * sin(t * 30.0 + s4)) * minf(rch, s4 + 34.0))
+					s4 += 120.0
+				if _flame_cover(noz, aj2):
+					splash.append(noz + Vector2.from_angle(aj2) * rch)
+			if tongues.size() > 0:
+				draw_multiline(tongues, Pal.red(0.7 * dim, 2.6), 3.0)
+			# where cover stops it, the flame splashes white on the crate's face
+			for sp in splash:
+				draw_circle(sp, 7.0, Pal.ink(0.2 * dim, 1.6))
+				draw_circle(sp, 3.0, Pal.ink(0.8 * dim, 2.2))
 	if rail_mode == 1 or rail_mode == 2:
 		var m0 := _rail_muzzle()
 		var e0 := _rail_line_end()

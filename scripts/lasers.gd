@@ -153,9 +153,25 @@ func _draw() -> void:
 			# the beam: a hot core with a modest glow. Held on by the boss, the
 			# glow drops further so its own attacks read over the fences.
 			var soft := 0.55 if forced == 1 else 1.0
-			draw_line(a, b, Pal.red(0.08 * soft, 1.2), 12.0)
-			draw_line(a, b, Pal.red(0.3 * soft, 1.6), 4.0)
-			draw_line(a, b, Pal.red(1.0, 2.8), 2.0)
+			if forced == 1:
+				# held on through a test: a low steady line, so the boss's own
+				# attacks read over it; it flares up only near you
+				draw_line(a, b, Pal.red(0.5, 1.5), 2.0)
+				if game:
+					var pp: Vector2 = game.player.pos
+					var q := Geometry2D.get_closest_point_to_segment(pp, a, b)
+					var near := clampf(1.0 - (q.distance_to(pp) - 40.0) / 140.0, 0.0, 1.0)
+					if near > 0.01:
+						var span4 := a.distance_to(b)
+						var u := a.distance_to(q)
+						var q0 := a + d * maxf(0.0, u - 160.0)
+						var q1 := a + d * minf(span4, u + 160.0)
+						draw_line(q0, q1, Pal.red(0.12 * near, 1.4), 12.0)
+						draw_line(q0, q1, Pal.red(near, 3.0), 2.5)
+			else:
+				draw_line(a, b, Pal.red(0.08, 1.2), 12.0)
+				draw_line(a, b, Pal.red(0.3, 1.6), 4.0)
+				draw_line(a, b, Pal.red(1.0, 2.8), 2.0)
 			var span := a.distance_to(b)
 			var runs := PackedVector2Array()
 			var s := fmod(now * 520.0, 90.0)
@@ -164,7 +180,7 @@ func _draw() -> void:
 				runs.append(a + d * minf(span, s + 26.0))
 				s += 90.0
 			if runs.size() > 0:
-				draw_multiline(runs, Pal.red(0.8 * soft, 3.0), 3.0)
+				draw_multiline(runs, Pal.red(0.8 * soft, 3.0 * soft), 3.0 if forced != 1 else 2.0)
 		elif warn[g] > 0.0:
 			# about to light: a thick pulsing band and hatching on the floor either
 			# side, both growing as it nears
