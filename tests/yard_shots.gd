@@ -20,10 +20,11 @@ func _run() -> void:
 	root.add_child(game)
 	for i in 60 * 5:
 		await process_frame
-	var ev := InputEventKey.new()
-	ev.physical_keycode = KEY_4
-	ev.pressed = true
-	game._unhandled_input(ev)
+	for k in [KEY_L, KEY_L, KEY_L, KEY_Y, KEY_4, KEY_M]:
+		var ev := InputEventKey.new()
+		ev.physical_keycode = k
+		ev.pressed = true
+		game._unhandled_input(ev)
 	for i in 40:
 		await process_frame
 	bot.fire = true

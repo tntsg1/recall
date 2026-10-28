@@ -673,6 +673,7 @@ func _in_focus() -> bool:
 const YARD_KEYS := [Enemies.CHASER, Enemies.LEECH, Enemies.GUARD, Enemies.CHARGER, Enemies.PRISM, Enemies.PULSE, Enemies.ECHO]
 var yard_slots: Array = []      # [kind, home position, enemy or null, respawn timer]
 var yard_live := false
+var yard_timed := false         # Y: shells run their real time (to see the Lv2 chain and the final blast)
 
 
 func _yard_layout() -> void:
@@ -690,7 +691,7 @@ func _yard_layout() -> void:
 func _trial_step(sdt: float) -> void:
 	dev_god = true
 	dev_ammo = true
-	possess.endless = true
+	possess.endless = not yard_timed
 	possess.cooldown = 0.0
 	if wave_ctl.phase != Waves.FIGHT:
 		return
@@ -719,6 +720,27 @@ func _trial_step(sdt: float) -> void:
 
 
 func yard_key(k: int) -> void:
+	if k == KEY_L:
+		# the 夺壳 school, 0 → 3
+		lv.possess = (int(lv.get("possess", 0)) + 1) % 4
+		hud.school_pop["possess"] = 1.0
+		hud.flash_text(Txt.t("yard_lv_now") % lv.possess)
+		sfx.play("pick", 1.0 + lv.possess * 0.1, -6.0)
+		return
+	if k == KEY_Y:
+		yard_timed = not yard_timed
+		possess.endless = not yard_timed
+		if yard_timed and possess.hosting():
+			possess.t_left = possess.duration()
+		hud.flash_text(Txt.t("yard_timed_on" if yard_timed else "yard_timed_off"))
+		sfx.play("tick", 1.0, -6.0)
+		return
+	if k == KEY_M:
+		for sl in yard_slots:
+			if sl[2] != null and sl[2].state == Enemies.ALIVE:
+				possess.mark(sl[2])
+		sfx.play("lit", 1.0, -6.0)
+		return
 	if k == KEY_R:
 		for sl in yard_slots:
 			if sl[2] != null and sl[2].state != Enemies.HOST:
@@ -790,7 +812,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if trial and not paused and event is InputEventKey and event.pressed and not event.echo:
 		var kc: int = event.physical_keycode
-		if (kc >= KEY_1 and kc <= KEY_7) or kc == KEY_R or kc == KEY_T:
+		if (kc >= KEY_1 and kc <= KEY_7) or kc in [KEY_R, KEY_T, KEY_L, KEY_Y, KEY_M]:
 			yard_key(kc)
 			get_viewport().set_input_as_handled()
 			return

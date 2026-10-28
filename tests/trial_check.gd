@@ -57,6 +57,26 @@ func _run() -> void:
 	for f in 60 * 3:
 		await process_frame
 	check(game.wave_ctl.phase == Waves.FIGHT and game.enemies.remaining() == game.yard_slots.size(), "打死的木桩 1.2 秒后原地复活（%d）" % game.enemies.remaining())
+	# L: the 夺壳 school level; Y: real time limit; M: mark every dummy -> the Lv2 chain
+	key(KEY_L)
+	key(KEY_L)
+	check(game.lv.possess == 2, "L：夺壳流派切到 Lv2（%d）" % game.lv.possess)
+	key(KEY_1)
+	for f in 20:
+		await process_frame
+	key(KEY_M)
+	check(game.possess.marks.size() >= 5, "M：标记所有木桩（%d）" % game.possess.marks.size())
+	key(KEY_Y)
+	check(game.yard_timed and not game.possess.endless, "Y：打开限时")
+	var first = game.possess.shell
+	game.possess.t_left = 0.05
+	for f in 40:
+		await process_frame
+	check(game.possess.hosting() and game.possess.shell != first, "限时到了，2 级连锁跳进下一个被标记的木桩")
+	key(KEY_Y)
+	key(KEY_L)
+	key(KEY_L)
+	check(game.lv.possess == 0 and not game.yard_timed, "再按回到 Lv0、不限时")
 	key(KEY_T)
 	check(game.yard_live, "T：木桩动起来")
 	key(KEY_E)
