@@ -23,6 +23,8 @@ var cam: Cam
 var player: Player
 var possess: Possess
 var possess_prev := false
+var trial := false            # 夺壳试玩: keep chasers and leeches coming, nothing ends, nothing saved
+var trial_cd := 0.0
 var hud: Hud
 var sfx: Sfx
 var floor_rect: ColorRect
@@ -119,6 +121,10 @@ var dev_speed := 2
 
 func _ready() -> void:
 	Meta.test_mode = bot != null
+	if Meta.possess_trial:
+		Meta.possess_trial = false
+		trial = true
+		Meta.test_mode = true
 	if Meta.training_requested > 0:
 		tutorial = TutorialGate.new()
 		tutorial.configure(self, Meta.training_requested)
@@ -659,6 +665,47 @@ func _in_focus() -> bool:
 	return Input.is_action_pressed("recall") or Input.is_action_pressed("recall_mouse")
 
 
+# 夺壳试玩: once the first wave is up, keep six chasers and two leeches in the room
+# (fresh ones walk in from the edges as others fall). You cannot lose here.
+func _trial_step(sdt: float) -> void:
+	dev_god = true
+	if wave_ctl.phase != Waves.FIGHT:
+		return
+	wave_ctl.queue.clear()
+	if not has_meta("trial_hinted"):
+		set_meta("trial_hinted", true)
+		hud.flash_text(Txt.t("trial_hint"))
+	trial_cd -= sdt
+	if trial_cd > 0.0:
+		return
+	var chasers := 0
+	var leeches := 0
+	for e in enemies.list:
+		if e.state == Enemies.DEAD:
+			continue
+		if e.kind == Enemies.CHASER:
+			chasers += 1
+		elif e.kind == Enemies.LEECH:
+			leeches += 1
+		elif e.state == Enemies.ALIVE and e.kind != Enemies.CHASER and e.kind != Enemies.LEECH:
+			e.state = Enemies.DEAD      # the room is only for the two seizable kinds
+	var kind := -1
+	if leeches < 2:
+		kind = Enemies.LEECH
+	elif chasers < 6:
+		kind = Enemies.CHASER
+	if kind < 0:
+		return
+	trial_cd = 0.45
+	var room := Arena.ROOM.grow(-90.0)
+	var at := player.pos
+	for k in 12:
+		at = Vector2(randf_range(room.position.x, room.end.x), randf_range(room.position.y, room.end.y))
+		if at.distance_to(player.pos) > 420.0 and arena.raycast(at, at + Vector2(1, 1)).is_empty():
+			break
+	enemies.spawn(kind, at)
+
+
 func _in_possess() -> bool:
 	if tutorial != null:
 		return false
@@ -832,6 +879,8 @@ func _process(dt: float) -> void:
 		tutorial.step(dt)
 	else:
 		wave_ctl.step(sdt)
+		if trial:
+			_trial_step(sdt)
 	fx.step(sdt, dt)
 	_update_regen(sdt)
 	_update_pass()

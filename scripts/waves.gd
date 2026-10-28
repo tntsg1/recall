@@ -179,7 +179,7 @@ func step(dt: float) -> void:
 				else:
 					k += 1
 			var boss_up: bool = index == BOSS and game.boss.state != Boss.DEAD
-			if queue.is_empty() and game.enemies.remaining() == 0 and not boss_up:
+			if queue.is_empty() and game.enemies.remaining() == 0 and not boss_up and not game.trial:
 				var tm := time_now()
 				var g := grade_for(index, tm)
 				results.append([tm, g])

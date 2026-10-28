@@ -12,9 +12,14 @@ const LETTERS := {
 	"C": [[Vector2(4, 0), Vector2(1, 0), Vector2(0, 1), Vector2(0, 6), Vector2(1, 7), Vector2(4, 7)]],
 	"A": [[Vector2(0, 7), Vector2(2, 0), Vector2(4, 7)], [Vector2(1, 4.5), Vector2(3, 4.5)]],
 	"L": [[Vector2(0, 0), Vector2(0, 7), Vector2(4, 7)]],
+	"N": [[Vector2(0, 7), Vector2(0, 0), Vector2(4, 7), Vector2(4, 0)]],
+	"O": [[Vector2(1, 0), Vector2(3, 0), Vector2(4, 1), Vector2(4, 6), Vector2(3, 7), Vector2(1, 7), Vector2(0, 6), Vector2(0, 1), Vector2(1, 0)]],
+	"I": [[Vector2(1, 0), Vector2(3, 0)], [Vector2(2, 0), Vector2(2, 7)], [Vector2(1, 7), Vector2(3, 7)]],
+	"D": [[Vector2(0, 0), Vector2(0, 7), Vector2(3, 7), Vector2(4, 6), Vector2(4, 1), Vector2(3, 0), Vector2(0, 0)]],
+	" ": [],
 }
 const UNIT := 22.0
-const MENU := ["start", "tutorial", "gun", "stake", "achievements", "settings", "quit"]
+const MENU := ["start", "trial", "tutorial", "gun", "stake", "achievements", "settings", "quit"]
 const SETTINGS := ["master", "music", "sfx", "shake", "soft", "fullscreen", "lang", "keys", "assist", "back"]
 const ROW_H := 58.0
 const ROW_W := 520.0
@@ -63,6 +68,9 @@ var dot_tex: Texture2D
 
 func _ready() -> void:
 	Meta.test_mode = false
+	Meta.possess_trial = false
+	if not OS.has_feature("web"):
+		get_window().title = "霓虹行者 NEON RAID"
 	Settings.load_all()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -132,7 +140,7 @@ func _ensure_ui_keys() -> void:
 
 
 func _build_word() -> void:
-	var word := "RECALL"
+	var word := "NEON RAID"
 	var width := (word.length() * 6 - 2) * UNIT
 	var origin := Vector2(960 - width / 2.0, 190)
 	var i := 0
@@ -429,6 +437,13 @@ func _accept(d: int) -> void:
 					Meta.clear_run()
 					start_t = 0.0
 					sfx.play("release", 1.0, -2.0)
+				"trial":
+					# 夺壳试玩: an endless room of chasers and leeches, nothing saved
+					Meta.resume = null
+					Meta.training_requested = 0
+					Meta.possess_trial = true
+					start_t = 0.0
+					sfx.play("release", 1.0, -2.0)
 				"tutorial":
 					Meta.resume = null
 					Meta.training_requested = 2
@@ -610,7 +625,7 @@ func _draw_word(vp: Vector2) -> void:
 					draw_circle(p2, 5.0, Pal.red(1.0, 3.0))
 					break
 				acc += l
-	_text_c(font_s, "归弹", Vector2(vp.x / 2.0, 395), 22, Pal.ink(0.55 * whole))
+	_text_c(font_s, "霓虹行者", Vector2(vp.x / 2.0, 395), 22, Pal.ink(0.55 * whole))
 
 
 # The highlight: a soft band that springs between rows, a red underline that

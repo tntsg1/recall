@@ -5,6 +5,9 @@ static var zh := OS.get_locale_language() == "zh"
 
 const S := {
 	"t_tutorial": ["新手训练", "TRAINING"],
+	"t_trial": ["夺壳试玩", "SEIZE TRIAL"],
+	"trial_hint": ["夺壳试玩 · 左键射击 → 按住 Q 松开回收 → 被贯穿的三角 / 五边形带青框 → 按 E 夺壳 · Esc 回标题", "SEIZE TRIAL · FIRE → HOLD Q, RELEASE → PIERCED TRIANGLES / PENTAGONS GET A CYAN MARK → E TO SEIZE · ESC FOR TITLE"],
+	"trial_title": ["夺壳试玩", "SEIZE TRIAL"],
 	"teach_skip": ["Tab / Y / 点击 · 跳过教学", "Tab / Y / CLICK · SKIP"],
 	"teach_0_title": ["01 · 先走两步", "01 · GET MOVING"],
 	"teach_0_body": ["按 {move} 或推动左摇杆，走进右侧的红色圆圈。这里没有危险，可以慢慢试。", "Use {move} or the left stick to reach the red circle to your right. This is a safe practice room."],
