@@ -747,10 +747,12 @@ func _draw_radio(vp: Vector2) -> void:
 	if radio_t >= 0.0:
 		var a := clampf(radio_t / 0.3, 0.0, 1.0) * (1.0 - clampf((radio_t - 6.2) / 0.8, 0.0, 1.0))
 		var n := int(radio_text.length() * clampf((radio_t - 0.4) / 2.2, 0.0, 1.0))
-		var x := BAND_EDGE + 46.0
+		var x := BAND_EDGE + 56.0
 		var y := 112.0
+		var pw := font_s.get_string_size(radio_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+		view.draw_rect(Rect2(BAND_EDGE + 12.0, y - 36.0, pw + 64.0, 56.0), Color(0, 0, 0, 0.62 * a))
 		# a loudspeaker: a box and its horn, with waves while it speaks
-		var sp := Vector2(BAND_EDGE + 22.0, y - 10.0)
+		var sp := Vector2(BAND_EDGE + 34.0, y - 10.0)
 		view.draw_rect(Rect2(sp + Vector2(-8, -5), Vector2(6, 10)), Pal.ink(0.7 * a))
 		view.draw_colored_polygon(PackedVector2Array([sp + Vector2(-2, -5), sp + Vector2(6, -11), sp + Vector2(6, 11), sp + Vector2(-2, 5)]), Pal.ink(0.7 * a))
 		if radio_t < 2.8:

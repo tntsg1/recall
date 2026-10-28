@@ -561,7 +561,7 @@ func _draw() -> void:
 	var bm := bg.material as ShaderMaterial
 	bm.set_shader_parameter("cursor", cur_p.x)
 	bm.set_shader_parameter("size", vp)
-	_draw_searchlight(vp)
+	_draw_searchlight(vp, _page_k("menu", 0).x)
 	_draw_word(vp)
 	var dim_word := 0.0
 	for pg in ["achievements", "archive", "settings", "keys"]:
@@ -590,13 +590,18 @@ func _draw() -> void:
 
 
 # A searchlight from somewhere above the city sweeps slowly behind the menu.
-func _draw_searchlight(vp: Vector2) -> void:
+func _draw_searchlight(vp: Vector2, on: float) -> void:
 	var o := Vector2(vp.x * 0.12, -60.0)
 	var a := 1.05 + sin(t * 0.21) * 0.32
 	var len := vp.length() * 1.1
-	var k := clampf((t - 1.2) / 2.0, 0.0, 1.0)
-	var pts := PackedVector2Array([o, o + Vector2.from_angle(a - 0.09) * len, o + Vector2.from_angle(a + 0.09) * len])
-	draw_polygon(pts, PackedColorArray([Color(1, 1, 1, 0.028 * k), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
+	var k := clampf((t - 1.2) / 2.0, 0.0, 1.0) * on
+	if k <= 0.01:
+		return
+	# a soft beam: a bright core and wider, fainter skirts that fade to nothing
+	for layer in [[0.16, 0.005], [0.09, 0.007], [0.04, 0.009]]:
+		var w: float = layer[0]
+		var pts := PackedVector2Array([o, o + Vector2.from_angle(a - w) * len, o + Vector2.from_angle(a + w) * len])
+		draw_polygon(pts, PackedColorArray([Color(1, 1, 1, layer[1] * k), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
 
 
 func _draw_word(vp: Vector2) -> void:

@@ -235,11 +235,11 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	draw_rect(r, Pal.ink(0.6 * dim), false, 1.5)
 	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
 	draw_string(font, r.position + Vector2(15, 54), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * dim, 1.2))
-	var sc := Vector2(r.end.x - 26.0, r.end.y - 20.0)
-	draw_arc(sc, 15.0, 0.0, TAU, 24, Pal.red(0.7 * k * dim, 1.4), 2.0, false)
+	var sc := Vector2(r.end.x + 4.0, r.end.y + 4.0)
+	draw_arc(sc, 22.0, 0.0, TAU, 28, Pal.red(0.75 * k * dim, 1.4), 2.5, false)
 	draw_set_transform(sc, -0.3, Vector2.ONE)
 	var sw := Txt.t("notice_stamp")
-	draw_string(Fonts.get_font("SemiBold"), Vector2(-Fonts.get_font("SemiBold").get_string_size(sw, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x / 2.0, 4.0), sw, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.red(0.85 * k * dim, 1.5))
+	draw_string(Fonts.get_font("SemiBold"), Vector2(-Fonts.get_font("SemiBold").get_string_size(sw, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x / 2.0, 6.0), sw, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.red(0.9 * k * dim, 1.5))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -257,8 +257,11 @@ func _draw_door(c: Vector2, dim: float) -> void:
 	var glow := 0.10 + 0.05 * sin(t * 1.3)
 	draw_rect(gap, Color(1, 1, 1, glow * dim))
 	# and that light spills out across the floor in front of the door
-	var spill := PackedVector2Array([Vector2(gap.position.x, top), Vector2(gap.end.x, top), Vector2(gap.end.x + 40.0, top - 110.0), Vector2(gap.position.x - 40.0, top - 110.0)])
-	draw_polygon(spill, PackedColorArray([Color(1, 1, 1, glow * 0.28 * dim), Color(1, 1, 1, glow * 0.28 * dim), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
+	# the door is drawn turned onto the left wall: put the pool where that lands
+	var pool_c := Vector2(80, 790) + Vector2(-(top - 40.0), gap.get_center().x)
+	draw_set_transform(pool_c, 0.0, Vector2(0.9, 1.5))
+	draw_texture_rect(Fx.make_glow_texture(), Rect2(-Vector2(60, 60), Vector2(120, 120)), false, Color(1, 1, 1, glow * 0.9 * dim))
+	draw_set_transform(Vector2(80, 790), PI / 2.0, Vector2.ONE)
 	for j in 4:
 		draw_line(Vector2(gap.position.x + 8.0 + j * 16.0, gap.position.y + 4.0), Vector2(gap.position.x + 8.0 + j * 16.0, gap.end.y - 4.0), Color(1, 1, 1, 0.05 * dim), 1.0)
 	var left := Rect2(c.x - w / 2.0, top, w / 2.0 - 10.0, h)
@@ -409,7 +412,7 @@ func _draw_memory() -> void:
 	var n := int(memory.length() * clampf(memory_t / 0.5, 0.0, 1.0))
 	var txt := memory.substr(0, n)
 	var tw := font.get_string_size(memory, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	var p: Vector2 = (sh.pos as Vector2) + Vector2(-tw / 2.0, -70.0)
+	var p: Vector2 = (sh.pos as Vector2) + Vector2(-tw / 2.0, 92.0)
 	p.x = clampf(p.x, Arena.ROOM.position.x + 10.0, Arena.ROOM.end.x - tw - 10.0)
 	mem_layer.draw_rect(Rect2(p + Vector2(-12, -24), Vector2(tw + 24, 34)), Color(0, 0, 0, 0.7 * a))
 	mem_layer.draw_line(p + Vector2(-12, -24), p + Vector2(-12, 10), Possess.cyan(a, 1.8), 2.0)
