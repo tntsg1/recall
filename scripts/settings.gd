@@ -6,8 +6,19 @@ const PATH := "user://recall_settings.cfg"
 
 
 # Under a test script the settings live in a sandbox file (see Meta.path).
+static var _sandbox_fresh := false
+
+
 static func _path() -> String:
-	return "user://recall_settings.test.cfg" if Meta.under_test() else PATH
+	if not Meta.under_test():
+		return PATH
+	# each test process starts from the defaults, never from a previous test's
+	var p := "user://recall_settings.test.cfg"
+	if not _sandbox_fresh:
+		_sandbox_fresh = true
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
+	return p
 const ACTIONS := ["up", "down", "left", "right", "recall", "dash", "pause"]
 
 static var master := 1.0

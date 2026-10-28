@@ -142,29 +142,11 @@ func _ready() -> void:
 		randomize()
 	_setup_input()
 	var env := WorldEnvironment.new()
-	var e := Environment.new()
-	e.background_mode = Environment.BG_CANVAS
-	e.glow_enabled = true
-	e.glow_intensity = 0.9
-	e.glow_strength = 1.0
-	e.glow_bloom = 0.0
-	e.glow_hdr_threshold = 1.05
-	if Pal.ldr:
-		# nothing passes 1.0 here: let only the clipped-white highlights glow
-		e.glow_hdr_threshold = 0.97
-		e.glow_intensity = 0.7
-	e.glow_hdr_scale = 2.0
-	e.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
-	for lv in 7:
-		e.set_glow_level(lv, 0.0)
-	e.set_glow_level(1, 0.6)
-	e.set_glow_level(2, 0.8)
-	e.set_glow_level(3, 0.6)
-	e.set_glow_level(4, 0.35)
-	env.environment = e
+	env.environment = make_environment()
 	add_child(env)
 	post = Post.new()
 	add_child(post)
+
 
 	floor_rect = ColorRect.new()
 	floor_rect.position = Arena.ROOM.position
@@ -195,9 +177,6 @@ func _ready() -> void:
 	possess = Possess.new()
 	possess.game = self
 	add_child(possess)
-	var signs := Signs.new()
-	signs.game = self
-	add_child(signs)
 	for cls in [Boss, Warden, Devourer, Metronome, Zero]:
 		var bn = cls.new()
 		bn.game = self
@@ -889,7 +868,54 @@ func _unhandled_input(event: InputEvent) -> void:
 		_pause_choice("restart")
 
 
+
+# The run's glow. The title builds the same one at no strength, so the glow
+# passes are compiled and their buffers made before the first frame of play.
+static func make_environment() -> Environment:
+	var e := Environment.new()
+	e.background_mode = Environment.BG_CANVAS
+	e.glow_enabled = true
+	e.glow_intensity = 0.9
+	e.glow_strength = 1.0
+	e.glow_bloom = 0.0
+	e.glow_hdr_threshold = 1.05
+	if Pal.ldr:
+		# nothing passes 1.0 here: let only the clipped-white highlights glow
+		e.glow_hdr_threshold = 0.97
+		e.glow_intensity = 0.7
+	e.glow_hdr_scale = 2.0
+	e.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
+	for lv in 7:
+		e.set_glow_level(lv, 0.0)
+	e.set_glow_level(1, 0.6)
+	e.set_glow_level(2, 0.8)
+	e.set_glow_level(3, 0.6)
+	e.set_glow_level(4, 0.35)
+	return e
+
+
+# per-section frame timings, filled only while a perf test asks for them
+var prof_on := false
+var prof := {}
+var _lap_at := 0
+
+
+func _lap(name: String) -> void:
+	var now := Time.get_ticks_usec()
+	prof[name] = (now - _lap_at) / 1000.0
+	_lap_at = now
+
+
 func _process(dt: float) -> void:
+	if prof_on:
+		prof.clear()
+		_lap_at = Time.get_ticks_usec()
+	_run_frame(dt)
+	if prof_on:
+		_lap("tail")
+
+
+func _run_frame(dt: float) -> void:
 	dt = minf(dt, 1.0 / 20.0)
 	if paused:
 		hud.step(dt)
@@ -939,26 +965,44 @@ func _process(dt: float) -> void:
 	elif not possess.busy():
 		player.step(sdt, dt, move, aim_world())
 	possess.step(sdt, dt)
+	if prof_on:
+		_lap("player+possess")
 	trail.append([sim_time, player.pos])
 	while trail.size() > 2 and sim_time - trail[0][0] > 4.0:
 		trail.pop_front()
 	_update_fire(sdt, dt)
+	if prof_on:
+		_lap("fire")
 	bullets.step(sdt, dt)
+	if prof_on:
+		_lap("bullets")
 	enemies.step(sdt)
+	if prof_on:
+		_lap("enemies")
 	boss.step(sdt)
+	if prof_on:
+		_lap("boss")
 	if tutorial != null:
 		tutorial.step(dt)
 	else:
 		wave_ctl.step(sdt)
 		if trial:
 			_trial_step(sdt)
+	if prof_on:
+		_lap("waves")
 	fx.step(sdt, dt)
+	if prof_on:
+		_lap("fx")
 	_update_regen(sdt)
 	_update_pass()
+	if prof_on:
+		_lap("regen+pass")
 	cam.step(dt)
 	post.step(dt)
 	hud.step(dt)
 	sfx.step(dt, focus)
+	if prof_on:
+		_lap("cam+post+hud+sfx")
 	_update_floor(dt)
 	if absf(focus - last_focus_drawn) > 0.004:
 		last_focus_drawn = focus

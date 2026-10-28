@@ -60,7 +60,12 @@ func _ready() -> void:
 	_motion_ready()
 
 
+static var _vig_tex: Texture2D
+
+
 static func _vignette_texture() -> Texture2D:
+	if _vig_tex != null:
+		return _vig_tex
 	var w := 192
 	var h := 108
 	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
@@ -71,7 +76,8 @@ static func _vignette_texture() -> Texture2D:
 			var d := sqrt(u * u * 0.8 + v * v * 1.1)
 			var a := clampf((d - 0.55) / 0.75, 0.0, 1.0)
 			img.set_pixel(x, y, Color(0, 0, 0, a * a * 0.85))
-	return ImageTexture.create_from_image(img)
+	_vig_tex = ImageTexture.create_from_image(img)
+	return _vig_tex
 
 
 func fired() -> void:
@@ -1387,7 +1393,23 @@ func _draw_over(vp: Vector2) -> void:
 	_text_c(font_b, Txt.t("restart"), Vector2(cx, y + 370.0), 20, Pal.ink(pulse * bt))
 
 
+# Lines are measured once per text, size and width, not every frame.
+static var _wrap_cache := {}
+
+
 func _wrap(txt: String, size: int, width: float) -> Array:
+	var key := "%d|%d|%s" % [size, int(width), txt]
+	var hit = _wrap_cache.get(key)
+	if hit != null:
+		return hit
+	var out := _wrap_lines(txt, size, width)
+	if _wrap_cache.size() > 512:
+		_wrap_cache.clear()
+	_wrap_cache[key] = out
+	return out
+
+
+func _wrap_lines(txt: String, size: int, width: float) -> Array:
 	var out: Array = []
 	var cur := ""
 	for ch in txt:
@@ -1475,6 +1497,7 @@ var pause_sel := 0
 var pause_hl := Motion.Spring2.new(Vector2.ZERO, 420.0, 0.78)
 var pause_k: Array = []
 var open_t := 0.0
+var held_frames := 0
 var close_t := -1.0
 var close_cb: Callable
 var ammo_s := Motion.Spring.new(0.0, 520.0, 0.42)
@@ -1564,7 +1587,12 @@ func close_to(cb: Callable) -> void:
 
 
 func _step_motion(dt: float) -> void:
-	open_t += dt
+	# hold the closed slit (black, one red line — exactly where the title left the
+	# screen) for the first few frames, while the GPU settles; then open smoothly
+	if held_frames < 6:
+		held_frames += 1
+	else:
+		open_t += minf(dt, 1.0 / 30.0)
 	if close_t >= 0.0:
 		close_t += dt
 		if close_t > 0.55 and close_cb.is_valid():

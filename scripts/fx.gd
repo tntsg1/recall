@@ -13,6 +13,7 @@ var flashes: Array = []  # [pos, r, t, dur, color]
 var motes: Array = []    # [pos, vel, phase, size]
 var add_layer: Node2D
 var glow_tex: Texture2D
+var dot_tex: Texture2D
 var num_font: Font
 
 
@@ -28,6 +29,7 @@ func _ready() -> void:
 	add_layer.draw.connect(_draw_add)
 	add_child(add_layer)
 	glow_tex = make_glow_texture()
+	dot_tex = make_dot_texture()
 	num_font = Fonts.get_font("SemiBold")
 	var room := Arena.ROOM
 	for i in 70:
@@ -35,7 +37,33 @@ func _ready() -> void:
 			Vector2.from_angle(randf() * TAU) * randf_range(4.0, 12.0), randf() * TAU, randf_range(0.8, 1.8)])
 
 
+static var _ring_tex: Texture2D
+static var _glow_tex: Texture2D
+static var _dot_tex: Texture2D
+
+
+# A solid disc with a one-pixel soft edge, drawn at any small size.
+static func make_dot_texture() -> Texture2D:
+	if _dot_tex != null:
+		return _dot_tex
+	var n := 16
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	for y in n:
+		for x in n:
+			var d := Vector2(x + 0.5 - n / 2.0, y + 0.5 - n / 2.0).length()
+			img.set_pixel(x, y, Color(1, 1, 1, clampf(n / 2.0 - d, 0.0, 1.0)))
+	img.generate_mipmaps()
+	# drawn a few pixels across, so it is sampled from its mipmaps
+	var ct := CanvasTexture.new()
+	ct.diffuse_texture = ImageTexture.create_from_image(img)
+	ct.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	_dot_tex = ct
+	return _dot_tex
+
+
 static func make_ring_texture() -> Texture2D:
+	if _ring_tex != null:
+		return _ring_tex
 	var n := 64
 	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
 	for y in n:
@@ -44,10 +72,13 @@ static func make_ring_texture() -> Texture2D:
 			var a := clampf(1.0 - absf(d - 0.84) / 0.12, 0.0, 1.0)
 			img.set_pixel(x, y, Color(1, 1, 1, a * a * (3.0 - 2.0 * a)))
 	img.generate_mipmaps()
-	return ImageTexture.create_from_image(img)
+	_ring_tex = ImageTexture.create_from_image(img)
+	return _ring_tex
 
 
 static func make_glow_texture() -> Texture2D:
+	if _glow_tex != null:
+		return _glow_tex
 	var n := 64
 	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
 	for y in n:
@@ -56,7 +87,8 @@ static func make_glow_texture() -> Texture2D:
 			var a := clampf(1.0 - d, 0.0, 1.0)
 			a = a * a * (3.0 - 2.0 * a)
 			img.set_pixel(x, y, Color(1, 1, 1, a * a))
-	return ImageTexture.create_from_image(img)
+	_glow_tex = ImageTexture.create_from_image(img)
+	return _glow_tex
 
 
 func spark(pos: Vector2, vel: Vector2, dur: float, c: Color, w: float = 1.5, l: float = 10.0, drag: float = 7.0) -> void:
@@ -150,9 +182,11 @@ func _age(arr: Array, ti: int, di: int, dt: float) -> void:
 
 func _draw() -> void:
 	var f: float = game.focus
+	# the motes are tiny discs: one ready-made dot each, not a tessellated circle
 	for m in motes:
 		var a := (0.05 + 0.04 * sin(m[2] * 0.7 + m[3] * 3.0)) * (1.0 - 0.6 * f)
-		draw_circle(m[0], m[3], Pal.ink(a))
+		var r: float = m[3]
+		draw_texture_rect(dot_tex, Rect2(m[0] - Vector2(r, r), Vector2(r, r) * 2.0), false, Pal.ink(a))
 	# all sparks in one batch
 	var segs := PackedVector2Array()
 	var cols := PackedColorArray()

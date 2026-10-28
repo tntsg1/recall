@@ -109,6 +109,11 @@ func _ready() -> void:
 	dot_tex = _make_dot()
 	# load the run in the background so Start never stalls
 	ResourceLoader.load_threaded_request("res://scenes/main.tscn")
+	add_child(Warm.new())
+	var env := WorldEnvironment.new()
+	env.environment = Game.make_environment()
+	env.environment.glow_intensity = 0.0001
+	add_child(env)
 	hl.snap(_row_rect(0).get_center())
 	hl_w.snap(ROW_W)
 
@@ -270,7 +275,7 @@ func _process(dt: float) -> void:
 	count_roll.step(dt)
 	if start_t >= 0.0:
 		start_t += dt
-		if start_t > 1.05 and not leaving:
+		if start_t > 1.05 and not leaving and (Warm.done or start_t > 2.5):
 			leaving = true
 			var packed = ResourceLoader.load_threaded_get("res://scenes/main.tscn")
 			if packed is PackedScene:
