@@ -129,8 +129,14 @@ func _draw() -> void:
 		if worker_t >= 0.0 and game.wave_ctl.index <= 0:
 			_draw_worker(dim)
 	elif story == 2:
+		_draw_pillars(dim)
+		_draw_reflections(dim)
 		_draw_queue(dim)
-		_draw_gates(Vector2(420, 70), dim)
+		# the gates, half again as large, a little clear of the wall
+		draw_set_transform(Vector2(1500, 96), 0.0, Vector2(1.5, 1.5))
+		_draw_gates(Vector2.ZERO, dim)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		_draw_scan(Vector2(1500, 96 + 72), dim)
 		_draw_terminal(Vector2(80, 300), dim, "w2_terminal")
 		_draw_terminal(Vector2(80, 760), dim, "")
 		if shows.get("w2_retire", 0.0) <= 0.01:
@@ -250,7 +256,7 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	draw_rect(r, Pal.ink(0.6 * dim), false, 1.5)
 	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
 	draw_string(font, r.position + Vector2(15, 54), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * dim, 1.2))
-	var sc := Vector2(r.end.x + 4.0, r.end.y + 4.0)
+	var sc := Vector2(r.end.x + 4.0, r.end.y + 4.0) if (w[2] as Vector2).y > 0.5 else Vector2(r.end.x - 26.0, r.position.y + 22.0)
 	draw_arc(sc, 22.0, 0.0, TAU, 28, Pal.red(0.75 * k * dim, 1.4), 2.5, false)
 	draw_set_transform(sc, -0.3, Vector2.ONE)
 	var sw := Txt.t("notice_stamp")
@@ -262,7 +268,7 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 
 # Stencilled under the ID gates along the top wall, letters spaced wide.
 func _remnant_plaque(w: Array, shown: String, k: float, dim: float) -> void:
-	var at: Vector2 = (w[1] as Vector2) + Vector2(0, 92.0)
+	var at: Vector2 = (w[1] as Vector2) + Vector2(0, 150.0)
 	var sf := Fonts.get_font("SemiBold")
 	var full: String = w[4] if Txt.zh else w[5]
 	var step := 22.0
@@ -278,7 +284,52 @@ func _remnant_floor(w: Array, shown: String, full: String, k: float, dim: float)
 	var at: Vector2 = (w[1] as Vector2) + Vector2(0, -36.0)
 	var sf := Fonts.get_font("SemiBold")
 	var tw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
-	draw_string(sf, Vector2(at.x - tw / 2.0, at.y), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Pal.ink(0.55 * k * dim, 1.1))
+	draw_string(sf, Vector2(at.x - tw / 2.0, at.y), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Pal.ink(0.8 * k * dim, 1.2))
+
+
+# The hall's two pillars are registration columns: a number, a scan strip.
+func _draw_pillars(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	var n := 0
+	for r: Rect2 in game.arena.inner:
+		n += 1
+		var ins := r.grow(-10.0)
+		draw_string(sf, ins.position + Vector2(4, 16), "REG-%d" % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.5 * dim))
+		var sy := ins.position.y + 22.0 + fmod(t * 30.0 + n * 17.0, ins.size.y - 26.0)
+		draw_line(Vector2(ins.position.x + 4.0, sy), Vector2(ins.end.x - 4.0, sy), Pal.ink(0.45 * dim, 1.4), 1.5)
+		draw_rect(Rect2(ins.position + Vector2(4, 22), Vector2(ins.size.x - 8.0, ins.size.y - 26.0)), Pal.ink(0.18 * dim), false, 1.0)
+
+
+# The mirrors give back a citizen: as you pass, a faint figure of you shows
+# beyond the glass, smiling the way a registered asset should.
+func _draw_reflections(dim: float) -> void:
+	var p: Vector2 = game.player.pos
+	for m: Rect2 in game.arena.mirrors:
+		var long_x := m.size.x > m.size.y
+		var mirrored := p
+		var inside := false
+		var dist := 0.0
+		if long_x:
+			inside = p.x > m.position.x and p.x < m.end.x
+			var my := m.get_center().y
+			dist = absf(p.y - my)
+			mirrored = Vector2(p.x, 2.0 * my - p.y)
+		else:
+			inside = p.y > m.position.y and p.y < m.end.y
+			var mx := m.get_center().x
+			dist = absf(p.x - mx)
+			mirrored = Vector2(2.0 * mx - p.x, p.y)
+		if not inside or dist > 260.0 or dist < 20.0:
+			continue
+		var a := (1.0 - dist / 260.0) * 0.55 * dim
+		draw_arc(mirrored, 16.0, 0.0, TAU, 24, Pal.ink(a), 1.5, false)
+		draw_circle(mirrored + Vector2(-5, -4), 1.8, Pal.ink(a))
+		draw_circle(mirrored + Vector2(5, -4), 1.8, Pal.ink(a))
+		var smile := PackedVector2Array()
+		for j in 7:
+			var u := lerpf(-1.0, 1.0, j / 6.0)
+			smile.append(mirrored + Vector2(u * 8.0, 4.0 + 3.0 * (1.0 - u * u)))
+		draw_polyline(smile, Pal.ink(a), 1.5, false)
 
 
 # A row of ID gates against the top wall: posts, arms, a scanner light each.
@@ -301,6 +352,15 @@ func _draw_gates(c: Vector2, dim: float) -> void:
 		draw_line(Vector2(gx - gap / 2.0 + 6.0, y + 12.0), Vector2(gx - gap / 2.0 + 6.0 + 20.0 * (0.5 + 0.5 * sin(t * 3.0 + i)), y + 12.0), Pal.ink(0.25 * dim), 1.0)
 
 
+# The gates' scanner: a soft fan that sweeps the floor in front of them.
+func _draw_scan(o: Vector2, dim: float) -> void:
+	var a := PI / 2.0 + sin(t * 0.7) * 0.55
+	for layer in [[0.14, 0.03], [0.07, 0.05]]:
+		var w: float = layer[0]
+		var pts := PackedVector2Array([o, o + Vector2.from_angle(a - w) * 420.0, o + Vector2.from_angle(a + w) * 420.0])
+		draw_polygon(pts, PackedColorArray([Color(1, 1, 1, layer[1] * dim), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
+
+
 # A registration terminal on the left wall: a kiosk with a screen that
 # shows its remnant when a recall sweeps it, "REGISTERING..." otherwise.
 func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
@@ -308,6 +368,8 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 	draw_rect(body, Color(0.05, 0.05, 0.055, 1.0))
 	draw_rect(body, Pal.ink(0.55 * dim), false, 2.0)
 	var scr := Rect2(body.position + Vector2(10, 12), Vector2(110, 86))
+	# the screen's glow on the wall around it
+	draw_texture_rect(Fx.make_glow_texture(), scr.grow(40.0), false, Color(1, 1, 1, 0.07 * dim))
 	draw_rect(scr, Color(0.03, 0.03, 0.035, 1.0))
 	draw_rect(scr, Pal.ink(0.35 * dim), false, 1.0)
 	# keypad and a card slot under the screen
@@ -346,7 +408,7 @@ func _draw_queue(dim: float) -> void:
 			draw_polyline(PackedVector2Array([Vector2(x, y - 22.0), Vector2((x + x2) / 2.0, y - 12.0), Vector2(x2, y - 22.0)]), Pal.ink(0.4 * dim), 2.0)
 	var lx := 990.0
 	while lx < 1500.0:
-		draw_line(Vector2(lx, y + 30.0), Vector2(lx + 24.0, y + 30.0), Pal.ink(0.25 * dim), 3.0)
+		draw_line(Vector2(lx, y - 48.0), Vector2(lx + 24.0, y - 48.0), Pal.ink(0.25 * dim), 3.0)
 		lx += 40.0
 
 

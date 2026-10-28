@@ -34,7 +34,7 @@ const WALL := {
 	],
 	2: [
 		["terminal", Vector2(80, 300), Vector2(1, 0), "terminal", "新生儿资产登记 · 终身劳动账户已开通", "NEWBORN ASSET REGISTERED · LIFETIME LABOUR ACCOUNT OPENED"],
-		["gate", Vector2(420, 70), Vector2(0, 1), "plaque", "请出示股东卡 · 未持卡者按遗失物品处理", "SHOW YOUR SHAREHOLDER CARD · THE CARDLESS ARE LOST PROPERTY"],
+		["gate", Vector2(1500, 70), Vector2(0, 1), "plaque", "请出示股东卡 · 未持卡者按遗失物品处理", "SHOW YOUR SHAREHOLDER CARD · THE CARDLESS ARE LOST PROPERTY"],
 		["queue", Vector2(1240, 1010), Vector2(0, -1), "floor", "等候区 · 请勿越线 · 请勿思考", "WAITING AREA · DO NOT CROSS · DO NOT THINK"],
 		["retire", Vector2(1840, 300), Vector2(-1, 0), "notice", "本年度退休申请批准 0 份。感谢您的耐心。", "RETIREMENT APPLICATIONS APPROVED THIS YEAR: 0. THANK YOU FOR YOUR PATIENCE."],
 	],

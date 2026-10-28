@@ -81,7 +81,7 @@ func think(game) -> void:
 		if bd2 < 220.0:
 			move += (p - bs.bob) / maxf(bd2, 1.0) * 2.0
 	if bs is Warden and bs.state == Warden.RUN:
-		var wd: float = bs.pos.distance_to(p)
+		var wd: float = bs.pos.distance_to(p) - 70.0
 		if wd < 260.0:
 			move += (p - bs.pos) / maxf(wd, 1.0) * (260.0 - wd) / 60.0
 		# circle round to its open back

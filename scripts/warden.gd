@@ -11,8 +11,8 @@ enum { OFF, ENTER, RUN, DYING, DEAD }
 enum { HOLD, BRACE, LUNGE }
 
 const HP := 1500.0
-const R := 58.0
-const SHIELD_R := 98.0
+const R := 96.0
+const SHIELD_R := 160.0
 const SHIELD_HALF := deg_to_rad(70.0)
 const TURN := [0.8, 1.15, 1.5]
 const HOME := Vector2(960, 540)
@@ -292,6 +292,8 @@ func _draw() -> void:
 	if state == DEAD:
 		return
 	var appear := Pal.back(clampf(t / 0.6, 0.0, 1.0)) if state == ENTER else 1.0
+	if state == ENTER:
+		dim *= clampf(t / 0.6, 0.0, 1.0)   # it steps out of the dark of the hall
 	var col := Pal.foe(dim, 1.0 + 0.8 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
 	# body: an octagon with slow inner facets
 	var pts := PackedVector2Array()
@@ -302,9 +304,28 @@ func _draw() -> void:
 	for k in 4:
 		var a := t * 0.4 + TAU * k / 4.0
 		draw_line(pos + Vector2.from_angle(a) * R * 0.25 * appear, pos + Vector2.from_angle(a) * R * 0.75 * appear, Pal.foe(0.25 * dim), 1.0)
-	# the eye: a slit that looks where the mirror points
-	var eye := pos + face * R * 0.45 * appear
-	draw_line(eye - face.orthogonal() * 12.0, eye + face.orthogonal() * 12.0, Pal.foe(dim, 2.0), 3.0)
+	# the Bureau's mark across its back: a band of red hazard stripes
+	var bk := -face
+	var bs := bk.orthogonal()
+	var b0 := pos + bk * R * 0.62 * appear - bs * R * 0.42 * appear
+	var b1 := pos + bk * R * 0.62 * appear + bs * R * 0.42 * appear
+	for j in 7:
+		var q := b0.lerp(b1, (j + 0.5) / 7.0)
+		draw_line(q - bk * 7.0, q + bk * 7.0 + bs * 6.0, Pal.red(0.7 * dim, 1.6), 3.0)
+	# its unit number, stencilled
+	draw_set_transform(pos + bk * R * 0.25 * appear, bk.angle() + PI / 2.0, Vector2.ONE)
+	draw_string(Fonts.get_font("SemiBold"), Vector2(-22, 6), "BSB-02", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.foe(0.5 * dim))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# the face: a lens that smiles at you, two dots and a curve, always
+	var eye := pos + face * R * 0.5 * appear
+	var side := face.orthogonal()
+	draw_circle(eye - side * 13.0 - face * 6.0, 3.5, Pal.foe(dim, 2.2))
+	draw_circle(eye + side * 13.0 - face * 6.0, 3.5, Pal.foe(dim, 2.2))
+	var smile := PackedVector2Array()
+	for j in 9:
+		var u := lerpf(-1.0, 1.0, j / 8.0)
+		smile.append(eye + side * u * 20.0 + face * (8.0 - 7.0 * u * u))
+	draw_polyline(smile, Pal.foe(dim, 2.4), 3.0, false)
 	# the mirror arc
 	var a0 := face.angle() - SHIELD_HALF * appear
 	var a1 := face.angle() + SHIELD_HALF * appear

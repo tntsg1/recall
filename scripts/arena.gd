@@ -165,7 +165,15 @@ func _draw() -> void:
 	# mirrors: bright glass with a sheen that slides along when struck
 	for m in mirrors:
 		var long_x := m.size.x > m.size.y
-		draw_rect(m, Color(0.13, 0.13, 0.14))
+		draw_rect(m, Color(0.16, 0.16, 0.18))
+		# glass: slanted streaks of reflected light along its length
+		var span := m.size.x if long_x else m.size.y
+		var sp := 10.0
+		while sp < span - 10.0:
+			var q := m.position + (Vector2(sp, 0) if long_x else Vector2(0, sp))
+			var d := Vector2(-6, m.size.y) if long_x else Vector2(m.size.x, -6)
+			draw_line(q, q + d, Pal.ink(0.22, 1.2), 1.5)
+			sp += 26.0
 		draw_rect(m, Pal.ink(0.95 - 0.3 * f, 1.4), false, 1.5)
 		var a0 := m.position + (Vector2(0, m.size.y / 2.0) if long_x else Vector2(m.size.x / 2.0, 0))
 		var a1 := a0 + (Vector2(m.size.x, 0) if long_x else Vector2(0, m.size.y))
