@@ -1,0 +1,8 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# 打包产物和测试录像截图不进仓库
+/build/
+/proofs/
+/tools/audio_work/

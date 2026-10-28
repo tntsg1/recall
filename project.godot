@@ -1,0 +1,41 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="测试"
+config/description="归弹 RECALL — every bullet you fire comes back along the path it flew."
+run/main_scene="res://scenes/title.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+boot_splash/bg_color=Color(0.043, 0.043, 0.047, 1)
+boot_splash/show_image=false
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/window_width_override=1600
+window/size/window_height_override=900
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+
+[rendering]
+
+rendering_device/driver.windows="d3d12"
+viewport/hdr_2d=true
+renderer/rendering_method.web="gl_compatibility"
+anti_aliasing/quality/msaa_2d=2
+anti_aliasing/quality/msaa_2d.web=0
+environment/defaults/default_clear_color=Color(0.043, 0.043, 0.047, 1)
