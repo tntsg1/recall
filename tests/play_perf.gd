@@ -2,7 +2,8 @@ extends SceneTree
 # Real play, real frame times: the bot plays the opening of a run (vsync off,
 # no fixed fps) and every frame over the budget is printed with where its time
 # went. Ends with the average, the 99th percentile and the worst frame.
-# Usage: tools/run_test.sh tests/play_perf.gd -- [seconds] [budget_ms]
+# Usage: tools/run_test.sh tests/play_perf.gd -- [seconds] [budget_ms] [cold]
+# (cold: skip the title's warm-up, to see what it saves)
 
 const BUDGET := 7.0
 
@@ -36,6 +37,20 @@ func _initialize() -> void:
 		budget = float(args[1])
 	RenderingServer.frame_pre_draw.connect(func(): pre_at = Time.get_ticks_usec())
 	seed(7)
+	# as in play: the title's warm-up runs first (with the same glow), then the run
+	if not "cold" in OS.get_cmdline_user_args():
+		var env := WorldEnvironment.new()
+		env.environment = Game.make_environment()
+		env.environment.glow_intensity = 0.0001
+		root.add_child(env)
+		var w := Warm.new()
+		root.add_child(w)
+		while not Warm.done:
+			await process_frame
+		# leaving the title frees it, page text and all
+		if is_instance_valid(w):
+			w.queue_free()
+		env.queue_free()
 	var scene: Node = load("res://scenes/main.tscn").instantiate()
 	scene.bot = bot
 	root.add_child(scene)
@@ -65,6 +80,8 @@ func _watch(n: Node) -> void:
 
 
 func _process(_dt: float) -> bool:
+	if game == null:
+		return false
 	frame += 1
 	var now := Time.get_ticks_usec()
 	if last > 0 and frame > 30:

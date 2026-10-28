@@ -969,13 +969,15 @@ func _draw() -> void:
 					_trail(0, b.sub(s, maxf(0.0, s - tl)), Pal.you(0.55, 1.4))
 			RETURN:
 				var s2 := b.s
-				var tc := Pal.you(0.9, 2.4) if b.zero_pass else (Pal.you(0.35, 1.2) if b.shadow else Pal.red(0.85, 3.2))
-				_trail(1, b.sub(s2, minf(b.total(), s2 + 240.0)), tc)
+				# the head carries the light; the tail behind it stays a quiet line,
+				# so a flock coming home never buries you or what it is cutting
+				var tc := Pal.you(0.9, 2.4) if b.zero_pass else (Pal.you(0.35, 1.2) if b.shadow else Pal.red(0.55, 1.7))
+				_trail(1, b.sub(s2, minf(b.total(), s2 + 160.0)), tc)
 			HOME, ORBIT:
 				if b.hist.size() > 1:
 					var pts := b.hist.duplicate()
 					pts.reverse()
-					_trail(2, pts, Pal.red(0.7, 2.6))
+					_trail(2, pts, Pal.red(0.55, 2.0))
 	var widths := [2.0, 3.0, 1.6]
 	for g in 3:
 		if _ts[g].size() > 0:
@@ -1114,7 +1116,7 @@ func _draw_paths() -> void:
 		elif b.state == PULL or b.state == RETURN:
 			var upto := b.s if b.state == RETURN else b.total()
 			if upto > 0.0:
-				_poly_r(b.sub(upto, 0.0), Pal.red(0.3, 1.6))
+				_poly_r(b.sub(upto, 0.0), Pal.red(0.18, 1.2))
 			var key2 := Vector2i(roundi(b.path[0].x / 3.0), roundi(b.path[0].y / 3.0))
 			origins[key2] = 1.0
 			_so.append(b.path[0])

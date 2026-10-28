@@ -63,12 +63,16 @@ class E:
 
 var list: Array[E] = []
 var game
+var halo_tex: Texture2D
 var next_id := 1
 
 
 func _ready() -> void:
-	z_index = 0
+	# above the rounds' trails and the walls, so a shell is never drawn under
+	# the light passing through it
+	z_index = 3
 	z_as_relative = false
+	halo_tex = Fx.make_glow_texture()
 
 
 func remaining() -> int:
@@ -730,6 +734,11 @@ func _poly(e: E) -> Array[Vector2]:
 func _draw() -> void:
 	var f: float = game.focus
 	var dim := 1.0 - 0.5 * f
+	# a soft dark pool under every shell, all first, so it reads against trails
+	for e in list:
+		if e.state == ALIVE or e.state == SPAWN:
+			var h: float = e.r * 2.6
+			draw_texture_rect(halo_tex, Rect2(e.pos - Vector2(h, h), Vector2(h, h) * 2.0), false, Color(0, 0, 0, 0.62))
 	for e in list:
 		if e.state == DEAD or e.state == HOST:
 			continue
