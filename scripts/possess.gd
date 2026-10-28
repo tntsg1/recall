@@ -54,9 +54,13 @@ const RAM_BURST_R := 160.0
 const RAM_BURST_DMG := 80.0
 # prism: one beam, three beams, then twelve
 const BEAM_DMG := [40.0, 38.0, 50.0]
-# pulse: rings on the beat; three clean beats in a row and the third is huge
-const PULSE_R := [110.0, 160.0, 250.0]
-const PULSE_DMG := [30.0, 45.0, 85.0]
+# pulse: beat blink — two blinks, then a leap that slams; on the beat ×1.5
+const BLINK_REACH := 320.0
+const BLINK_R := 130.0
+const BLINK_DMG := 40.0
+const LEAP_TIME := 0.36
+const BLINK_SLAM_R := 220.0
+const BLINK_SLAM_DMG := 90.0
 # echo: two copies trace where you walked, then everything replays and detonates
 const ECHO_TOUCH := 25.0
 const ECHO_BURST_R := 110.0
@@ -114,11 +118,20 @@ var lanes: Array = []           # [a, b, age] — the red line a ram leaves
 var beams: Array = []           # [a, b, age]
 # pulse
 var last_beat := -1
+var leap_t := -1.0
+var leap_from := Vector2.ZERO
+var leap_to := Vector2.ZERO
+var afterlines: Array = []      # [from, to, age] — the streak a blink leaves
 # echo
 var clones: Array = []          # {pos, path, replay, idx, hit, done}
 var clone_t := 0.0
 
 var _parts := {}
+## How seized shells and their effects are drawn (compare in the training yard with V):
+## "pixel" neon pixel art · "dots" dotted outlines like the title · "vector" glowing
+## lines like the enemies · "glitch" lines that break into pixel noise at big moments
+const STYLES := ["pixel", "dots", "vector", "glitch"]
+var style := "pixel"
 
 
 func _ready() -> void:
@@ -242,6 +255,7 @@ func _begin_host() -> void:
 	winding = false
 	ram_t = 0.0
 	clones.clear()
+	leap_t = -1.0
 	last_beat = int(floor(game.sfx.beat()))
 	fire_prev = true          # the E press must not also count as a click
 	game.player.pos = shell.pos
@@ -318,7 +332,7 @@ func _shatter(at: Vector2, broken: bool) -> void:
 func shell_hit(dir: Vector2) -> bool:
 	if state != HOST:
 		return false
-	if iframes > 0.0 or game.wave_ctl.phase != Waves.FIGHT or game.dev_god or spin_t >= 0.0 or rush_t > 0.0 or ram_t > 0.0:
+	if iframes > 0.0 or game.wave_ctl.phase != Waves.FIGHT or game.dev_god or spin_t >= 0.0 or rush_t > 0.0 or ram_t > 0.0 or leap_t >= 0.0:
 		return false
 	if shell.kind == Enemies.GUARD and dir.dot(aim) < -0.2:
 		# the raised shield takes it
@@ -366,11 +380,11 @@ func step(sdt: float, dt: float) -> void:
 			ghosts.remove_at(i)
 		else:
 			i += 1
-	for arr in [lanes, beams]:
+	for arr in [lanes, beams, afterlines]:
 		var j := 0
 		while j < arr.size():
 			arr[j][2] += dt
-			if arr[j][2] > (3.0 if arr == lanes else 0.18):
+			if arr[j][2] > (3.0 if arr == lanes else (0.18 if arr == beams else 0.3)):
 				arr.remove_at(j)
 			else:
 				j += 1
@@ -410,8 +424,8 @@ func host_step(sdt: float, dt: float, move: Vector2, aim_at: Vector2, fire_held:
 	if queue_t <= 0.0:
 		queued = false
 	# guard, prism and echo take the remembered click once they are ready again
-	var pressed := queued and recover <= 0.0 and dash_t <= 0.0 and spin_t < 0.0 and rush_t <= 0.0
-	if pressed and shell.kind in [Enemies.GUARD, Enemies.PRISM, Enemies.ECHO]:
+	var pressed := queued and recover <= 0.0 and dash_t <= 0.0 and spin_t < 0.0 and rush_t <= 0.0 and leap_t < 0.0
+	if pressed and shell.kind in [Enemies.GUARD, Enemies.PRISM, Enemies.ECHO, Enemies.PULSE]:
 		queued = false
 	var r: float = shell.r * 1.3
 	var before: Vector2 = shell.pos
@@ -427,7 +441,7 @@ func host_step(sdt: float, dt: float, move: Vector2, aim_at: Vector2, fire_held:
 		Enemies.PRISM:
 			_prism(sdt, pressed, move)
 		Enemies.PULSE:
-			_pulse(sdt, raw, move)    # the beat needs the click exactly when it lands
+			_pulse(sdt, pressed, move, aim_at)
 		Enemies.ECHO:
 			_echo(sdt, pressed, move)
 	var free_pos: Vector2 = shell.pos
@@ -883,30 +897,65 @@ func pulse_beat() -> bool:
 	return state == HOST and shell.kind == Enemies.PULSE and on_beat_now()
 
 
-func _pulse(sdt: float, pressed: bool, move: Vector2) -> void:
+# Beat blink: click and you are already at the reticle (up to 320 px), the landing
+# goes off like a kick drum. Twice; the third click leaps high and comes down on
+# the reticle hard. On the beat everything hits half again as hard — a bonus, never
+# a requirement.
+func _pulse(sdt: float, pressed: bool, move: Vector2, aim_at: Vector2) -> void:
 	stage_window -= sdt
-	_move(sdt, move, 330.0, 10.0)
+	if leap_t >= 0.0:
+		leap_t += sdt
+		var k := clampf(leap_t / LEAP_TIME, 0.0, 1.0)
+		shell.pos = leap_from.lerp(leap_to, Pal.ease_io(k))
+		vel = Vector2.ZERO
+		if k >= 1.0:
+			leap_t = -1.0
+			_blink_land(leap_to, BLINK_SLAM_R, BLINK_SLAM_DMG, true)
+			stage = 0
+			recover = 0.3
+		return
+	_move(sdt, move, 340.0, 12.0)
 	var bi := int(floor(game.sfx.beat()))
 	if bi != last_beat:
 		last_beat = bi
-		# every beat it throbs out a small ring of its own
 		shell.squash = 1.0
-		_ring_hit(70.0, 10.0, false)
-	if not pressed or recover > 0.0:
+	if not pressed:
 		return
-	recover = 0.12
-	if on_beat_now():
-		stage = stage + 1 if stage_window > 0.0 and stage < 3 else 1
-		stage_window = 60.0 / game.sfx.BPMS[game.sfx.chapter] * 1.7
-		_ring_hit(PULSE_R[stage - 1], PULSE_DMG[stage - 1], true)
-		game.sfx.play("p_hit", 0.9 + stage * 0.1, -3.0)
-		if stage >= 3:
-			stage = 0
-			_finisher(shell.pos, PULSE_R[2])
-	else:
-		stage = 0
-		_ring_hit(80.0, 15.0, false)
-		game.sfx.play("empty", 1.3, -10.0)
+	stage = stage + 1 if stage_window > 0.0 and stage < 3 else 1
+	stage_window = 0.8
+	recover = 0.14
+	var to: Vector2 = shell.pos + (aim_at - shell.pos).limit_length(BLINK_REACH)
+	to = game.arena.push_circle(to, shell.r * 1.3)
+	to = to.clamp(Arena.ROOM.position + Vector2(30, 30), Arena.ROOM.end - Vector2(30, 30))
+	if stage >= 3:
+		leap_t = 0.0
+		leap_from = shell.pos
+		leap_to = to
+		game.sfx.play("dash_e", 0.8, -3.0)
+		return
+	var from: Vector2 = shell.pos
+	ghosts.append([from, 0.0, shell.rot])
+	shell.pos = to
+	afterlines.append([from, to, 0.0])
+	_blink_land(to, BLINK_R, BLINK_DMG, false)
+
+
+func _blink_land(at: Vector2, radius: float, dmg: float, slam: bool) -> void:
+	var beat := on_beat_now()
+	var mult := 1.5 if beat else 1.0
+	for e in game.enemies.list:
+		if e.state == Enemies.ALIVE and e.pos.distance_to(at) < radius + e.r:
+			var d: Vector2 = (e.pos - at).normalized()
+			_deal(e, dmg * mult, d, true)
+			e.knock += d * (640.0 if slam else 420.0)
+	bursts.append([at, radius, 0.0])
+	if beat:
+		bursts.append([at, radius * 0.6, 0.1])
+		game.hud.flash_text(Txt.t("on_beat"), at)
+	game.sfx.play("p_slam" if slam else "p_hit", 1.0 if slam else 1.15, -1.0 if slam else -4.0)
+	game.cam.add_trauma(0.4 if slam else 0.18)
+	if slam:
+		_finisher(at, radius)
 
 
 func _ring_hit(radius: float, dmg: float, heavy: bool) -> void:
@@ -1074,27 +1123,129 @@ func _finisher(at: Vector2, radius: float) -> void:
 # ---------------------------------------------------------------- drawing
 
 func _px(p: Vector2, n: float, c: Color) -> void:
-	var q := (p / PX).floor() * PX
-	draw_rect(Rect2(q - Vector2(PX, PX) * floor(n * 0.5), Vector2(PX, PX) * n), c)
+	if style == "pixel":
+		var q := (p / PX).floor() * PX
+		draw_rect(Rect2(q - Vector2(PX, PX) * floor(n * 0.5), Vector2(PX, PX) * n), c)
+	elif style == "dots":
+		draw_circle(p, 1.1 + n * 0.75, c)
+	else:
+		draw_circle(p, 0.8 + n * 0.6, c)
 
 
 func _px_line(a: Vector2, b: Vector2, c: Color, n: float = 1.0) -> void:
-	var l := a.distance_to(b)
-	var steps := maxi(1, int(l / PX))
-	for k in steps + 1:
-		_px(a.lerp(b, float(k) / steps), n, c)
+	if style == "pixel":
+		var l := a.distance_to(b)
+		var steps := maxi(1, int(l / PX))
+		for k in steps + 1:
+			_px(a.lerp(b, float(k) / steps), n, c)
+	elif style == "dots":
+		var l2 := a.distance_to(b)
+		var steps2 := maxi(1, int(l2 / 7.0))
+		for k in steps2 + 1:
+			draw_circle(a.lerp(b, float(k) / steps2), 1.0 + 0.6 * n, c)
+	else:
+		draw_line(a, b, c, 1.2 + 0.9 * n)
 
 
 func _px_ring(o: Vector2, r: float, c: Color, dots: int = 0) -> void:
-	var n := dots if dots > 0 else maxi(12, int(TAU * r / (PX * 3.0)))
-	for k in n:
-		_px(o + Vector2.from_angle(TAU * k / n) * r, 1.0, c)
+	if style == "pixel":
+		var n := dots if dots > 0 else maxi(12, int(TAU * r / (PX * 3.0)))
+		for k in n:
+			_px(o + Vector2.from_angle(TAU * k / n) * r, 1.0, c)
+	elif style == "dots":
+		var n2 := dots if dots > 0 else maxi(12, int(TAU * r / 9.0))
+		for k in n2:
+			draw_circle(o + Vector2.from_angle(TAU * k / n2) * r, 1.5, c)
+	else:
+		draw_arc(o, r, 0.0, TAU, maxi(24, int(r / 3.0)), c, 1.6, false)
+
+
+# The body's outline in the enemies' own geometry (local, facing +x), a third larger.
+func _shape(kind: int) -> PackedVector2Array:
+	var r: float = Enemies.SPEC[kind].r * 1.3
+	var pts := PackedVector2Array()
+	match kind:
+		Enemies.CHASER:
+			pts = [Vector2(r * 1.25, 0), Vector2(-r * 0.85, -r * 0.85), Vector2(-r * 0.85, r * 0.85)]
+		Enemies.CHARGER:
+			pts = [Vector2(r * 1.45, 0), Vector2(0, -r * 0.8), Vector2(-r, 0), Vector2(0, r * 0.8)]
+		_:
+			var n: int = Enemies.SPEC[kind].sides
+			var off := PI / 4.0 if kind == Enemies.GUARD else 0.0
+			for k in n:
+				pts.append(Vector2.from_angle(off + TAU * k / n) * r)
+	return pts
+
+
+const _KIND_OF := {"chaser": Enemies.CHASER, "leech": Enemies.LEECH, "guard": Enemies.GUARD, "charger": Enemies.CHARGER,
+	"prism": Enemies.PRISM, "pulse": Enemies.PULSE, "echo": Enemies.ECHO}
 
 
 func _part(name: String, at: Vector2, angle: float, mod: Color) -> void:
-	var p: PixelPart = _parts[name]
-	var base := Transform2D(0.0, Vector2(BODY_PX, BODY_PX), 0.0, (at / BODY_PX).round() * BODY_PX)
-	p.draw(self, base, Vector2.ZERO, angle, false, mod)
+	if style == "pixel":
+		var p: PixelPart = _parts[name]
+		var base := Transform2D(0.0, Vector2(BODY_PX, BODY_PX), 0.0, (at / BODY_PX).round() * BODY_PX)
+		p.draw(self, base, Vector2.ZERO, angle, false, mod)
+		return
+	var parts := name.split("_")
+	var kind: int = _KIND_OF[parts[0]]
+	var spk := 0.0
+	if parts.size() > 1:
+		spk = 0.5 if parts[1] == "spk1" else 1.0
+	var tr := Transform2D(angle, at)
+	var local := _shape(kind)
+	var pts := PackedVector2Array()
+	for q in local:
+		pts.append(tr * q)
+	var hot: bool = mod.r > 2.0
+	var a := mod.a
+	var c := Pal.ink(a, 2.4) if hot else cyan(a, 2.1)
+	if spk > 0.0:
+		# crystal spikes out of every corner
+		var r: float = Enemies.SPEC[kind].r * 1.3
+		for q in local:
+			var d := q.normalized()
+			var side := d.orthogonal() * r * 0.16
+			var tip := q + d * r * (0.25 + 0.45 * spk)
+			_px_line(tr * (q + side), tr * tip, cyan(a, 2.4), 1.0)
+			_px_line(tr * (q - side), tr * tip, cyan(a, 2.4), 1.0)
+		return
+	var closed := pts.duplicate()
+	closed.append(pts[0])
+	match style:
+		"dots":
+			# the outline as a string of glowing dots, corners brighter
+			for k in pts.size():
+				var p0: Vector2 = closed[k]
+				var p1: Vector2 = closed[k + 1]
+				var n := maxi(2, int(p0.distance_to(p1) / 6.0))
+				for j in n:
+					draw_circle(p0.lerp(p1, float(j) / n), 1.9, c)
+				draw_circle(p0, 2.8, Pal.ink(a, 2.4))
+			for j in 6:
+				draw_circle(at + Vector2.from_angle(angle + TAU * j / 6.0) * 4.5, 1.4, Pal.ink(a, 2.2))
+		_:
+			draw_polyline(closed, cyan(0.18 * a, 1.6), 7.0, true)
+			draw_polyline(closed, c, 2.4, true)
+			var core := PackedVector2Array()
+			for j in 4:
+				core.append(at + Vector2.from_angle(angle + PI / 4.0 + TAU * j / 4.0) * 4.5)
+			draw_colored_polygon(core, Pal.ink(a, 2.2))
+			if style == "glitch" and name == parts[0] and a > 0.9 and (grow < 1.0 or hot or t_left < 1.5 or iframes > 0.0):
+				_glitch(at, Enemies.SPEC[kind].r * 1.3)
+
+
+# C: at the big moments the clean lines break into a handful of pixel blocks.
+func _glitch(at: Vector2, r: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(t * 30.0) * 7919
+	for k in 12:
+		var p := at + Vector2(rng.randf_range(-r * 1.5, r * 1.5), rng.randf_range(-r * 1.3, r * 1.3))
+		var w := float(rng.randi_range(1, 4)) * 3.0
+		var h := float(rng.randi_range(1, 2)) * 3.0
+		var pick := rng.randi() % 3
+		var c := cyan(0.9, 2.2) if pick == 0 else (Pal.ink(0.9, 2.2) if pick == 1 else Color(1.7, 0.35, 1.4, 0.8))
+		draw_rect(Rect2((p / 3.0).floor() * 3.0, Vector2(w, h)), c)
 
 
 func _draw() -> void:
@@ -1143,6 +1294,9 @@ func _draw() -> void:
 	for l in lanes:
 		var la: float = 1.0 - l[2] / 3.0
 		_px_line(l[0], l[1], Pal.red(0.5 * la, 2.0), 1.0)
+	for al in afterlines:
+		var aa: float = 1.0 - al[2] / 0.3
+		_px_line(al[0], al[1], cyan(0.7 * aa, 2.2), 2.0)
 	for bm in beams:
 		var ba: float = 1.0 - bm[2] / 0.18
 		_px_line(bm[0], bm[1], cyan(ba, 2.6), 2.0 if bm[2] < 0.05 else 1.0)
@@ -1207,6 +1361,10 @@ func _draw() -> void:
 				tip = pos.lerp(well_pos, 0.25 + 0.05 * k)
 			_px_line(pos + Vector2.from_angle(ta) * 14.0, tip, cyan(0.9, 1.8), 1.0)
 	var draw_rot: float = shell.rot
+	if leap_t >= 0.0:
+		var lk := clampf(leap_t / LEAP_TIME, 0.0, 1.0)
+		shake.y -= sin(lk * PI) * 70.0
+		_px_ring(leap_to, BLINK_SLAM_R * (1.0 - 0.6 * lk), cyan(0.3 + 0.5 * lk, 2.0))
 	_part(kind_name, pos + shake, draw_rot, mod)
 	if shell.kind == Enemies.GUARD:
 		# the raised shield: a thick pixel arc toward the aim

@@ -726,6 +726,13 @@ func yard_key(k: int) -> void:
 			sl[3] = 0.0
 		sfx.play("reroll", 1.0, -6.0)
 		return
+	if k == KEY_V:
+		var i2 := (Possess.STYLES.find(possess.style) + 1) % Possess.STYLES.size()
+		possess.style = Possess.STYLES[i2]
+		possess.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if possess.style == "pixel" else CanvasItem.TEXTURE_FILTER_LINEAR
+		hud.flash_text(Txt.t("style_" + possess.style))
+		sfx.play("tick", 1.2, -6.0)
+		return
 	if k == KEY_T:
 		yard_live = not yard_live
 		for sl in yard_slots:
@@ -790,7 +797,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if trial and not paused and event is InputEventKey and event.pressed and not event.echo:
 		var kc: int = event.physical_keycode
-		if (kc >= KEY_1 and kc <= KEY_7) or kc == KEY_R or kc == KEY_T:
+		if (kc >= KEY_1 and kc <= KEY_7) or kc == KEY_R or kc == KEY_T or kc == KEY_V:
 			yard_key(kc)
 			get_viewport().set_input_as_handled()
 			return

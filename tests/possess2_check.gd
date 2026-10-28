@@ -139,29 +139,24 @@ func _run() -> void:
 			hit += 1
 	check(hit >= 6, "棱镜壳：第三下棱镜爆 12 道光，打中四周 %d / 8" % hit)
 
-	# ---- pulse: three clean beats in a row, the third ring is huge
-	var u = await seize(Enemies.PULSE, Vector2(960, 540))
-	var far: Array = []
+	# ---- pulse: beat blink — blink, blink, leap and slam
+	var u = await seize(Enemies.PULSE, Vector2(600, 540))
+	var start: Vector2 = u.pos
+	var spot := Vector2(1150, 540)
+	var crowd: Array = []
 	for k in 6:
-		far.append(spawn(Enemies.GUARD, u.pos + Vector2.from_angle(TAU * k / 6.0) * 220.0, 900.0))
-	var max_stage := 0
-	for beat in 3:
-		var w := 0
-		while not game.possess.on_beat_now() and w < 200:
-			await process_frame
-			w += 1
-		await click(1, 2)
-		max_stage = maxi(max_stage, game.possess.stage if game.possess.stage > 0 else 3)
-		var w2 := 0
-		while game.possess.on_beat_now() and w2 < 200:
-			await process_frame
-			w2 += 1
-	await frames(10)
+		crowd.append(spawn(Enemies.GUARD, spot + Vector2.from_angle(TAU * k / 6.0) * 150.0, 900.0))
+	bot.aim = spot
+	await click(1, 8)
+	check(u.pos.distance_to(start) > 250.0, "脉冲体壳：点一下瞬移到准星方向（%.0f 像素）" % u.pos.distance_to(start))
+	await click(1, 8)
+	await click(1, 40)
 	var touched := 0
-	for e in far:
+	for e in crowd:
 		if e.hp < e.maxhp - 60.0:
 			touched += 1
-	check(touched >= 5, "脉冲体壳：连踩三拍，第三拍超大冲击环打到 220 外 %d / 6" % touched)
+	check(touched >= 4, "第三下跃起砸地，大范围打到 %d / 6" % touched)
+	check(u.pos.distance_to(spot) < 40.0, "砸在准星处")
 
 	# ---- echo: two copies, then they replay your path and blow
 	var o = await seize(Enemies.ECHO, Vector2(700, 540))

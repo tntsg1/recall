@@ -1784,6 +1784,6 @@ func _draw_yard(vp: Vector2) -> void:
 				view.draw_string(font_s, Vector2(x + 26.0, y), row, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Possess.cyan(0.75, 1.3))
 				y += 21.0
 	y += 12.0
-	for key in ["yard_e", "yard_r", "yard_t", "yard_esc"]:
+	for key in ["yard_e", "yard_r", "yard_t", "yard_v", "yard_esc"]:
 		view.draw_string(font_s, Vector2(x, y), Txt.t(key), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.45))
 		y += 20.0
