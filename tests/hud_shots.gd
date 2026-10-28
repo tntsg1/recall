@@ -30,6 +30,7 @@ func _process(_dt: float) -> bool:
 		20, 34, 150:
 			_shot("h_intro_%d" % frame)
 		200:
+			game.hud.title_t = -1.0   # in play the stamp never shares the screen with a title
 			game.hud.stamp(0, 23.4, "S")
 		213:
 			_shot("h_stamp")

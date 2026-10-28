@@ -453,23 +453,27 @@ func _draw_title(vp: Vector2) -> void:
 	var a := 1.0 - out
 	var cx := vp.x / 2.0
 	var shift := out * 80.0
-	view.draw_line(Vector2(cx - half + shift, cy - 44.0), Vector2(cx + half * (1.0 - out) + shift, cy - 44.0), Pal.ink(0.5 * a), 1.0)
-	view.draw_line(Vector2(cx - half * (1.0 - out) - shift, cy + 28.0), Vector2(cx + half - shift, cy + 28.0), Pal.ink(0.5 * a), 1.0)
+	var size := 56 if title_i == Waves.BOSS else 46
+	# the hairlines keep the same air above the glyphs' tops and below their baseline
+	var top := cy - size * 0.86 - 16.0
+	var bot := cy + 18.0
+	view.draw_line(Vector2(cx - half + shift, top), Vector2(cx + half * (1.0 - out) + shift, top), Pal.ink(0.5 * a), 1.0)
+	view.draw_line(Vector2(cx - half * (1.0 - out) - shift, bot), Vector2(cx + half - shift, bot), Pal.ink(0.5 * a), 1.0)
 	var label := Txt.t("wave") % (title_i + 1)
 	if title_i == Waves.BOSS:
 		label = Txt.t(game.boss.name_key())
 		var ba := clampf((t - 0.05) / 0.2, 0.0, 1.0) * a
-		_text_c(font_b, "BOSS", Vector2(cx, cy - 58.0), 14, Pal.ink(0.55 * ba))
+		_text_c(font_b, "BOSS", Vector2(cx, top - 12.0), 14, Pal.ink(0.55 * ba))
 	var rise := (1.0 - Pal.back(clampf((t - 0.12) / 0.4, 0.0, 1.0))) * 26.0
 	var la := clampf((t - 0.12) / 0.25, 0.0, 1.0) * a
-	_text_stagger(font_xl, label, Vector2(cx, cy), 56 if title_i == Waves.BOSS else 46, Pal.ink(1.0, 1.1), t - 0.12, t - 1.5)
+	_text_stagger(font_xl, label, Vector2(cx, cy), size, Pal.ink(1.0, 1.1), t - 0.12, t - 1.5)
 	if title_note != "":
 		var na := clampf((t - 0.45) / 0.3, 0.0, 1.0) * a
-		_text_c(font_s, Txt.t(title_note), Vector2(cx, cy + 62.0), 17, Pal.ink(0.7 * na))
+		_text_c(font_s, Txt.t(title_note), Vector2(cx, bot + 30.0), 17, Pal.ink(0.7 * na))
 	var tick := Pal.ease_out(clampf((t - 0.2) / 0.5, 0.0, 1.0))
 	for sd in [-1.0, 1.0]:
 		var x: float = cx + sd * (half + 14.0)
-		view.draw_line(Vector2(x, cy - 44.0), Vector2(x, cy - 44.0 + 72.0 * tick), Pal.ink(0.35 * a), 1.0)
+		view.draw_line(Vector2(x, top), Vector2(x, top + (bot - top) * tick), Pal.ink(0.35 * a), 1.0)
 
 
 func _draw_stamp(vp: Vector2) -> void:
@@ -1354,7 +1358,7 @@ func _draw_intro(vp: Vector2) -> void:
 	var cy := vp.y * 0.4
 	var w := 520.0 * Pal.ease_out(t / 0.7)
 	view.draw_line(Vector2(vp.x / 2.0 - w / 2.0, cy + 34.0), Vector2(vp.x / 2.0 + w / 2.0, cy + 34.0), Pal.ink(0.5 * a), 1.0)
-	_text_c(font_s, Txt.t("chapter_n") % (game.chapter + 1), Vector2(vp.x / 2.0, cy - 48.0), 16, Pal.ink(0.55 * a))
+	_text_c(font_s, Txt.t("chapter_n") % (game.chapter + 1), Vector2(vp.x / 2.0, cy + 10.0 - 60.0 * 0.86 - 18.0), 16, Pal.ink(0.55 * a))
 	var rise := (1.0 - Pal.ease_out(clampf((t - 0.15) / 0.6, 0.0, 1.0))) * 20.0
 	_text_stagger(font_xl, Txt.t("chapter_%d" % (game.chapter + 1)), Vector2(vp.x / 2.0, cy + 10.0), 60, Pal.ink(1.0, 1.15), t - 0.15, t - 2.15, 0.05)
 	_text_c(font_s, Txt.t("chapter_%d_sub" % (game.chapter + 1)), Vector2(vp.x / 2.0, cy + 70.0), 16, Pal.ink(0.6 * a * clampf((t - 0.5) / 0.4, 0.0, 1.0)))
