@@ -619,13 +619,18 @@ func _draw_lanes(dim: float) -> void:
 		# scorch: a few overlapping dark blots, no rim
 		for j in 4:
 			draw_circle(sp + Vector2.from_angle(j * 1.9) * sr * 0.4, sr * (0.75 - j * 0.1), Color(0, 0, 0, 0.22 * dim))
+	# holes cluster where things were aimed: round the targets and the crates
 	var holes := PackedVector2Array()
-	for j in 40:
-		var hp := Vector2(460.0 + fmod(j * 377.0, 1020.0), 440.0 + fmod(j * 131.0, 530.0))
-		holes.append(hp - Vector2(2, 2))
-		holes.append(hp + Vector2(2, 2))
-		holes.append(hp + Vector2(-2, 2))
-		holes.append(hp + Vector2(2, -2))
+	var spots := [[Vector2(1760, 590), 70.0, 14], [Vector2(600, 210), 60.0, 10], [Vector2(785, 620), 60.0, 8], [Vector2(1135, 620), 60.0, 8], [Vector2(560, 490), 40.0, 6], [Vector2(1340, 490), 40.0, 6]]
+	var hn := 0
+	for spot in spots:
+		for j in int(spot[2]):
+			hn += 1
+			var hp: Vector2 = spot[0] + Vector2.from_angle(hn * 2.39) * spot[1] * sqrt(fmod(hn * 0.618, 1.0))
+			holes.append(hp - Vector2(2, 2))
+			holes.append(hp + Vector2(2, 2))
+			holes.append(hp + Vector2(-2, 2))
+			holes.append(hp + Vector2(2, -2))
 	draw_multiline(holes, Pal.ink(0.16 * dim), 1.0)
 	for cs: Vector2 in [Vector2(700, 905), Vector2(712, 914), Vector2(1135, 948), Vector2(1020, 780)]:
 		draw_line(cs, cs + Vector2(7, 3), Pal.ink(0.3 * dim), 2.0)
@@ -646,7 +651,15 @@ func _draw_lanes(dim: float) -> void:
 	for ax: float in [520.0, 960.0, 1400.0]:
 		fl.append_array(PackedVector2Array([Vector2(ax - 12, 600), Vector2(ax, 586), Vector2(ax, 586), Vector2(ax + 12, 600)]))
 	draw_multiline(fl, Color(1, 1, 1, 0.06 * dim), 3.0)
-	draw_string(sf, Vector2(1470.0, 646.0), Txt.t("range_line"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 1, 1, 0.09 * dim))
+	draw_string(sf, Vector2(388.0, 646.0), Txt.t("range_line"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 1, 1, 0.09 * dim))
+	# the target boxes' numbers and the figure each one stood for
+	for tb in 4:
+		var bx2 := 560.0 + tb * 260.0
+		if absf(bx2 - 785.0) < 70.0 or absf(bx2 - 1135.0) < 70.0:
+			continue
+		draw_string(sf, Vector2(bx2 - 22.0, 466.0), "A-%d" % (tb + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 1, 1, 0.12 * dim))
+		draw_circle(Vector2(bx2, 482.0), 5.0, Color(1, 1, 1, 0.07 * dim))
+		draw_polyline(PackedVector2Array([Vector2(bx2 - 12, 506), Vector2(bx2 - 10, 492), Vector2(bx2 + 10, 492), Vector2(bx2 + 12, 506)]), Color(1, 1, 1, 0.08 * dim), 2.0)
 	# the test zone: a hatched band across the floor under the platform
 	var y0 := 330.0
 	var x := 700.0

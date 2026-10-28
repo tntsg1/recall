@@ -107,7 +107,8 @@ func _run() -> void:
 	bs.tests_run = 3
 	bs._announce()
 	game.player.pos = Vector2(1240, 800)
-	while not (bs.stage == Testbed.TEST and bs.stage_t > 1.2):
+	# a beat where the hull is lit red, with a volley down and the rail locking
+	while not (bs.stage == Testbed.TEST and bs.stage_t > 1.5 and fmod(bs.t * 4.0, 1.0) < 0.3 and bs.missiles.size() >= 3):
 		await process_frame
 	await shot("10_demo")
 	quit()

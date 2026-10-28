@@ -431,7 +431,7 @@ func _begin_test() -> void:
 			rail_left = 2 + mini(phase, 1)
 			_rail_lock()
 		3:
-			mis_left = 6
+			mis_left = 4
 			mis_cd = 0.4
 			rail_left = 2
 			_rail_lock()
@@ -444,16 +444,22 @@ func _step_launcher(dt: float, pl: Vector2) -> bool:
 		return true
 	mis_cd -= dt
 	if mis_cd <= 0.0:
-		mis_cd = 0.42 if test == 0 else 0.7
+		mis_cd = 0.42 if test == 0 else 1.0
 		mis_left -= 1
 		var lead: Vector2 = game.player.vel * 0.45
-		var at := pl + lead + Vector2.from_angle(randf() * TAU) * randf_range(0.0, 70.0)
 		var room := Arena.ROOM.grow(-40.0)
-		at = Vector2(clampf(at.x, room.position.x, room.end.x), clampf(at.y, HULL.end.y + 80.0, room.end.y))
-		var tube := Vector2(lerpf(POD.position.x + 20.0, POD.end.x - 20.0, randf()), POD.get_center().y) + _off()
-		missiles.append([tube, at, 0.0])
+		# the full demonstration fires in volleys: one on you, two either side
+		var marks: Array = [pl + lead + Vector2.from_angle(randf() * TAU) * randf_range(0.0, 70.0)]
+		if test == 3:
+			var side := Vector2.from_angle(randf() * TAU)
+			marks.append(pl + side * 190.0)
+			marks.append(pl - side * 190.0)
+		for at0: Vector2 in marks:
+			var at := Vector2(clampf(at0.x, room.position.x, room.end.x), clampf(at0.y, HULL.end.y + 80.0, room.end.y))
+			var tube := Vector2(lerpf(POD.position.x + 20.0, POD.end.x - 20.0, randf()), POD.get_center().y) + _off()
+			missiles.append([tube, at, randf_range(-0.12, 0.0)])
+			game.fx.flash(tube, 20.0, 0.1, Pal.red(0.6, 2.2))
 		game.sfx.play("shot", 0.55, -8.0)
-		game.fx.flash(tube, 20.0, 0.1, Pal.red(0.6, 2.2))
 	return mis_left <= 0
 
 
@@ -616,6 +622,8 @@ func _draw() -> void:
 	var f: float = game.focus
 	var dim := 1.0 - 0.45 * f
 	var o := _off()
+	if test == 3 and (stage == ANNOUNCE or stage == TEST) and state == RUN:
+		_draw_alarm(dim)
 	_draw_dangers(dim)
 	# gantry arms up to the wall it hangs from
 	for x: float in [HOME.x - 150.0, HOME.x + 150.0]:
@@ -651,6 +659,31 @@ func _draw() -> void:
 	for k in 2:
 		_draw_nozzle(k, o, dim)
 	_draw_turret(o, dim, col)
+
+
+# The full demonstration: the whole range's edge pulses red in time with
+# the hull, and warning chevrons run along the top and bottom walls.
+func _draw_alarm(dim: float) -> void:
+	var on := fmod(t * 4.0, 1.0) < 0.5
+	var k := (1.0 if on else 0.35) * dim
+	var r := Arena.ROOM
+	for j in 4:
+		var w := 6.0 + j * 10.0
+		var a := (0.14 - j * 0.03) * k
+		draw_rect(Rect2(r.position, Vector2(r.size.x, w)), Pal.red(a, 1.4))
+		draw_rect(Rect2(Vector2(r.position.x, r.end.y - w), Vector2(r.size.x, w)), Pal.red(a, 1.4))
+		draw_rect(Rect2(r.position, Vector2(w, r.size.y)), Pal.red(a, 1.4))
+		draw_rect(Rect2(Vector2(r.end.x - w, r.position.y), Vector2(w, r.size.y)), Pal.red(a, 1.4))
+	var ch := PackedVector2Array()
+	var x := r.position.x + fmod(t * 120.0, 60.0)
+	while x < r.end.x - 20.0:
+		for y: float in [r.end.y - 14.0]:
+			ch.append(Vector2(x, y))
+			ch.append(Vector2(x + 12.0, y - 8.0))
+			ch.append(Vector2(x + 12.0, y - 8.0))
+			ch.append(Vector2(x + 24.0, y))
+		x += 60.0
+	draw_multiline(ch, Pal.red(0.6 * k, 1.8), 3.0)
 
 
 func _draw_screen(o: Vector2, dim: float) -> void:
@@ -704,7 +737,7 @@ func _draw_screen(o: Vector2, dim: float) -> void:
 	# the stamp: 合格, slanted, fading out
 	if stamp > 0.0 and state != DYING:
 		var sa := minf(1.0, stamp * 2.0)
-		var sc := r.position + Vector2(r.size.x - 48.0, r.size.y * 0.5)
+		var sc := r.position + Vector2(r.size.x - 22.0, r.size.y + 4.0)
 		draw_set_transform(sc, -0.2, Vector2.ONE * (1.0 + 0.4 * maxf(0.0, stamp - 0.85) / 0.15))
 		var tw := font.get_string_size(Txt.t("tb_ok"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
 		var box := Rect2(-tw / 2.0 - 8.0, -17.0, tw + 16.0, 30.0)
