@@ -11,8 +11,8 @@ enum { OFF, ENTER, RUN, DYING, DEAD }
 enum { HOLD, BRACE, LUNGE }
 
 const HP := 1500.0
-const R := 96.0
-const SHIELD_R := 160.0
+const R := 112.0
+const SHIELD_R := 182.0
 const SHIELD_HALF := deg_to_rad(70.0)
 const TURN := [0.8, 1.15, 1.5]
 const HOME := Vector2(960, 540)
@@ -319,13 +319,13 @@ func _draw() -> void:
 	# the face: a lens that smiles at you, two dots and a curve, always
 	var eye := pos + face * R * 0.5 * appear
 	var side := face.orthogonal()
-	draw_circle(eye - side * 13.0 - face * 6.0, 3.5, Pal.foe(dim, 2.2))
-	draw_circle(eye + side * 13.0 - face * 6.0, 3.5, Pal.foe(dim, 2.2))
+	draw_circle(eye - side * 22.0 - face * 10.0, 5.5, Pal.foe(dim, 2.2))
+	draw_circle(eye + side * 22.0 - face * 10.0, 5.5, Pal.foe(dim, 2.2))
 	var smile := PackedVector2Array()
-	for j in 9:
-		var u := lerpf(-1.0, 1.0, j / 8.0)
-		smile.append(eye + side * u * 20.0 + face * (8.0 - 7.0 * u * u))
-	draw_polyline(smile, Pal.foe(dim, 2.4), 3.0, false)
+	for j in 11:
+		var u := lerpf(-1.0, 1.0, j / 10.0)
+		smile.append(eye + side * u * 34.0 + face * (12.0 - 12.0 * u * u))
+	draw_polyline(smile, Pal.foe(dim, 2.4), 4.0, false)
 	# the mirror arc
 	var a0 := face.angle() - SHIELD_HALF * appear
 	var a1 := face.angle() + SHIELD_HALF * appear

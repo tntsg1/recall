@@ -55,10 +55,11 @@ func setup(ch: int) -> void:
 			# the Hall of Mirrors: two pillars, four panels, the middle kept open
 			inner.append(Rect2(390, 500, 80, 80))
 			inner.append(Rect2(1450, 500, 80, 80))
-			mirrors.append(Rect2(620, 200, 14, 200))
-			mirrors.append(Rect2(1286, 680, 14, 200))
-			mirrors.append(Rect2(1180, 262, 220, 14))
-			mirrors.append(Rect2(520, 804, 220, 14))
+			# mirrors stand thick enough to read as glass panels
+			mirrors.append(Rect2(613, 200, 28, 200))
+			mirrors.append(Rect2(1279, 680, 28, 200))
+			mirrors.append(Rect2(1180, 255, 220, 28))
+			mirrors.append(Rect2(520, 797, 220, 28))
 	rects.append_array(inner)
 	mirror_from = rects.size()
 	rects.append_array(mirrors)
@@ -182,10 +183,19 @@ func _draw() -> void:
 			var d := Vector2(-6, m.size.y) if long_x else Vector2(m.size.x, -6)
 			draw_line(q, q + d, Pal.ink(0.22, 1.2), 1.5)
 			sp += 26.0
+		# a slow band of light slides along the glass
+		var slide := fmod(game_t() * 0.25 + m.position.x * 0.001, 1.0) * span
+		var sq := m.position + (Vector2(slide, 0) if long_x else Vector2(0, slide))
+		var sd := Vector2(-10, m.size.y) if long_x else Vector2(m.size.x, -10)
+		draw_line(sq, sq + sd, Pal.ink(0.7, 1.8), 4.0)
 		draw_rect(m, Pal.ink(0.95 - 0.3 * f, 1.4), false, 1.5)
 		var a0 := m.position + (Vector2(0, m.size.y / 2.0) if long_x else Vector2(m.size.x / 2.0, 0))
 		var a1 := a0 + (Vector2(m.size.x, 0) if long_x else Vector2(0, m.size.y))
 		draw_line(a0, a1, Pal.ink(0.5, 1.6), 1.0)
+
+
+func game_t() -> float:
+	return game.real_time if game else 0.0
 
 
 func _corner_marks(r: Rect2, c: Color) -> void:

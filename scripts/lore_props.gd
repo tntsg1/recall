@@ -25,6 +25,7 @@ var mem_shown := false
 var tick := 0.0
 var focus_last := 0.0
 var row_cache := {}
+var mirror_tick := 0.0
 
 
 func _ready() -> void:
@@ -91,6 +92,12 @@ func step(dt: float) -> void:
 			busy = true
 			break
 	focus_last = game.focus
+	# the hall's mirrors carry a slow light: the room redraws twenty times a second
+	if story == 2:
+		mirror_tick -= dt
+		if mirror_tick <= 0.0:
+			mirror_tick = 0.05
+			game.arena.queue_redraw()
 	tick -= dt
 	if busy or tick <= 0.0:
 		tick = 0.1
@@ -129,7 +136,7 @@ func _draw() -> void:
 		if worker_t >= 0.0 and game.wave_ctl.index <= 0:
 			_draw_worker(dim)
 	elif story == 2:
-		_draw_seal(Vector2(560, 820), dim)
+		_draw_seal(Vector2(330, 880), dim)
 		_draw_pillars(dim)
 		_draw_reflections(dim)
 		_draw_queue(dim)
@@ -137,7 +144,7 @@ func _draw() -> void:
 		draw_set_transform(Vector2(1500, 96), 0.0, Vector2(1.5, 1.5))
 		_draw_gates(Vector2.ZERO, dim)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		_draw_scan(Vector2(1500, 96 + 72), dim)
+		_draw_scan(Vector2(1500 - 114, 96 + 72), dim)
 		_draw_terminal(Vector2(80, 300), dim, "w2_terminal")
 		_draw_terminal(Vector2(80, 760), dim, "")
 		if shows.get("w2_retire", 0.0) <= 0.01:
@@ -259,11 +266,11 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	draw_string(font, r.position + Vector2(15, 54), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * dim, 1.2))
 	var on_top := (w[2] as Vector2).y > 0.5
 	var sc := Vector2(r.end.x + 4.0, r.end.y + 4.0) if on_top else Vector2(r.end.x - 20.0, r.position.y + 20.0)
-	var sr := 22.0 if on_top else 13.0
+	var sr := 22.0 if on_top else 17.0
 	draw_arc(sc, sr, 0.0, TAU, 28, Pal.red(0.75 * k * dim, 1.4), 2.5 if on_top else 1.5, false)
 	draw_set_transform(sc, -0.3, Vector2.ONE)
 	var sw := Txt.t("notice_stamp")
-	var ss := 16 if on_top else 10
+	var ss := 16 if on_top else 13
 	draw_string(Fonts.get_font("SemiBold"), Vector2(-Fonts.get_font("SemiBold").get_string_size(sw, HORIZONTAL_ALIGNMENT_LEFT, -1, ss).x / 2.0, ss * 0.36), sw, HORIZONTAL_ALIGNMENT_LEFT, -1, ss, Pal.red(0.9 * k * dim, 1.5))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
@@ -339,14 +346,18 @@ func _draw_reflections(dim: float) -> void:
 		if not inside or dist < 20.0:
 			continue
 		var a := lerpf(0.14, 0.6, clampf(1.0 - dist / 300.0, 0.0, 1.0)) * dim
-		draw_arc(mirrored, 16.0, 0.0, TAU, 24, Pal.ink(a), 1.5, false)
-		draw_circle(mirrored + Vector2(-5, -4), 1.8, Pal.ink(a))
-		draw_circle(mirrored + Vector2(5, -4), 1.8, Pal.ink(a))
+		# you, as the glass would rather have you: your outline, a little ring of
+		# light about it, and a smile you are not wearing
+		draw_circle(mirrored, 26.0, Color(1, 1, 1, a * 0.08))
+		draw_arc(mirrored, 26.0, 0.0, TAU, 32, Pal.ink(a), 2.0, false)
+		draw_arc(mirrored, 34.0, 0.0, TAU, 40, Pal.ink(a * 0.4), 1.0, false)
+		draw_circle(mirrored + Vector2(-9, -7), 2.6, Pal.ink(a))
+		draw_circle(mirrored + Vector2(9, -7), 2.6, Pal.ink(a))
 		var smile := PackedVector2Array()
-		for j in 7:
-			var u := lerpf(-1.0, 1.0, j / 6.0)
-			smile.append(mirrored + Vector2(u * 8.0, 4.0 + 3.0 * (1.0 - u * u)))
-		draw_polyline(smile, Pal.ink(a), 1.5, false)
+		for j in 9:
+			var u := lerpf(-1.0, 1.0, j / 8.0)
+			smile.append(mirrored + Vector2(u * 13.0, 5.0 + 6.0 * (1.0 - u * u)))
+		draw_polyline(smile, Pal.ink(a), 2.0, false)
 
 
 # A row of ID gates against the top wall: posts, arms, a scanner light each.
