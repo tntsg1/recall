@@ -78,6 +78,13 @@ func step(dt: float) -> void:
 	var j2 := 0
 	while j2 < thrown.size():
 		thrown[j2][2] += dt
+		var tb2 = thrown[j2][0]
+		if tb2.state == Bullets.EMBED and thrown[j2].size() < 4:
+			thrown[j2].append(true)
+			game.fx.flash(tb2.pos, 40.0, 0.14, Pal.ink(0.6, 2.0))
+			game.fx.ring(tb2.pos, 6.0, 46.0, 0.3, Pal.ink(0.8, 1.8), 2.5)
+			game.fx.sparks(tb2.pos, -tb2.dir, 8, Pal.ink(1.0, 2.0), 340.0, 0.2, 1.0)
+			game.cam.add_trauma(0.06)
 		if thrown[j2][2] > 1.4:
 			thrown.remove_at(j2)
 		else:

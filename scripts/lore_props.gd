@@ -619,7 +619,12 @@ func _rows(txt: String, width: float, size: int) -> Array:
 func _split_rows(txt: String, width: float, size: int) -> Array:
 	var out: Array = []
 	for part in txt.split(" · "):
-		out.append_array(_rows(part, width, size))
+		var ci := part.find("：")
+		if ci > 0 and ci < part.length() - 1 and font.get_string_size(part, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width:
+			out.append_array(_rows(part.substr(0, ci + 1), width, size))
+			out.append_array(_rows(part.substr(ci + 1), width, size))
+		else:
+			out.append_array(_rows(part, width, size))
 	return out
 
 
@@ -843,7 +848,7 @@ func _draw_floor_notice(c: Vector2, dim: float) -> void:
 # where they wait, facing a train that never stops.
 func _draw_platform(dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
-	var r := Rect2(600, 934, 720, 70)
+	var r := Rect2(600, 946, 720, 58)
 	var passed := 9.0
 	if game.boss is Boss and game.boss.alive():
 		passed = game.boss.station_t
@@ -859,7 +864,7 @@ func _draw_platform(dim: float) -> void:
 		x += 28.0
 	draw_multiline(yl, Pal.ink(0.55 * dim, 1.2), 4.0)
 	# the name board at its left end
-	var nb := Rect2(Vector2(r.position.x + 12.0, r.position.y + 24.0), Vector2(128, 34))
+	var nb := Rect2(Vector2(r.position.x + 12.0, r.position.y + 18.0), Vector2(128, 32))
 	draw_rect(nb, Color(0.09, 0.09, 0.095))
 	draw_rect(nb, Pal.ink(0.6 * dim), false, 1.5)
 	var nm := Txt.t("station_name")
@@ -871,7 +876,7 @@ func _draw_platform(dim: float) -> void:
 	var figs := PackedVector2Array()
 	var poses := [0, 1, 0, 2, 0, 1, 3, 0, 2, 1]
 	for j in poses.size():
-		var c := Vector2(162.0 + r.position.x + j * 33.0, r.position.y + 42.0)
+		var c := Vector2(162.0 + r.position.x + j * 33.0, r.position.y + 36.0)
 		c += Vector2(sin(j * 3.1 + passed * 30.0) * 3.0 * flinch, 6.0 * flinch)
 		var pose: int = poses[j]
 		var head_r := 7.0 if pose != 3 else 5.0
@@ -887,7 +892,7 @@ func _draw_platform(dim: float) -> void:
 			figs.append_array(PackedVector2Array([c + Vector2(sw, 0), c + Vector2(sw + 8.0, -18)]))
 	draw_multiline(figs, Pal.ink(0.5 * dim), 2.0)
 	# the sign: 本站不停, flashing as it passes; when woken, it runs the rule
-	var sg := Rect2(Vector2(r.end.x - 212.0, r.position.y + 14.0), Vector2(200, 50))
+	var sg := Rect2(Vector2(r.end.x - 212.0, r.position.y + 8.0), Vector2(200, 46))
 	draw_rect(sg, Color(0.02, 0.025, 0.03))
 	draw_rect(sg, Pal.ink(0.55 * dim), false, 1.5)
 	var wake: float = shows.get("w5_yellow", 0.0)
@@ -1166,6 +1171,7 @@ func _draw_memory() -> void:
 	var tw := font.get_string_size(memory, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var p: Vector2 = (sh.pos as Vector2) + Vector2(-tw / 2.0, 92.0)
 	p.x = clampf(p.x, Arena.ROOM.position.x + 10.0, Arena.ROOM.end.x - tw - 10.0)
-	mem_layer.draw_rect(Rect2(p + Vector2(-12, -24), Vector2(tw + 24, 34)), Color(0, 0, 0, 0.7 * a))
+	mem_layer.draw_rect(Rect2(p + Vector2(-12, -24), Vector2(tw + 24, 34)), Color(0.01, 0.015, 0.02, 0.94 * a))
+	mem_layer.draw_rect(Rect2(p + Vector2(-12, -24), Vector2(tw + 24, 34)), Possess.cyan(0.25 * a, 1.0), false, 1.0)
 	mem_layer.draw_line(p + Vector2(-12, -24), p + Vector2(-12, 10), Possess.cyan(a, 1.8), 2.0)
 	mem_layer.draw_string(font, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Possess.cyan(0.95 * a, 1.4))

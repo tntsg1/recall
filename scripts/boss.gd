@@ -642,7 +642,7 @@ func _draw() -> void:
 				var sj := s0 + dir * u * 300.0
 				var pj := at(sj)
 				var nj := tangent(sj).orthogonal()
-				var hw := 8.0 + 34.0 * u
+				var hw := 8.0 + 14.0 * u
 				left.append(pj + nj * hw)
 				right.append(pj - nj * hw)
 			var poly := PackedVector2Array(left)
@@ -658,8 +658,17 @@ func _draw() -> void:
 	if station_t < WAVE_TIME and state == RUN:
 		var k := station_t / WAVE_TIME
 		var wr := WAVE_R0 + (WAVE_R1 - WAVE_R0) * Pal.ease_out(k)
-		draw_arc(STATION, wr, PI * 1.05, TAU * 0.975, 64, Pal.red((1.0 - k) * dim, 2.2), 4.0)
-		draw_arc(STATION, wr - 10.0, PI * 1.05, TAU * 0.975, 64, Pal.red(0.3 * (1.0 - k) * dim, 1.4), 10.0)
+		var pa: float = (game.player.pos - STATION).angle()
+		var gap := 26.0 / maxf(wr, 1.0)
+		var near_you: bool = absf(game.player.pos.distance_to(STATION) - wr) < 60.0
+		var spans: Array = [[PI * 1.05, TAU * 0.975]]
+		if near_you:
+			var pw := wrapf(pa, PI * 0.5, PI * 2.5)
+			spans = [[PI * 1.05, minf(pw - gap, TAU * 0.975)], [maxf(pw + gap, PI * 1.05), TAU * 0.975]]
+		for sp in spans:
+			if sp[1] - sp[0] > 0.01:
+				draw_arc(STATION, wr, sp[0], sp[1], 48, Pal.red((1.0 - k) * dim, 2.2), 4.0)
+				draw_arc(STATION, wr - 10.0, sp[0], sp[1], 48, Pal.red(0.3 * (1.0 - k) * dim, 1.4), 10.0)
 	# the lane ahead lights up while it brakes to reverse
 	if state == RUN and reverse_t > 0.0:
 		var lead := CARS - 1 if dir > 0.0 else 0

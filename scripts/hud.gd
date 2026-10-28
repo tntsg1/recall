@@ -1549,7 +1549,7 @@ func _draw_intro(vp: Vector2) -> void:
 		return
 	var t := intro_t
 	var a := clampf(t / 0.3, 0.0, 1.0) * (1.0 - Pal.ease_in(clampf((t - 2.2) / 0.6, 0.0, 1.0)))
-	var cy := vp.y * 0.4
+	var cy := vp.y * 0.4 - 40.0
 	var w := 520.0 * Pal.ease_out(t / 0.7)
 	view.draw_line(Vector2(vp.x / 2.0 - w / 2.0, cy + 34.0), Vector2(vp.x / 2.0 + w / 2.0, cy + 34.0), Pal.ink(0.5 * a), 1.0)
 	_text_c(font_s, Chapters.label(game.chapter), Vector2(vp.x / 2.0, cy + 10.0 - 60.0 * 0.86 - 18.0), 18, Pal.ink(0.65 * a))
