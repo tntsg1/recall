@@ -96,7 +96,7 @@ func _run() -> void:
 		bs.damage(bs.HP * 0.36 * Loadout.boss_hp(), false, bs.pos, Vector2.UP)
 	bs.guard_t = 0.0
 	game.arms.feed_cd = 0.3
-	await frames(40)
+	await frames(58)
 	print("FULL phase ", bs.phase, " state ", bs.state, " hp ", bs.hp)
 	await shot("8_full")
 	quit()

@@ -27,6 +27,7 @@ var crate: Array = []     # rounds sitting in the crate's wall
 var belts: Array = []     # [from, to]
 var t := 0.0
 var feed_cd := 0.0
+var crate_flash := 0.0    # the crate's seal lights as something is put in it
 var game
 
 
@@ -43,7 +44,7 @@ func setup(room: int) -> void:
 	t = 0.0
 	feed_cd = 6.0
 	if room == 2:
-		for spec in [[Vector2(80, 540), Vector2.RIGHT, 0.0], [Vector2(1840, 540), Vector2.LEFT, 3.0], [Vector2(1400, 1010), Vector2.UP, 6.0]]:
+		for spec in [[Vector2(80, 540), Vector2.RIGHT, 0.0], [Vector2(1840, 380), Vector2.LEFT, 3.0], [Vector2(760, 1010), Vector2.UP, 6.0]]:
 			var face: Vector2 = spec[1]
 			arms.append({"base": spec[0], "face": face, "offset": spec[2], "mode": REST, "t": 0.0, "a": _rest(face), "prev": _rest(face)})
 		belts.append([Vector2(250, 290), Vector2(760, 290)])
@@ -100,6 +101,7 @@ func step(dt: float) -> void:
 					arm.mode = REST
 					arm.a = _rest(face)
 	_step_carry(dt)
+	crate_flash = maxf(0.0, crate_flash - dt / 0.5)
 	if full:
 		feed_cd -= dt
 		if feed_cd <= 0.0:
@@ -179,9 +181,16 @@ func _step_carry(dt: float) -> void:
 			continue
 		var from: Vector2 = c[1]
 		var to: Vector2 = game.boss.core_pos() if c[4] else c[2]
-		var k := Pal.ease_io(minf(1.0, c[3]))
+		var k := Pal.ease_io(clampf(c[3], 0.0, 1.0))
 		var mid := from.lerp(to, 0.5) + (to - from).orthogonal().normalized() * from.distance_to(to) * 0.2
 		var p := from.lerp(mid, k).lerp(mid.lerp(to, k), k)
+		if c.size() < 6:
+			c.append(PackedVector2Array())
+		var tr: PackedVector2Array = c[5]
+		tr.append(p)
+		if tr.size() > 9:
+			tr.remove_at(0)
+		c[5] = tr
 		b.pos = p
 		b.path = PackedVector2Array([b.path[0], p])
 		b.cum = PackedFloat32Array([0.0, b.path[0].distance_to(p)])
@@ -193,10 +202,17 @@ func _step_carry(dt: float) -> void:
 			if c[4]:
 				if game.boss is Devourer and game.boss.holds():
 					game.bullets.capture(b, game.boss)
+					# the mouth takes it: it flares white
+					game.boss.flash = 1.0
+					game.fx.ring(to, 10.0, 70.0, 0.3, Pal.ink(0.8, 2.0), 3.0)
+					game.fx.flash(to, 50.0, 0.12, Pal.ink(0.5, 2.0))
+					game.sfx.play("slam", randf_range(0.9, 1.1), -10.0)
 			else:
 				b.dir = (to - b.path[0]).normalized()
 				crate.append(b)
+				crate_flash = 1.0
 				game.fx.sparks(to, Vector2.UP, 3, Pal.ink(0.8, 1.5), 200.0, 0.15, 1.0)
+				game.fx.ring(to, 4.0, 26.0, 0.25, Pal.ink(0.7, 1.6), 2.0)
 				game.sfx.play("embed", randf_range(0.8, 0.95), -12.0)
 			continue
 		i += 1
@@ -213,8 +229,10 @@ func _step_carry(dt: float) -> void:
 func _feed() -> void:
 	if crate.is_empty():
 		return
+	var n := 0
 	for b in crate:
-		carry.append([b, b.pos, Vector2.ZERO, 0.0, true])
+		carry.append([b, b.pos, Vector2.ZERO, -0.12 * n, true])
+		n += 1
 	crate.clear()
 	game.sfx.play("focus", 0.5, -2.0)
 	game.fx.flash(CRATE.get_center(), 90.0, 0.2, Pal.foe(0.4, 1.6))
@@ -229,8 +247,10 @@ func _draw() -> void:
 	for arm in arms:
 		_draw_sector(arm, dim)
 	for c in carry:
-		var b = c[0]
-		draw_line(c[1], b.pos, Pal.ink(0.12 * dim), 1.0)
+		if c.size() > 5 and (c[5] as PackedVector2Array).size() >= 2:
+			var tr: PackedVector2Array = c[5]
+			draw_polyline(tr, Pal.ink(0.25 * dim, 1.4), 3.0)
+			draw_polyline(tr, Pal.ink(0.8 * dim, 2.0) if not c[4] else Pal.foe(0.9 * dim, 2.2), 1.5)
 	for arm in arms:
 		_draw_arm(arm, dim)
 
@@ -316,18 +336,36 @@ func _draw_arm(arm: Dictionary, dim: float) -> void:
 	var cl := base + dir * L
 	var live: bool = arm.mode == SWEEP
 	var col := Pal.foe(dim, 1.6) if live else Pal.ink(0.75 * dim)
-	for seg in [[sh, elbow, 14.0], [elbow, cl, 10.0]]:
-		draw_line(seg[0], seg[1], Pal.WALL, seg[2])
-		draw_line(seg[0], seg[1], col, 2.0)
-	draw_circle(sh, 13.0, Pal.WALL)
-	draw_arc(sh, 13.0, 0.0, TAU, 20, col, 2.0)
-	draw_circle(elbow, 8.0, Pal.WALL)
-	draw_arc(elbow, 8.0, 0.0, TAU, 16, col, 1.5)
-	# the claw opens on its way in, closes as it sweeps
-	var open := 0.5 if live else 0.25
+	# each segment a framed beam: dark body, two edges, a hydraulic line down it
+	for seg in [[sh, elbow, 11.0], [elbow, cl, 8.0]]:
+		var p0: Vector2 = seg[0]
+		var p1: Vector2 = seg[1]
+		var w: float = seg[2]
+		var sn := (p1 - p0).normalized().orthogonal()
+		var body := PackedVector2Array([p0 + sn * w, p1 + sn * w, p1 - sn * w, p0 - sn * w])
+		draw_colored_polygon(body, Color(0.07, 0.07, 0.08))
+		draw_line(p0 + sn * w, p1 + sn * w, col, 2.0)
+		draw_line(p0 - sn * w, p1 - sn * w, col, 2.0)
+		draw_line(p0 + sn * w * 0.3, p1 + sn * w * 0.3, Pal.ink(0.25 * dim), 1.0)
+	draw_circle(sh, 17.0, Color(0.1, 0.1, 0.11))
+	draw_arc(sh, 17.0, 0.0, TAU, 24, col, 2.0)
+	draw_circle(sh, 6.0, col)
+	draw_circle(elbow, 12.0, Color(0.1, 0.1, 0.11))
+	draw_arc(elbow, 12.0, 0.0, TAU, 20, col, 2.0)
+	draw_circle(elbow, 4.0, col)
+	# the claw: a wrist block and two heavy prongs, open on the way in
+	var wn := dir.orthogonal()
+	var wrist := PackedVector2Array([cl - dir * 6.0 + wn * 12.0, cl + dir * 8.0 + wn * 12.0, cl + dir * 8.0 - wn * 12.0, cl - dir * 6.0 - wn * 12.0])
+	draw_colored_polygon(wrist, Color(0.1, 0.1, 0.11))
+	wrist.append(wrist[0])
+	draw_polyline(wrist, col, 2.0)
+	var open := 0.55 if live else 0.25
 	for s2: float in [-1.0, 1.0]:
+		var root := cl + dir * 8.0 + wn * 8.0 * s2
 		var prong := dir.rotated(open * s2)
-		draw_line(cl, cl + prong * 22.0, col, 3.0)
-		draw_line(cl + prong * 22.0, cl + prong * 22.0 + dir.rotated(-0.5 * s2) * 10.0, col, 2.0)
+		var tip := root + prong * 26.0
+		draw_line(root, tip, Color(0.1, 0.1, 0.11), 7.0)
+		draw_line(root, tip, col, 2.5)
+		draw_line(tip, tip + dir.rotated(-0.7 * s2) * 12.0, col, 2.5)
 	if live:
-		draw_circle(cl, 5.0, Pal.foe(dim, 2.4))
+		draw_circle(cl + dir * 14.0, 5.0, Pal.foe(dim, 2.4))

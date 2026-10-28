@@ -163,7 +163,8 @@ func _draw() -> void:
 		_draw_reserve(dim)
 		_draw_terminal(Vector2(80, 260), dim, "w4_board")
 		if shows.get("w4_notice", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 300), dim)
+			_draw_notice(Vector2(1500, 70), dim)
+		_draw_floor_wear(dim)
 		_draw_scrawl(Vector2(1840, 820), dim)
 	for w in Lore.walls(story):
 		var id := "w%d_%s" % [story, w[0]]
@@ -797,7 +798,7 @@ func _draw_stations(dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
 	var lines := PackedVector2Array()
 	var n := 0
-	for st: Vector2 in [Vector2(360, 360), Vector2(680, 360), Vector2(1240, 360), Vector2(1560, 360), Vector2(700, 900), Vector2(1100, 900)]:
+	for st: Vector2 in [Vector2(360, 360), Vector2(680, 360), Vector2(1240, 360), Vector2(1560, 360), Vector2(1140, 900), Vector2(1500, 900)]:
 		n += 1
 		var r := Rect2(st - Vector2(34, 22), Vector2(68, 44))
 		lines.append_array(PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.position.y), r.end,
@@ -807,6 +808,30 @@ func _draw_stations(dim: float) -> void:
 			draw_colored_polygon(PackedVector2Array([fp + Vector2(-4, -9), fp + Vector2(4, -9), fp + Vector2(5, 8), fp + Vector2(-5, 8)]), Color(1, 1, 1, 0.05 * dim))
 		draw_string(sf, r.position + Vector2(4, -4), Txt.t("station") % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 1, 1, 0.12 * dim))
 	draw_multiline(lines, Color(1, 1, 1, 0.07 * dim), 2.0)
+
+
+# Oil under the presses, scuffed lanes where the carts run, stacked ration
+# boxes waiting by the belts.
+func _draw_floor_wear(dim: float) -> void:
+	for oil in [[Vector2(560, 420), 26.0], [Vector2(1360, 730), 34.0], [Vector2(1010, 250), 20.0], [Vector2(470, 740), 22.0]]:
+		var op: Vector2 = oil[0]
+		var orr: float = oil[1]
+		for j in 3:
+			draw_circle(op + Vector2.from_angle(j * 2.1) * orr * 0.35, orr * (0.8 - j * 0.15), Color(0, 0, 0, 0.3 * dim))
+	var scuff := PackedVector2Array()
+	for j in 14:
+		var x := 300.0 + j * 97.0
+		scuff.append(Vector2(x, 470.0 + sin(j * 1.3) * 6.0))
+		scuff.append(Vector2(x + 40.0, 470.0 + sin(j * 1.3 + 1.0) * 6.0))
+		scuff.append(Vector2(x + 10.0, 612.0 + cos(j * 1.7) * 6.0))
+		scuff.append(Vector2(x + 52.0, 612.0 + cos(j * 1.7 + 1.0) * 6.0))
+	draw_multiline(scuff, Color(1, 1, 1, 0.01 * dim), 5.0)
+	for st: Vector2 in [Vector2(820, 300), Vector2(1080, 300), Vector2(1700, 980)]:
+		for j in 3:
+			var br := Rect2(st + Vector2(j * 24.0 - 36.0, -(j % 2) * 10.0), Vector2(22, 22))
+			draw_rect(br, Color(0.07, 0.07, 0.075))
+			draw_rect(br, Pal.ink(0.35 * dim), false, 1.0)
+			draw_line(br.position + Vector2(0, 11), br.position + Vector2(22, 11), Pal.ink(0.18 * dim), 1.0)
 
 
 # The six blocks are stamping-press bases: a hazard band, a number, bolts.
@@ -847,7 +872,8 @@ func _draw_reserve(dim: float) -> void:
 	draw_rect(Rect2(lk - Vector2(9, 6), Vector2(18, 14)), Pal.WALL)
 	draw_rect(Rect2(lk - Vector2(9, 6), Vector2(18, 14)), Pal.ink(0.6 * dim), false, 1.5)
 	draw_arc(lk - Vector2(0, 6), 6.0, PI, TAU, 10, Pal.ink(0.6 * dim), 1.5)
-	draw_line(Vector2(r.position.x + 10.0, r.position.y + 18.0), Vector2(r.end.x - 10.0, r.position.y + 30.0), Pal.red(0.45 * dim, 1.1), 3.0)
+	var fl: float = game.arms.crate_flash
+	draw_line(Vector2(r.position.x + 10.0, r.position.y + 18.0), Vector2(r.end.x - 10.0, r.position.y + 30.0), Pal.ink(0.35 * dim).lerp(Pal.red(dim, 1.8), fl), 3.0)
 
 
 # The maintenance worker: by the door as the chapter opens, then back inside.

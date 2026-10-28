@@ -315,40 +315,62 @@ func _draw() -> void:
 	var appear := Pal.back(clampf(t / 0.8, 0.0, 1.0)) if state == ENTER else 1.0
 	var col := Pal.foe(dim, 1.0 + 0.6 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
 	var full := phase >= 2 and state == RUN
-	# feed belts running in from four sides, slats moving toward the mouth
+	# feed belts running in from four sides, slats and ration boxes moving in
 	var slats := PackedVector2Array()
 	var rails := PackedVector2Array()
+	var boxes: Array = []
+	var bl := 170.0
 	for k0 in 4:
 		var d0 := Vector2.from_angle(PI / 4.0 + TAU * k0 / 4.0)
 		var n0 := d0.orthogonal()
-		var a := pos + d0 * (R + 22.0) * appear
-		var b := pos + d0 * (R + 120.0) * appear
+		var a := pos + d0 * (R + 50.0) * appear
+		var b := pos + d0 * (R + 50.0 + bl) * appear
 		for sd: float in [-1.0, 1.0]:
-			rails.append(a + n0 * 15.0 * sd)
-			rails.append(b + n0 * 15.0 * sd)
-		var s0 := fmod(t * (90.0 if full else 45.0), 14.0)
-		while s0 < 98.0 * appear:
+			rails.append(a + n0 * 19.0 * sd)
+			rails.append(b + n0 * 19.0 * sd)
+		var spd := 90.0 if full else 45.0
+		var s0 := fmod(t * spd, 14.0)
+		while s0 < bl * appear:
 			var q := b - d0 * s0
-			slats.append(q + n0 * 12.0)
-			slats.append(q - n0 * 12.0)
+			slats.append(q + n0 * 16.0)
+			slats.append(q - n0 * 16.0)
 			s0 += 14.0
+		var s1 := fmod(t * spd + k0 * 37.0, 80.0)
+		while s1 < bl * appear - 10.0:
+			boxes.append([b - d0 * s1, d0])
+			s1 += 80.0
 	if slats.size() > 0:
 		draw_multiline(slats, Pal.ink(0.14 * dim), 2.0)
-	draw_multiline(rails, Pal.ink(0.4 * dim), 1.5)
-	# the hopper: a square frame round the crusher, hazard corners
-	var hs := (R + 20.0) * appear
-	var hop := Rect2(pos - Vector2(hs, hs), Vector2(hs, hs) * 2.0)
-	draw_rect(hop, Color(0.045, 0.045, 0.05, appear))
-	draw_rect(hop, col, false, 2.0)
+	draw_multiline(rails, Pal.ink(0.45 * dim), 2.0)
+	for bx in boxes:
+		var c0: Vector2 = bx[0]
+		var bxr := Rect2(c0 - Vector2(10, 10), Vector2(20, 20))
+		draw_rect(bxr, Color(0.07, 0.07, 0.075))
+		draw_rect(bxr, Pal.ink(0.45 * dim), false, 1.0)
+	# the hopper: a square mouth stepping down in three rims to the crusher,
+	# hazard corners on the outer rim
+	var hs := (R + 46.0) * appear
+	for ring in 3:
+		var rs := hs - ring * 14.0
+		var rr2 := Rect2(pos - Vector2(rs, rs), Vector2(rs, rs) * 2.0)
+		draw_rect(rr2, Color(0.04 + ring * 0.008, 0.04 + ring * 0.008, 0.045 + ring * 0.008, appear))
+		draw_rect(rr2, col if ring == 0 else Pal.foe((0.35 - ring * 0.08) * dim), false, 2.0 if ring == 0 else 1.0)
+	# funnel seams from each corner down to the crusher
+	var seams := PackedVector2Array()
+	for cx: float in [-1.0, 1.0]:
+		for cy: float in [-1.0, 1.0]:
+			seams.append(pos + Vector2(cx, cy) * hs)
+			seams.append(pos + Vector2(cx, cy).normalized() * R * appear)
+	draw_multiline(seams, Pal.foe(0.3 * dim), 1.5)
 	var corner := PackedVector2Array()
 	for cx: float in [-1.0, 1.0]:
 		for cy: float in [-1.0, 1.0]:
-			var c0 := pos + Vector2(cx, cy) * hs
+			var c1 := pos + Vector2(cx, cy) * hs
 			for j2 in 3:
-				var o := 6.0 + j2 * 7.0
-				corner.append(c0 - Vector2(cx * o, 0))
-				corner.append(c0 - Vector2(0, cy * o))
-	draw_multiline(corner, Pal.red((0.7 if full else 0.35) * dim, 1.4), 2.0)
+				var o := 6.0 + j2 * 8.0
+				corner.append(c1 - Vector2(cx * o, 0))
+				corner.append(c1 - Vector2(0, cy * o))
+	draw_multiline(corner, Pal.red((0.7 if full else 0.3) * dim, 1.4), 2.5)
 	# the crusher: a ring of teeth that turns (faster at full capacity)
 	var teeth := 14
 	var pts2 := PackedVector2Array()
@@ -367,7 +389,7 @@ func _draw() -> void:
 	draw_multiline(fun, Pal.foe(0.22 * dim), 1.0)
 	# the core: opens with what it holds
 	var cr := core_r() * appear
-	draw_circle(pos, cr, Pal.foe(dim, 1.2 + 1.2 * flash).lerp(Pal.red(dim, 2.2), red * 0.8))
+	draw_circle(pos, cr, Pal.foe(dim, 1.2 + 1.2 * flash).lerp(Pal.red(dim, 2.2), red * 0.8).lerp(Pal.ink(dim, 2.4), flash * 0.6))
 	draw_arc(pos, cr + 5.0, 0.0, TAU, 32, Pal.foe(0.5 * dim), 1.0, false)
 	_draw_counter(dim, appear, full)
 	# inhale: lines of pull toward the mouth
@@ -390,10 +412,10 @@ func _draw_counter(dim: float, appear: float, full: bool) -> void:
 	if appear < 0.3:
 		return
 	var font := Fonts.get_font("SemiBold")
-	var r := Rect2(pos + Vector2(-110.0, -R - 92.0), Vector2(220.0, 56.0))
+	var r := Rect2(pos + Vector2(-110.0, -R - 120.0), Vector2(220.0, 56.0))
 	draw_rect(r, Color(0.02, 0.025, 0.03, appear))
 	draw_rect(r, Pal.foe(0.55 * dim * appear), false, 1.5)
-	draw_line(Vector2(r.get_center().x, r.end.y), pos + Vector2(0, -R - 20.0), Pal.ink(0.35 * dim), 2.0)
+	draw_line(Vector2(r.get_center().x, r.end.y), pos + Vector2(0, -R - 46.0), Pal.ink(0.35 * dim), 2.0)
 	if full:
 		if fmod(t * 3.0, 1.0) < 0.6:
 			var w := font.get_string_size(Txt.t("intake_full"), HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x

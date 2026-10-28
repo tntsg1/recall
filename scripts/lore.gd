@@ -61,7 +61,7 @@ const WALL := {
 	4: [
 		["board", Vector2(80, 260), Vector2(1, 0), "screen", "今日产出口粮 98400 份 · 入库 98105 · 发放 295", "RATIONS MADE TODAY 98,400 · TO RESERVE 98,105 · ISSUED 295"],
 		["crate", Vector2(315, 845), Vector2(0, -1), "crate", "战略储备 · 开启须经全民董事会批准", "STRATEGIC RESERVE · OPENING REQUIRES THE BOARD'S APPROVAL"],
-		["notice", Vector2(1840, 300), Vector2(-1, 0), "notice", "为庆祝产量再创新高，午餐时间缩短为 4 分钟。", "TO CELEBRATE RECORD OUTPUT, LUNCH IS NOW FOUR MINUTES."],
+		["notice", Vector2(1500, 70), Vector2(0, 1), "notice", "为庆祝产量再创新高，午餐时间缩短为 4 分钟。", "TO CELEBRATE RECORD OUTPUT, LUNCH IS NOW FOUR MINUTES."],
 		["scrawl", Vector2(1840, 820), Vector2(-1, 0), "scrawl", "我们造的面包，我们买不起。", "WE BAKE THE BREAD. WE CAN'T AFFORD IT."],
 	],
 }
