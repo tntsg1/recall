@@ -35,7 +35,10 @@ func shot(name: String) -> void:
 func _run() -> void:
 	await frames(2)
 	game.next_chapter()
-	await frames(100)
+	await frames(60)
+	# stand by a mirror: the hall gives back a smiling citizen
+	game.player.pos = Vector2(640, 920)
+	await frames(40)
 	await shot("1_open")
 	while game.wave_ctl.phase != Waves.FIGHT:
 		await process_frame
@@ -65,6 +68,10 @@ func _run() -> void:
 	game.dev_jump(Waves.BOSS)
 	while game.boss.state != Warden.RUN:
 		await process_frame
-	await frames(30)
+	# stand in front of it, so its smiling lens turns to you
+	game.player.pos = Vector2(960, 860)
+	await frames(90)
+	game.player.pos = Vector2(960, 860)
+	await frames(2)
 	await shot("4_warden")
 	quit()

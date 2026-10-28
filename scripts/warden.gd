@@ -338,7 +338,7 @@ func _draw() -> void:
 		draw_arc(pos, SHIELD_R - 8.0, mid - h, mid + h, 32, Pal.foe(0.3 * dim), 1.0, false)
 		# a sheen slides along the glass
 		var sh := mid - h + fmod(t * 0.7, 1.0) * 2.0 * h
-		draw_arc(pos, SHIELD_R, sh - 0.06, sh + 0.06, 6, Pal.foe(dim, 2.6), 7.0, false)
+		draw_arc(pos, SHIELD_R, sh - 0.06, sh + 0.06, 6, Pal.foe(dim, 1.5), 5.0, false)
 	# the open back, marked with a faint bracket
 	var back := face.angle() + PI
 	draw_arc(pos, R + 12.0, back - 0.6, back + 0.6, 16, Pal.foe(0.22 * dim), 1.0, false)

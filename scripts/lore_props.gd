@@ -129,6 +129,7 @@ func _draw() -> void:
 		if worker_t >= 0.0 and game.wave_ctl.index <= 0:
 			_draw_worker(dim)
 	elif story == 2:
+		_draw_seal(Vector2(560, 820), dim)
 		_draw_pillars(dim)
 		_draw_reflections(dim)
 		_draw_queue(dim)
@@ -140,7 +141,7 @@ func _draw() -> void:
 		_draw_terminal(Vector2(80, 300), dim, "w2_terminal")
 		_draw_terminal(Vector2(80, 760), dim, "")
 		if shows.get("w2_retire", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 300), dim)
+			_draw_wall_notice(Vector2(1840, 760), dim)
 	for w in Lore.walls(story):
 		var id := "w%d_%s" % [story, w[0]]
 		var k: float = shows.get(id, 0.0)
@@ -256,11 +257,14 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	draw_rect(r, Pal.ink(0.6 * dim), false, 1.5)
 	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
 	draw_string(font, r.position + Vector2(15, 54), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * dim, 1.2))
-	var sc := Vector2(r.end.x + 4.0, r.end.y + 4.0) if (w[2] as Vector2).y > 0.5 else Vector2(r.end.x - 26.0, r.position.y + 22.0)
-	draw_arc(sc, 22.0, 0.0, TAU, 28, Pal.red(0.75 * k * dim, 1.4), 2.5, false)
+	var on_top := (w[2] as Vector2).y > 0.5
+	var sc := Vector2(r.end.x + 4.0, r.end.y + 4.0) if on_top else Vector2(r.end.x - 20.0, r.position.y + 20.0)
+	var sr := 22.0 if on_top else 13.0
+	draw_arc(sc, sr, 0.0, TAU, 28, Pal.red(0.75 * k * dim, 1.4), 2.5 if on_top else 1.5, false)
 	draw_set_transform(sc, -0.3, Vector2.ONE)
 	var sw := Txt.t("notice_stamp")
-	draw_string(Fonts.get_font("SemiBold"), Vector2(-Fonts.get_font("SemiBold").get_string_size(sw, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x / 2.0, 6.0), sw, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.red(0.9 * k * dim, 1.5))
+	var ss := 16 if on_top else 10
+	draw_string(Fonts.get_font("SemiBold"), Vector2(-Fonts.get_font("SemiBold").get_string_size(sw, HORIZONTAL_ALIGNMENT_LEFT, -1, ss).x / 2.0, ss * 0.36), sw, HORIZONTAL_ALIGNMENT_LEFT, -1, ss, Pal.red(0.9 * k * dim, 1.5))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -285,6 +289,19 @@ func _remnant_floor(w: Array, shown: String, full: String, k: float, dim: float)
 	var sf := Fonts.get_font("SemiBold")
 	var tw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
 	draw_string(sf, Vector2(at.x - tw / 2.0, at.y), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Pal.ink(0.8 * k * dim, 1.2))
+
+
+# A great registration seal painted on the hall's floor, worn faint.
+func _draw_seal(c: Vector2, dim: float) -> void:
+	var col := Color(1, 1, 1, 0.024 * dim)
+	draw_arc(c, 150.0, 0.0, TAU, 64, col, 6.0, false)
+	draw_arc(c, 124.0, 0.0, TAU, 64, col, 2.0, false)
+	var sf := Fonts.get_font("SemiBold")
+	var word := Txt.t("floor_seal")
+	draw_string(sf, c + Vector2(-sf.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, 54).x / 2.0, 20.0), word, HORIZONTAL_ALIGNMENT_LEFT, -1, 54, col)
+	for j in 12:
+		var a := TAU * j / 12.0
+		draw_line(c + Vector2.from_angle(a) * 130.0, c + Vector2.from_angle(a) * 144.0, col, 3.0)
 
 
 # The hall's two pillars are registration columns: a number, a scan strip.
@@ -319,9 +336,9 @@ func _draw_reflections(dim: float) -> void:
 			var mx := m.get_center().x
 			dist = absf(p.x - mx)
 			mirrored = Vector2(2.0 * mx - p.x, p.y)
-		if not inside or dist > 260.0 or dist < 20.0:
+		if not inside or dist < 20.0:
 			continue
-		var a := (1.0 - dist / 260.0) * 0.55 * dim
+		var a := lerpf(0.14, 0.6, clampf(1.0 - dist / 300.0, 0.0, 1.0)) * dim
 		draw_arc(mirrored, 16.0, 0.0, TAU, 24, Pal.ink(a), 1.5, false)
 		draw_circle(mirrored + Vector2(-5, -4), 1.8, Pal.ink(a))
 		draw_circle(mirrored + Vector2(5, -4), 1.8, Pal.ink(a))
@@ -347,14 +364,14 @@ func _draw_gates(c: Vector2, dim: float) -> void:
 		var gx := x0 + i * gap
 		# the arm across the lane, and the scanner's eye that blinks red on refusal
 		draw_line(Vector2(gx - gap / 2.0 + 8.0, y + 30.0), Vector2(gx + gap / 2.0 - 8.0, y + 30.0), Pal.ink(0.4 * dim), 2.0)
-		var on := int(t * 1.5 + i * 0.7) % 4 == 0
+		var on: bool = int(t * 1.5 + i * 0.7) % 4 == 0 or (game.boss is Warden and game.boss.state == Warden.ENTER)
 		draw_circle(Vector2(gx - gap / 2.0, y + 12.0), 3.0, Pal.red(0.8 * dim, 2.0) if on else Pal.ink(0.35 * dim))
 		draw_line(Vector2(gx - gap / 2.0 + 6.0, y + 12.0), Vector2(gx - gap / 2.0 + 6.0 + 20.0 * (0.5 + 0.5 * sin(t * 3.0 + i)), y + 12.0), Pal.ink(0.25 * dim), 1.0)
 
 
 # The gates' scanner: a soft fan that sweeps the floor in front of them.
 func _draw_scan(o: Vector2, dim: float) -> void:
-	var a := PI / 2.0 + sin(t * 0.7) * 0.55
+	var a := PI / 2.0 + 0.55 + sin(t * 0.7) * 0.35
 	for layer in [[0.14, 0.03], [0.07, 0.05]]:
 		var w: float = layer[0]
 		var pts := PackedVector2Array([o, o + Vector2.from_angle(a - w) * 420.0, o + Vector2.from_angle(a + w) * 420.0])

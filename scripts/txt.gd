@@ -173,6 +173,7 @@ const S := {
 	"notice_head": ["品牌安全管理局 · 通告", "BRAND SAFETY BUREAU · NOTICE"],
 	"notice_stamp": ["已阅", "READ"],
 	"term_idle": ["登记中", "REGISTERING"],
+	"floor_seal": ["已登记", "REGISTERED"],
 	"arch_how": ["残迹：让回收弹扫过墙面    记忆：夺取那一种壳    广播：第 2、4 波和 Boss 之后", "WALLS: SWEEP THEM WITH A RECALL    MEMORIES: SEIZE THAT KIND OF SHELL    BROADCASTS: AFTER WAVES 2, 4 AND THE BOSS"],
 	"radio_lockdown": ["封锁程序启动。请市民原地等待，配合检查。", "LOCKDOWN PROTOCOL ENGAGED. CITIZENS, REMAIN WHERE YOU ARE FOR INSPECTION."],
 	"prop_screen_2": ["100%", "100%"],

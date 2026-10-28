@@ -768,7 +768,7 @@ func _draw_radio(vp: Vector2) -> void:
 		# top right, clear of the timer and the boss bar
 		var lf := Txt.t("lore_found")
 		var lw := font_b.get_string_size(lf, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-		var lp := Vector2(vp.x - BAND_EDGE - 20.0 - lw, 222.0 + rise)
+		var lp := Vector2(BAND_EDGE + 24.0, vp.y - 118.0 + rise)
 		view.draw_rect(Rect2(lp + Vector2(-12, -20), Vector2(lw + 24, 30)), Color(0, 0, 0, 0.55 * fa))
 		view.draw_line(lp + Vector2(-12, -20), lp + Vector2(-12, 10), Pal.ink(0.7 * fa, 1.4), 2.0)
 		view.draw_string(font_b, lp, lf, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.85 * fa, 1.3))
