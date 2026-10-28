@@ -49,7 +49,7 @@ func compare(center: Vector2, name: String) -> void:
 	var i := 0
 	for st in Possess.STYLES:
 		game.possess.style = st
-		game.possess.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if st == "pixel" else CanvasItem.TEXTURE_FILTER_LINEAR
+		game.possess.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if st in ["pixel", "invade"] else CanvasItem.TEXTURE_FILTER_LINEAR
 		game.possess.queue_redraw()
 		var img := await grab()
 		img.convert(Image.FORMAT_RGBA8)

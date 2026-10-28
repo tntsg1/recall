@@ -729,7 +729,7 @@ func yard_key(k: int) -> void:
 	if k == KEY_V:
 		var i2 := (Possess.STYLES.find(possess.style) + 1) % Possess.STYLES.size()
 		possess.style = Possess.STYLES[i2]
-		possess.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if possess.style == "pixel" else CanvasItem.TEXTURE_FILTER_LINEAR
+		possess.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if possess.style in ["pixel", "invade"] else CanvasItem.TEXTURE_FILTER_LINEAR
 		hud.flash_text(Txt.t("style_" + possess.style))
 		sfx.play("tick", 1.2, -6.0)
 		return

@@ -128,10 +128,14 @@ var clone_t := 0.0
 
 var _parts := {}
 ## How seized shells and their effects are drawn (compare in the training yard with V):
+## "invade" the enemy's own line shape being eaten by pixels, which also creep into the floor
 ## "pixel" neon pixel art · "dots" dotted outlines like the title · "vector" glowing
 ## lines like the enemies · "glitch" lines that break into pixel noise at big moments
-const STYLES := ["pixel", "dots", "vector", "glitch"]
-var style := "pixel"
+const STYLES := ["invade", "pixel", "dots", "vector", "glitch"]
+var style := "invade"
+# the floor infection: the shell itself, its recent trail, and the big landings
+var residue: Array = []         # [pos, radius, life, max life]
+var residue_cd := 0.0
 
 
 func _ready() -> void:
@@ -263,6 +267,7 @@ func _begin_host() -> void:
 	game.sfx.play("p_grow", 1.0, -3.0)
 	game.fx.ring(shell.pos, 12.0, 150.0, 0.45, cyan(1.0, 2.4), 3.0)
 	game.fx.flash(shell.pos, 90.0, 0.25, cyan(0.5, 2.0))
+	infect_patch(shell.pos, 200.0)
 	game.fx.sparks(shell.pos, Vector2.UP, 18, cyan(1.0, 2.4), 520.0, 0.35, PI)
 	game.cam.add_trauma(0.3)
 	game.cam.punch(0.03)
@@ -373,6 +378,7 @@ func step(sdt: float, dt: float) -> void:
 	if state == HOST and game.wave_ctl.phase != Waves.FIGHT:
 		end(false, true)
 	_step_wakes(sdt)
+	_update_infection(dt)
 	var i := 0
 	while i < ghosts.size():
 		ghosts[i][1] += dt
@@ -1117,13 +1123,18 @@ func _finisher(at: Vector2, radius: float) -> void:
 	game.fx.sparks(at, Vector2.UP, 30, cyan(1.0, 2.6), 900.0, 0.45, PI)
 	game.fx.wave_push(at, 400.0, 200.0)
 	bursts.append([at, radius, 0.0])
+	infect_patch(at, radius * 1.3)
 	game.hud.combo_hit(combo, true)
 
 
 # ---------------------------------------------------------------- drawing
 
+static func _h(a: float, b: float) -> float:
+	return fposmod(sin(a * 127.1 + b * 311.7) * 43758.5453, 1.0)
+
+
 func _px(p: Vector2, n: float, c: Color) -> void:
-	if style == "pixel":
+	if style == "pixel" or style == "invade":
 		var q := (p / PX).floor() * PX
 		draw_rect(Rect2(q - Vector2(PX, PX) * floor(n * 0.5), Vector2(PX, PX) * n), c)
 	elif style == "dots":
@@ -1133,6 +1144,18 @@ func _px(p: Vector2, n: float, c: Color) -> void:
 
 
 func _px_line(a: Vector2, b: Vector2, c: Color, n: float = 1.0) -> void:
+	if style == "invade":
+		# a clean line, with pixels breaking off its length here and there
+		draw_line(a, b, c, 1.0 + 0.8 * n)
+		var l0 := a.distance_to(b)
+		var k0 := int(l0 / 14.0)
+		var nrm := (b - a).orthogonal().normalized() if l0 > 0.1 else Vector2.ZERO
+		var tq: float = floorf(t * 8.0)
+		for j in k0:
+			var h := _h(a.x + j, a.y + tq)
+			if h > 0.55:
+				_px(a.lerp(b, (j + h) / maxf(1.0, k0)) + nrm * (h - 0.75) * 10.0, 1.0 + floor(h * 2.0), c)
+		return
 	if style == "pixel":
 		var l := a.distance_to(b)
 		var steps := maxi(1, int(l / PX))
@@ -1148,6 +1171,16 @@ func _px_line(a: Vector2, b: Vector2, c: Color, n: float = 1.0) -> void:
 
 
 func _px_ring(o: Vector2, r: float, c: Color, dots: int = 0) -> void:
+	if style == "invade":
+		draw_arc(o, r, 0.0, TAU, maxi(24, int(r / 3.0)), Color(c.r, c.g, c.b, c.a * 0.8), 1.4, false)
+		var n3 := maxi(6, int(TAU * r / 16.0))
+		var tq: float = floorf(t * 8.0)
+		for k in n3:
+			var h := _h(o.x + k, o.y + tq)
+			if h > 0.5:
+				var ang := TAU * (k + h) / n3
+				_px(o + Vector2.from_angle(ang) * (r + (h - 0.75) * 12.0), 1.0 + floor(h * 2.0), c)
+		return
 	if style == "pixel":
 		var n := dots if dots > 0 else maxi(12, int(TAU * r / (PX * 3.0)))
 		for k in n:
@@ -1182,6 +1215,9 @@ const _KIND_OF := {"chaser": Enemies.CHASER, "leech": Enemies.LEECH, "guard": En
 
 
 func _part(name: String, at: Vector2, angle: float, mod: Color) -> void:
+	if style == "invade":
+		_invade_part(name, at, angle, mod)
+		return
 	if style == "pixel":
 		var p: PixelPart = _parts[name]
 		var base := Transform2D(0.0, Vector2(BODY_PX, BODY_PX), 0.0, (at / BODY_PX).round() * BODY_PX)
@@ -1233,6 +1269,90 @@ func _part(name: String, at: Vector2, angle: float, mod: Color) -> void:
 			draw_colored_polygon(core, Pal.ink(a, 2.2))
 			if style == "glitch" and name == parts[0] and a > 0.9 and (grow < 1.0 or hot or t_left < 1.5 or iframes > 0.0):
 				_glitch(at, Enemies.SPEC[kind].r * 1.3)
+
+
+# Invade: the enemy keeps its own clean line shape, but pixels eat it from the
+# core outward — the outline breaks into pixel runs (more of it the further the
+# growth has gone), a pixel body shows through, and a fringe of loose pixels
+# dithers the border between the two worlds.
+func _invade_part(name: String, at: Vector2, angle: float, mod: Color) -> void:
+	var parts := name.split("_")
+	var kind: int = _KIND_OF[parts[0]]
+	var a := mod.a
+	if parts.size() > 1:
+		# the spikes are pure pixel growth
+		var p: PixelPart = _parts[name]
+		p.draw(self, Transform2D(0.0, Vector2(PX, PX), 0.0, (at / PX).round() * PX), Vector2.ZERO, angle, false, mod)
+		return
+	var hot: bool = mod.r > 2.0
+	# the pixel body underneath, at the outline's own size
+	var body: PixelPart = _parts[name]
+	body.draw(self, Transform2D(0.0, Vector2(PX, PX), 0.0, (at / PX).round() * PX), Vector2.ZERO, angle, false, Color(mod.r, mod.g, mod.b, a * 0.92))
+	# the enemy's own outline, being eaten
+	var tr := Transform2D(angle, at)
+	var local := _shape(kind)
+	var eat := clampf(0.15 + 0.3 * grow, 0.0, 0.45)
+	var tq: float = floorf(t * 5.0)
+	var line_c := Pal.ink(a, 2.2) if hot else Pal.ink(0.95 * a, 1.5).lerp(cyan(a, 2.0), 0.15)
+	for k in local.size():
+		var p0: Vector2 = tr * local[k]
+		var p1: Vector2 = tr * local[(k + 1) % local.size()]
+		var segs := maxi(3, int(p0.distance_to(p1) / 7.0))
+		for j in segs:
+			var q0 := p0.lerp(p1, float(j) / segs)
+			var q1 := p0.lerp(p1, float(j + 1) / segs)
+			var h := _h(k * 17.0 + j, tq + kind)
+			if h > eat:
+				draw_line(q0, q1, line_c, 2.0)
+			else:
+				# this run has gone over to pixels
+				var m := (q0 + q1) * 0.5
+				draw_rect(Rect2((m / 3.0).floor() * 3.0 - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), cyan(a, 2.3))
+				if h < eat * 0.4:
+					var out := (m - at).normalized() * (3.0 + 6.0 * h / maxf(eat, 0.01))
+					draw_rect(Rect2(((m + out) / 3.0).floor() * 3.0, Vector2(3.0, 3.0)), cyan(0.7 * a, 2.0))
+	# loose pixels drifting off the border
+	var r: float = Enemies.SPEC[kind].r * 1.3
+	for j in 8:
+		var h2 := _h(j * 3.1 + kind, tq)
+		var ang := TAU * h2 + angle
+		var rr := r * (1.05 + 0.5 * _h(j, tq + 7.0))
+		draw_rect(Rect2(((at + Vector2.from_angle(ang) * rr) / 3.0).floor() * 3.0, Vector2(3.0, 3.0)), cyan(0.55 * a * h2, 2.0))
+
+
+# Feeds the floor shader: the shell infects the dots around it, its trail heals
+# back over a second and a half, landings and finishers leave a wide patch.
+func _update_infection(dt: float) -> void:
+	var i := 0
+	while i < residue.size():
+		residue[i][2] -= dt
+		if residue[i][2] <= 0.0:
+			residue.remove_at(i)
+		else:
+			i += 1
+	if state == HOST and style == "invade":
+		residue_cd -= dt
+		if residue_cd <= 0.0:
+			residue_cd = 0.1
+			residue.append([shell.pos, 70.0, 1.2, 1.2])
+			if residue.size() > 7:
+				residue.remove_at(0)
+	var src: Array[Vector4] = []
+	if state == HOST and style == "invade":
+		src.append(Vector4(shell.pos.x, shell.pos.y, 120.0 + 20.0 * grow, clampf(grow * 1.2, 0.0, 1.0)))
+	for rs in residue:
+		src.append(Vector4(rs[0].x, rs[0].y, rs[1], 0.6 * rs[2] / rs[3]))
+	while src.size() < 8:
+		src.append(Vector4(0, 0, 0, 0))
+	src.resize(8)
+	game.floor_mat.set_shader_parameter("infect", src)
+
+
+func infect_patch(at: Vector2, radius: float) -> void:
+	if style == "invade":
+		residue.push_front([at, radius, 0.9, 0.9])
+		if residue.size() > 7:
+			residue.pop_back()
 
 
 # C: at the big moments the clean lines break into a handful of pixel blocks.
