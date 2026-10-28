@@ -18,7 +18,9 @@ const FLOW_TIME := 0.16
 const SHELL_HITS := 3
 const PX := 2.0                 # one effect pixel = two world units
 const BODY_PX := 3.0            # the seized body is drawn chunkier: one sprite pixel = three units
-const KINDS := [Enemies.CHASER, Enemies.LEECH]   # N1: these two can be seized
+const KINDS := [Enemies.CHASER, Enemies.LEECH, Enemies.GUARD, Enemies.CHARGER, Enemies.PRISM, Enemies.PULSE, Enemies.ECHO]
+const NAMES := {Enemies.CHASER: "chaser", Enemies.LEECH: "leech", Enemies.GUARD: "guard", Enemies.CHARGER: "charger",
+	Enemies.PRISM: "prism", Enemies.PULSE: "pulse", Enemies.ECHO: "echo"}
 const BLAST_R := 120.0
 const BLAST_DMG := 40.0
 # chaser: drill dash ×2, then the spiral
@@ -39,6 +41,26 @@ const SQUEEZE_DMG := 14.0
 const WELL_MAX := 1.4
 const WELL_BURST_R := 175.0
 const WELL_BURST_DMG := 85.0
+# guard: shove, sweep, then the shield rush that pins a row of bodies to the wall
+const SHOVE_DMG := 30.0
+const SWEEP_DMG := 35.0
+const RUSH_SPEED := 1150.0
+const RUSH_TIME := 0.45
+const RUSH_DMG := 70.0
+# charger: hold to aim the lane, let go to ram; the walls throw it back twice, the third one blows
+const RAM_SPEED := 1500.0
+const RAM_DMG := [50.0, 55.0, 60.0]
+const RAM_BURST_R := 160.0
+const RAM_BURST_DMG := 80.0
+# prism: one beam, three beams, then twelve
+const BEAM_DMG := [40.0, 38.0, 50.0]
+# pulse: rings on the beat; three clean beats in a row and the third is huge
+const PULSE_R := [110.0, 160.0, 250.0]
+const PULSE_DMG := [30.0, 45.0, 85.0]
+# echo: two copies trace where you walked, then everything replays and detonates
+const ECHO_TOUCH := 25.0
+const ECHO_BURST_R := 110.0
+const ECHO_BURST_DMG := 60.0
 
 var game
 var state := IDLE
@@ -66,6 +88,7 @@ var bursts: Array = []          # [pos, radius, age] — pixel shock rings
 var stage := 0
 var stage_window := 0.0
 var queued := false
+var queue_t := 0.0             # a click held over a short recovery (0.4 s) instead of being lost
 var dash_t := 0.0
 var dash_dir := Vector2.RIGHT
 var dash_hit := {}
@@ -77,6 +100,22 @@ var well_on := false
 var well_t := 0.0
 var well_pos := Vector2.ZERO
 var squeeze_tick := 0.0
+# guard
+var rush_t := 0.0
+var carried := {}
+# charger
+var winding := false
+var wind := 0.0
+var ram_t := 0.0
+var ram_seg := 0
+var lanes: Array = []           # [a, b, age] — the red line a ram leaves
+# prism
+var beams: Array = []           # [a, b, age]
+# pulse
+var last_beat := -1
+# echo
+var clones: Array = []          # {pos, path, replay, idx, hit, done}
+var clone_t := 0.0
 
 var _parts := {}
 
@@ -85,8 +124,10 @@ func _ready() -> void:
 	z_index = 5
 	z_as_relative = false
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	for n in ["chaser", "chaser_spk1", "chaser_spk2", "leech", "leech_spk1", "leech_spk2"]:
-		_parts[n] = PixelPart.get_part("res://assets/sprites/shell/" + n)
+	for k in NAMES:
+		for suffix in ["", "_spk1", "_spk2"]:
+			var n: String = NAMES[k] + suffix
+			_parts[n] = PixelPart.get_part("res://assets/sprites/shell/" + n)
 
 
 static func cyan(a: float = 1.0, k: float = 1.0) -> Color:
@@ -188,6 +229,12 @@ func _begin_host() -> void:
 	spin_t = -1.0
 	recover = 0.0
 	well_on = false
+	rush_t = 0.0
+	carried.clear()
+	winding = false
+	ram_t = 0.0
+	clones.clear()
+	last_beat = int(floor(game.sfx.beat()))
 	fire_prev = true          # the E press must not also count as a click
 	game.player.pos = shell.pos
 	game.player.position = shell.pos
@@ -236,6 +283,10 @@ func _restore(at: Vector2) -> void:
 	well_on = false
 	spin_t = -1.0
 	dash_t = 0.0
+	rush_t = 0.0
+	ram_t = 0.0
+	winding = false
+	clones.clear()
 	game.player.pos = at
 	game.player.vel = Vector2.ZERO
 	game.player.position = at
@@ -259,7 +310,14 @@ func _shatter(at: Vector2, broken: bool) -> void:
 func shell_hit(dir: Vector2) -> bool:
 	if state != HOST:
 		return false
-	if iframes > 0.0 or game.wave_ctl.phase != Waves.FIGHT or game.dev_god or spin_t >= 0.0:
+	if iframes > 0.0 or game.wave_ctl.phase != Waves.FIGHT or game.dev_god or spin_t >= 0.0 or rush_t > 0.0 or ram_t > 0.0:
+		return false
+	if shell.kind == Enemies.GUARD and dir.dot(aim) < -0.2:
+		# the raised shield takes it
+		game.fx.sparks(shell.pos + aim * 24.0, aim, 8, cyan(1.0, 2.2), 480.0, 0.22, 0.8)
+		game.sfx.play("shield", randf_range(1.0, 1.15), -6.0)
+		game.cam.add_trauma(0.08)
+		iframes = 0.25
 		return false
 	hits_left -= 1
 	iframes = 0.6
@@ -300,6 +358,14 @@ func step(sdt: float, dt: float) -> void:
 			ghosts.remove_at(i)
 		else:
 			i += 1
+	for arr in [lanes, beams]:
+		var j := 0
+		while j < arr.size():
+			arr[j][2] += dt
+			if arr[j][2] > (3.0 if arr == lanes else 0.18):
+				arr.remove_at(j)
+			else:
+				j += 1
 	i = 0
 	while i < bursts.size():
 		bursts[i][2] += dt
@@ -325,19 +391,42 @@ func host_step(sdt: float, dt: float, move: Vector2, aim_at: Vector2, fire_held:
 	var to_aim: Vector2 = aim_at - shell.pos
 	if to_aim.length() > 4.0:
 		aim = to_aim.normalized()
-	var pressed := fire_held and not fire_prev
+	var raw := fire_held and not fire_prev
 	fire_prev = fire_held
+	if raw:
+		queued = true
+		queue_t = 0.4
+	queue_t -= sdt
+	if queue_t <= 0.0:
+		queued = false
+	# guard, prism and echo take the remembered click once they are ready again
+	var pressed := queued and recover <= 0.0 and dash_t <= 0.0 and spin_t < 0.0 and rush_t <= 0.0
+	if pressed and shell.kind in [Enemies.GUARD, Enemies.PRISM, Enemies.ECHO]:
+		queued = false
 	var r: float = shell.r * 1.3
 	var before: Vector2 = shell.pos
 	match shell.kind:
 		Enemies.CHASER:
-			_chaser(sdt, pressed, move)
+			_chaser(sdt, false, move)
 		Enemies.LEECH:
 			_leech(sdt, fire_held, move, aim_at)
+		Enemies.GUARD:
+			_guard(sdt, pressed, move)
+		Enemies.CHARGER:
+			_charger(sdt, fire_held, move)
+		Enemies.PRISM:
+			_prism(sdt, pressed, move)
+		Enemies.PULSE:
+			_pulse(sdt, raw, move)    # the beat needs the click exactly when it lands
+		Enemies.ECHO:
+			_echo(sdt, pressed, move)
+	var free_pos: Vector2 = shell.pos
 	shell.pos = game.arena.push_circle(shell.pos, r)
 	shell.pos = shell.pos.clamp(Arena.ROOM.position + Vector2(r, r), Arena.ROOM.end - Vector2(r, r))
-	if dash_t > 0.0:
+	if dash_t > 0.0 or ram_t > 0.0:
 		_drill_sweep(before, shell.pos)
+	if free_pos.distance_to(shell.pos) > 1.5:
+		_on_wall((shell.pos - free_pos).normalized())
 	# shoulder anything in the way aside
 	for e in game.enemies.list:
 		if e.state != Enemies.ALIVE:
@@ -427,6 +516,8 @@ func _start_dash() -> void:
 
 func _drill_sweep(a: Vector2, b: Vector2) -> void:
 	var dmg: float = DRILL_DMG[clampi(stage - 1, 0, 1)]
+	if ram_t > 0.0:
+		dmg = RAM_DMG[clampi(ram_seg - 1, 0, 2)]
 	for e in game.enemies.list:
 		if e.state != Enemies.ALIVE or dash_hit.has(e.id):
 			continue
@@ -434,7 +525,7 @@ func _drill_sweep(a: Vector2, b: Vector2) -> void:
 		if q.distance_to(e.pos) <= e.r + shell.r * 1.3 + 6.0:
 			dash_hit[e.id] = true
 			_deal(e, dmg, dash_dir, true)
-			game.sfx.play("p_drill", randf_range(1.05, 1.2), -4.0)
+			game.sfx.play("p_drill", randf_range(1.05, 1.2) * (0.85 if ram_t > 0.0 else 1.0), -4.0)
 
 
 func _start_spin() -> void:
@@ -528,10 +619,16 @@ func home_through():
 
 # Chaser: each round that reaches the shell flies on down the drill's last line.
 func on_round_home() -> void:
-	if state != HOST or shell.kind != Enemies.CHASER:
+	if state != HOST:
 		return
-	var d := dash_dir.rotated(randf_range(-0.12, 0.12))
-	wakes.append([shell.pos, d * 1700.0, 0.0, {}])
+	match shell.kind:
+		Enemies.CHASER:
+			var d := dash_dir.rotated(randf_range(-0.12, 0.12))
+			wakes.append([shell.pos, d * 1700.0, 0.0, {}, 0.32])
+		Enemies.PRISM:
+			# the prism splits every round that comes home into three
+			for k in 3:
+				wakes.append([shell.pos, aim.rotated((k - 1) * 0.32 + randf_range(-0.05, 0.05)) * 1700.0, 0.0, {}, 0.36])
 
 
 func _step_wakes(sdt: float) -> void:
@@ -548,10 +645,360 @@ func _step_wakes(sdt: float) -> void:
 				if q.distance_to(e.pos) <= e.r + 6.0:
 					w[3][e.id] = true
 					_deal(e, WAKE_DMG, w[1].normalized(), false)
-		if w[2] > 0.32 or not Arena.ROOM.has_point(b) or game.arena.raycast(a, b):
+		if w[2] > w[4] or not Arena.ROOM.has_point(b) or game.arena.raycast(a, b):
 			wakes.remove_at(i)
 		else:
 			i += 1
+
+
+# ---------------------------------------------------------------- guard
+
+func _guard(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	if rush_t > 0.0:
+		rush_t -= sdt
+		vel = dash_dir * RUSH_SPEED
+		shell.pos += vel * sdt
+		shell.rot = dash_dir.angle()
+		ghost_cd -= sdt
+		if ghost_cd <= 0.0:
+			ghost_cd = 0.025
+			ghosts.append([shell.pos, 0.0, shell.rot])
+		# scoop up whatever is in front of the shield and carry it along
+		for e in game.enemies.list:
+			if e.state != Enemies.ALIVE:
+				continue
+			var d: Vector2 = e.pos - shell.pos
+			var ahead := d.dot(dash_dir)
+			if ahead > 0.0 and ahead < shell.r * 1.3 + e.r + 70.0 and absf(d.dot(dash_dir.orthogonal())) < 64.0:
+				if not carried.has(e.id):
+					carried[e.id] = e
+					game.sfx.play("p_hit", randf_range(1.1, 1.25), -8.0)
+				e.knock = dash_dir * RUSH_SPEED * 1.05
+		if rush_t <= 0.0:
+			_rush_end(false)
+		return
+	_move(sdt, move, 300.0, 12.0)
+	shell.rot = lerp_angle(shell.rot, aim.angle(), 1.0 - exp(-14.0 * sdt))
+	if not pressed or recover > 0.0:
+		return
+	stage = stage + 1 if stage_window > 0.0 and stage < 3 else 1
+	stage_window = 0.6
+	recover = 0.2
+	match stage:
+		1:
+			_cone(aim, 0.8, 130.0, SHOVE_DMG, 380.0)
+			game.sfx.play("shield", 0.85, -3.0)
+			game.cam.kick(-aim, 2.5)
+		2:
+			_cone(aim, 1.5, 150.0, SWEEP_DMG, 300.0, true)
+			game.sfx.play("dash", 0.9, -4.0)
+			game.cam.kick(aim.orthogonal(), 2.5)
+		3:
+			rush_t = RUSH_TIME
+			dash_dir = aim
+			carried.clear()
+			ghost_cd = 0.0
+			game.sfx.play("dash_e", 0.9, -2.0)
+			game.cam.kick(-aim, 3.0)
+
+
+# A shove or a sweep: everything inside the arc in front takes it and flies.
+func _cone(dir: Vector2, half: float, reach: float, dmg: float, push: float, sideways: bool = false) -> void:
+	var at: Vector2 = shell.pos
+	for e in game.enemies.list:
+		if e.state != Enemies.ALIVE:
+			continue
+		var d: Vector2 = e.pos - at
+		if d.length() > reach + e.r or absf(dir.angle_to(d)) > half:
+			continue
+		var kd: Vector2 = d.normalized()
+		if sideways:
+			kd = (kd + dir.orthogonal() * signf(dir.orthogonal().dot(d))).normalized()
+		_deal(e, dmg, kd, true)
+		e.knock += kd * push
+		e.bounce = 0.0      # a shove sets them up for the rush; only the rush slams them into walls
+	for k in 7:
+		var a := dir.angle() + lerpf(-half, half, k / 6.0)
+		bursts.append([at + Vector2.from_angle(a) * reach * 0.6, 14.0, 0.15])
+	game.fx.sparks(at + dir * 30.0, dir, 10, cyan(1.0, 2.2), 560.0, 0.22, half)
+
+
+func _rush_end(hit_wall: bool) -> void:
+	rush_t = 0.0
+	stage = 0
+	recover = 0.3
+	var at: Vector2 = shell.pos + dash_dir * 30.0
+	for id in carried:
+		var e = carried[id]
+		if e.state != Enemies.ALIVE:
+			continue
+		e.pinned = 2.0 if hit_wall else 1.0
+		_deal(e, RUSH_DMG * (1.4 if hit_wall else 1.0), dash_dir, true)
+	carried.clear()
+	if hit_wall:
+		game.sfx.play("p_slam", 1.1, -1.0)
+	_finisher(at, 120.0)
+
+
+# ---------------------------------------------------------------- charger
+
+func _charger(sdt: float, fire_held: bool, move: Vector2) -> void:
+	if ram_t > 0.0:
+		ram_t -= sdt
+		vel = dash_dir * RAM_SPEED
+		var from: Vector2 = shell.pos
+		shell.pos += vel * sdt
+		shell.rot = dash_dir.angle()
+		lanes.append([from, shell.pos, 0.0])
+		ghost_cd -= sdt
+		if ghost_cd <= 0.0:
+			ghost_cd = 0.02
+			ghosts.append([shell.pos, 0.0, shell.rot])
+		if ram_t <= 0.0:
+			ram_t = 0.0
+			recover = 0.3
+			vel = dash_dir * 260.0
+		return
+	if winding:
+		wind += sdt
+		vel = Pal.damp2(vel, -aim * 30.0, 8.0, sdt)
+		shell.pos += vel * sdt
+		shell.rot = aim.angle()
+		if not fire_held:
+			winding = false
+			if wind >= 0.12:
+				ram_t = 0.85
+				ram_seg = 1
+				dash_dir = aim
+				dash_hit.clear()
+				ghost_cd = 0.0
+				game.sfx.play("dash_e", 1.0, -2.0)
+				game.cam.kick(-aim, 3.5)
+				game.fx.ring(shell.pos, 10.0, 50.0, 0.25, cyan(0.9, 2.2), 2.0)
+		return
+	_move(sdt, move, 300.0, 12.0)
+	shell.rot = lerp_angle(shell.rot, aim.angle(), 1.0 - exp(-12.0 * sdt))
+	if fire_held and recover <= 0.0:
+		winding = true
+		wind = 0.0
+		game.sfx.play("windup", 1.15, -6.0)
+
+
+func _on_wall(n: Vector2) -> void:
+	if shell.kind == Enemies.GUARD and rush_t > 0.0:
+		_rush_end(true)
+	elif shell.kind == Enemies.CHARGER and ram_t > 0.0:
+		var at: Vector2 = shell.pos - n * shell.r
+		if ram_seg >= 3:
+			ram_t = 0.0
+			recover = 0.35
+			vel = n * 200.0
+			for e in game.enemies.list:
+				if e.state == Enemies.ALIVE and e.pos.distance_to(at) < RAM_BURST_R + e.r:
+					var d: Vector2 = (e.pos - at).normalized()
+					_deal(e, RAM_BURST_DMG, d, true)
+					e.knock += d * 640.0
+			game.sfx.play("p_slam", 1.0, 0.0)
+			_finisher(at, RAM_BURST_R)
+			return
+		# the wall throws it back: a fresh run down the new line
+		ram_seg += 1
+		dash_dir = dash_dir.bounce(n).normalized() if absf(dash_dir.dot(n)) > 0.05 else n
+		ram_t = maxf(ram_t, 0.6)
+		dash_hit.clear()
+		game.sfx.play("slam", randf_range(1.0, 1.1), -3.0)
+		game.cam.add_trauma(0.25)
+		game.add_hitstop(0.04)
+		game.fx.sparks(at, n, 14, cyan(1.0, 2.4), 620.0, 0.3, 1.0)
+		bursts.append([at, 60.0, 0.0])
+
+
+# Charger: a round coming home along the ram's red line cuts harder.
+func lane_bonus(p: Vector2) -> float:
+	for l in lanes:
+		if Geometry2D.get_closest_point_to_segment(p, l[0], l[1]).distance_to(p) < 40.0:
+			return 1.5
+	return 1.0
+
+
+# ---------------------------------------------------------------- prism
+
+func _prism(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 260.0, 10.0)
+	shell.rot += 1.2 * sdt
+	if not pressed or recover > 0.0:
+		return
+	stage = stage + 1 if stage_window > 0.0 and stage < 3 else 1
+	stage_window = 0.6
+	recover = 0.16
+	match stage:
+		1:
+			_beam(aim, BEAM_DMG[0])
+			game.sfx.play("cross", 1.0, -3.0)
+		2:
+			for k in 3:
+				_beam(aim.rotated((k - 1) * 0.26), BEAM_DMG[1])
+			game.sfx.play("cross", 1.15, -2.0)
+		3:
+			for k in 12:
+				_beam(aim.rotated(TAU * k / 12.0), BEAM_DMG[2])
+			game.sfx.play("cross", 0.8, 0.0)
+			stage = 0
+			_finisher(shell.pos, 140.0)
+	game.cam.kick(-aim, 1.5)
+
+
+func _beam(dir: Vector2, dmg: float) -> void:
+	var a: Vector2 = shell.pos + dir * shell.r
+	var h: Dictionary = game.arena.raycast(a, a + dir * 2200.0)
+	var b: Vector2 = h.point if h else a + dir * 2200.0
+	for e in game.enemies.list:
+		if e.state == Enemies.ALIVE and Geometry2D.get_closest_point_to_segment(e.pos, a, b).distance_to(e.pos) <= e.r + 16.0:
+			_deal(e, dmg, dir, false)
+	beams.append([a, b, 0.0])
+	game.fx.flash(b, 18.0, 0.1, cyan(0.4, 1.8))
+
+
+# ---------------------------------------------------------------- pulse
+
+func on_beat_now() -> bool:
+	var f: float = game.sfx.beat_frac()
+	return f < 0.2 or f > 0.85
+
+
+# Pulse: a recall let go on the beat sends every round at once, harder.
+func pulse_beat() -> bool:
+	return state == HOST and shell.kind == Enemies.PULSE and on_beat_now()
+
+
+func _pulse(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 330.0, 10.0)
+	var bi := int(floor(game.sfx.beat()))
+	if bi != last_beat:
+		last_beat = bi
+		# every beat it throbs out a small ring of its own
+		shell.squash = 1.0
+		_ring_hit(70.0, 10.0, false)
+	if not pressed or recover > 0.0:
+		return
+	recover = 0.12
+	if on_beat_now():
+		stage = stage + 1 if stage_window > 0.0 and stage < 3 else 1
+		stage_window = 60.0 / game.sfx.BPMS[game.sfx.chapter] * 1.7
+		_ring_hit(PULSE_R[stage - 1], PULSE_DMG[stage - 1], true)
+		game.sfx.play("p_hit", 0.9 + stage * 0.1, -3.0)
+		if stage >= 3:
+			stage = 0
+			_finisher(shell.pos, PULSE_R[2])
+	else:
+		stage = 0
+		_ring_hit(80.0, 15.0, false)
+		game.sfx.play("empty", 1.3, -10.0)
+
+
+func _ring_hit(radius: float, dmg: float, heavy: bool) -> void:
+	var at: Vector2 = shell.pos
+	for e in game.enemies.list:
+		if e.state == Enemies.ALIVE and e.pos.distance_to(at) < radius + e.r:
+			var d: Vector2 = (e.pos - at).normalized()
+			_deal(e, dmg, d, heavy)
+			e.knock += d * (420.0 if heavy else 160.0)
+	bursts.append([at, radius, 0.0])
+	if heavy:
+		game.cam.add_trauma(0.15)
+
+
+# ---------------------------------------------------------------- echo
+
+func _echo(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 420.0, 14.0)
+	if vel.length() > 20.0:
+		shell.rot = lerp_angle(shell.rot, vel.angle(), 1.0 - exp(-10.0 * sdt))
+		ghost_cd -= sdt
+		if ghost_cd <= 0.0:
+			ghost_cd = 0.05
+			ghosts.append([shell.pos, 0.0, shell.rot])
+	var replaying := false
+	for c in clones:
+		if c.replay:
+			replaying = true
+			_clone_replay(c, sdt)
+		else:
+			c.path.append(shell.pos)
+			if c.path.size() > 240:
+				c.path.remove_at(0)
+	var i := 0
+	while i < clones.size():
+		if clones[i].done:
+			clones.remove_at(i)
+		else:
+			i += 1
+	if not clones.is_empty() and not replaying:
+		clone_t += sdt
+		if clone_t > 4.0:
+			_echo_replay()
+	if not pressed or recover > 0.0 or replaying:
+		return
+	recover = 0.15
+	if clones.size() < 2:
+		clones.append({"pos": shell.pos, "path": PackedVector2Array([shell.pos]), "replay": false, "idx": 0.0, "hit": {}, "done": false})
+		clone_t = 0.0
+		stage = clones.size()
+		game.sfx.play("p_ready", 0.9 + clones.size() * 0.15, -4.0)
+		game.fx.ring(shell.pos, 6.0, 40.0, 0.3, cyan(0.8, 2.0), 1.5)
+	else:
+		_echo_replay()
+
+
+func _echo_replay() -> void:
+	stage = 3
+	for c in clones:
+		c.replay = true
+		c.idx = 0.0
+	game.sfx.play("p_well", 1.3, -3.0)
+
+
+func _clone_replay(c: Dictionary, sdt: float) -> void:
+	var path: PackedVector2Array = c.path
+	c.idx += sdt * 150.0       # three times the speed you walked it
+	var k := mini(int(c.idx), path.size() - 1)
+	c.pos = path[k]
+	for e in game.enemies.list:
+		if e.state != Enemies.ALIVE:
+			continue
+		var d: Vector2 = c.pos - e.pos
+		if d.length() < 150.0:
+			e.knock += d.normalized() * 900.0 * sdt     # drawn to the copy
+		if d.length() < e.r + 20.0 and not c.hit.has(e.id):
+			c.hit[e.id] = true
+			_deal(e, ECHO_TOUCH, -d.normalized(), false)
+	if k >= path.size() - 1:
+		c.done = true
+		var at: Vector2 = c.pos
+		for e in game.enemies.list:
+			if e.state == Enemies.ALIVE and e.pos.distance_to(at) < ECHO_BURST_R + e.r:
+				var dd: Vector2 = (e.pos - at).normalized()
+				_deal(e, ECHO_BURST_DMG, dd, true)
+				e.knock += dd * 520.0
+		_finisher(at, ECHO_BURST_R)
+		stage = 0
+
+
+# Echo: when you recall, every copy sends rounds of its own back to you.
+func on_recall_release() -> void:
+	if state != HOST or shell.kind != Enemies.ECHO:
+		return
+	for c in clones:
+		var to: Vector2 = shell.pos - c.pos
+		if to.length() < 30.0:
+			continue
+		for k in 4:
+			var v: Vector2 = to.normalized().rotated(randf_range(-0.08, 0.08)) * 1700.0
+			wakes.append([c.pos + to.normalized().orthogonal() * (k - 1.5) * 8.0, v, 0.0, {}, to.length() / 1700.0])
 
 
 # ---------------------------------------------------------------- damage
@@ -679,14 +1126,38 @@ func _draw() -> void:
 	for w in wakes:
 		var wa: Vector2 = w[0]
 		var wv: Vector2 = w[1]
-		_px_line(wa - wv.normalized() * 34.0, wa, cyan(1.0 - w[2] / 0.32, 2.4), 1.0)
+		_px_line(wa - wv.normalized() * 34.0, wa, cyan(1.0 - w[2] / w[4], 2.4), 1.0)
 	for bst in bursts:
 		var bk: float = bst[2] / 0.4
 		_px_ring(bst[0], bst[1] * Pal.ease_out(bk), cyan(1.0 - bk, 2.4))
+	for l in lanes:
+		var la: float = 1.0 - l[2] / 3.0
+		_px_line(l[0], l[1], Pal.red(0.5 * la, 2.0), 1.0)
+	for bm in beams:
+		var ba: float = 1.0 - bm[2] / 0.18
+		_px_line(bm[0], bm[1], cyan(ba, 2.6), 2.0 if bm[2] < 0.05 else 1.0)
 	if state != HOST or shell == null:
 		return
+	for c in clones:
+		_part("echo", c.pos, shell.rot, Color(0.6, 1.7, 1.9, 0.55 if c.replay else 0.35))
+		if not c.replay and c.path.size() > 1:
+			var pth: PackedVector2Array = c.path
+			for j in range(0, pth.size() - 1, 6):
+				_px(pth[j], 1.0, cyan(0.25))
+	if shell.kind == Enemies.CHARGER and winding:
+		var hh: Dictionary = game.arena.raycast(shell.pos, shell.pos + aim * 1600.0)
+		var end: Vector2 = hh.point if hh else shell.pos + aim * 1600.0
+		var lane: float = shell.pos.distance_to(end)
+		var off := fmod(t * 160.0, 22.0)
+		var at2 := 30.0 + off
+		while at2 < lane:
+			_px_line(shell.pos + aim * at2, shell.pos + aim * minf(at2 + 10.0, lane), cyan(0.35 + 0.4 * minf(wind / 0.4, 1.0), 2.0), 1.0)
+			at2 += 22.0
+	if shell.kind == Enemies.PULSE:
+		var bf: float = game.sfx.beat_frac()
+		_px_ring(shell.pos, lerpf(70.0, 30.0, bf), cyan(0.15 + 0.5 * (1.0 if on_beat_now() else 0.0), 2.0), 24)
 	var pos: Vector2 = shell.pos
-	var kind_name := "chaser" if shell.kind == Enemies.CHASER else "leech"
+	var kind_name: String = NAMES[shell.kind]
 	# afterimages
 	for g in ghosts:
 		var gk: float = 1.0 - g[1] / 0.3
@@ -725,7 +1196,13 @@ func _draw() -> void:
 			if well_on:
 				tip = pos.lerp(well_pos, 0.25 + 0.05 * k)
 			_px_line(pos + Vector2.from_angle(ta) * 14.0, tip, cyan(0.9, 1.8), 1.0)
-	_part(kind_name, pos + shake, shell.rot, mod)
+	var draw_rot: float = shell.rot
+	_part(kind_name, pos + shake, draw_rot, mod)
+	if shell.kind == Enemies.GUARD:
+		# the raised shield: a thick pixel arc toward the aim
+		for j in 9:
+			var aa := aim.angle() + lerpf(-0.9, 0.9, j / 8.0)
+			_px(pos + Vector2.from_angle(aa) * 36.0, 2.0, cyan(0.9, 2.2))
 	if grow > 0.35:
 		_part(kind_name + ("_spk2" if grow > 0.75 else "_spk1"), pos + shake, shell.rot, Color(mod.r * 1.2, mod.g * 1.2, mod.b * 1.2, mod.a))
 	# time left: a ring of pixels that empties; hits left: three pips under it

@@ -1,5 +1,5 @@
 extends SceneTree
-# Headless: the title's 夺壳试玩 room keeps six chasers and two leeches coming,
+# Headless: the title's 夺壳试玩 room keeps three chasers and one of every other seizable kind coming,
 # nothing else, never ends, and never writes the save.
 # Run: Godot --headless --path . -s tests/trial_check.gd --fixed-fps 60
 
@@ -24,23 +24,15 @@ func _run() -> void:
 	check(game.trial and Meta.test_mode, "进入夺壳试玩：不写存档")
 	for i in 60 * 12:
 		await process_frame
-	var ch := 0
-	var le := 0
-	var other := 0
+	var have := {}
 	for e in game.enemies.list:
-		if e.state == Enemies.DEAD:
-			continue
-		if e.kind == Enemies.CHASER:
-			ch += 1
-		elif e.kind == Enemies.LEECH:
-			le += 1
-		else:
-			other += 1
-	check(ch == 6 and le == 2 and other == 0, "场上 6 追击者 + 2 吸附者，没有别的（%d / %d / %d）" % [ch, le, other])
+		if e.state != Enemies.DEAD:
+			have[e.kind] = have.get(e.kind, 0) + 1
+	check(have.get(Enemies.CHASER, 0) == 3 and have.size() == 7, "七种能夺的敌人都在场：%s" % str(have))
 	for e in game.enemies.list:
 		e.state = Enemies.DEAD
 	for i in 60 * 6:
 		await process_frame
-	check(game.wave_ctl.phase == Waves.FIGHT and game.enemies.remaining() == 8, "打光了会马上补，试玩不会结束（%d）" % game.enemies.remaining())
+	check(game.wave_ctl.phase == Waves.FIGHT and game.enemies.remaining() == 9, "打光了会马上补，试玩不会结束（%d）" % game.enemies.remaining())
 	print("TRIAL CHECK " + ("PASS" if fails.is_empty() else "FAIL"))
 	quit(0 if fails.is_empty() else 1)

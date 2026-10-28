@@ -448,6 +448,9 @@ func recall(from: Vector2) -> int:
 	c.sort_custom(func(x: B, y: B) -> bool: return x.pos.distance_squared_to(from) < y.pos.distance_squared_to(from))
 	var n := c.size()
 	var gap := minf(0.014, 0.22 / maxf(1.0, n))
+	var on_beat: bool = game.possess.pulse_beat()
+	if on_beat:
+		gap = 0.0          # a seized pulse on the beat: every round leaves at once
 	for i in n:
 		var b := c[i]
 		b.state = PULL
@@ -464,6 +467,8 @@ func recall(from: Vector2) -> int:
 		b.zero_pass = false
 		b.first_bonus = game.has("zero_point")
 		b.dmg *= game.gun_dmg()
+		if on_beat:
+			b.dmg *= 1.5
 		if life_max - b.life <= 3.0 and not b.child:
 			game.crit_recalls += 1
 			if Meta.count("crit") >= 20:

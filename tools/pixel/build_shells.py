@@ -126,4 +126,73 @@ def leech_spk(k):
 
 save("leech_spk1", leech_spk(0.45), (cx, cy))
 save("leech_spk2", leech_spk(1.0), (cx, cy))
+
+def ngon(cx, cy, r, n, rot=0.0):
+    return [(cx + r * math.cos(rot + i * 2 * math.pi / n), cy + r * math.sin(rot + i * 2 * math.pi / n)) for i in range(n)]
+
+
+def radial_spk(cx, cy, n, r0, r1, half, rot=0.0):
+    tris = []
+    for i in range(n):
+        a = rot + i * 2 * math.pi / n
+        tris.append([(cx + r0 * math.cos(a + half), cy + r0 * math.sin(a + half)), (cx + r1 * math.cos(a), cy + r1 * math.sin(a)),
+                     (cx + r0 * math.cos(a - half), cy + r0 * math.sin(a - half))])
+    return tris
+
+
+W = H = 33
+cx = cy = 16
+# ---- 盾卫：方块机身，前方（+x）是一面厚盾；异体 = 盾沿长出前刺 + 背后两根稳定鳍
+guard = [(cx - 9, cy - 9), (cx + 5, cy - 9), (cx + 5, cy + 9), (cx - 9, cy + 9)]
+gimg = body(guard, W, H, (cx - 2, cy), 2.0)
+shield = mask([(cx + 7, cy - 13), (cx + 10, cy - 11), (cx + 11, cy), (cx + 10, cy + 11), (cx + 7, cy + 13), (cx + 8, cy)], W, H)
+paint(gimg, shield, "c2")
+paint(gimg, shield & ~edge(shield), "c3")
+save("guard", gimg, (cx, cy))
+for nm, k in (("guard_spk1", 0.5), ("guard_spk2", 1.0)):
+    save(nm, spikes(W, H, [
+        [(cx + 10, cy - 9), (cx + 12 + 4 * k, cy - 12 - 3 * k), (cx + 11, cy - 5)],
+        [(cx + 10, cy + 9), (cx + 12 + 4 * k, cy + 12 + 3 * k), (cx + 11, cy + 5)],
+        [(cx + 11, cy - 1.5), (cx + 13 + 4 * k, cy), (cx + 11, cy + 1.5)],
+        [(cx - 9, cy - 6), (cx - 11 - 4 * k, cy - 9 - 3 * k), (cx - 7, cy - 9)],
+        [(cx - 9, cy + 6), (cx - 11 - 4 * k, cy + 9 + 3 * k), (cx - 7, cy + 9)],
+    ]), (cx, cy))
+
+# ---- 冲锋者：前长后短的菱形撞角；异体 = 撞角前延 + 两侧倒钩
+charger = [(cx + 14, cy), (cx, cy - 8), (cx - 9, cy), (cx, cy + 8)]
+save("charger", body(charger, W, H, (cx - 1, cy), 1.8), (cx, cy))
+for nm, k in (("charger_spk1", 0.5), ("charger_spk2", 1.0)):
+    save(nm, spikes(W, H, [
+        [(cx + 12, cy - 2), (cx + 14 + 3 * k, cy), (cx + 12, cy + 2)],
+        [(cx + 3, cy - 6), (cx + 1 - 4 * k, cy - 10 - 4 * k), (cx - 1, cy - 6)],
+        [(cx + 3, cy + 6), (cx + 1 - 4 * k, cy + 10 + 4 * k), (cx - 1, cy + 6)],
+        [(cx - 7, cy - 2), (cx - 10 - 4 * k, cy), (cx - 7, cy + 2)],
+    ]), (cx, cy))
+
+# ---- 棱镜：三角晶体，内部三道折射线；异体 = 三个角延伸成长晶尖
+prism = ngon(cx, cy, 11, 3)
+pimg = body(prism, W, H, (cx, cy), 1.6)
+for i in range(3):
+    a = i * 2 * math.pi / 3 + math.pi / 3
+    line = mask([(cx, cy - 0.6), (cx + 9 * math.cos(a), cy + 9 * math.sin(a) - 0.6), (cx + 9 * math.cos(a), cy + 9 * math.sin(a) + 0.6), (cx, cy + 0.6)], W, H)
+    paint(pimg, line & mask(prism, W, H), "c3")
+save("prism", pimg, (cx, cy))
+for nm, k in (("prism_spk1", 0.5), ("prism_spk2", 1.0)):
+    save(nm, spikes(W, H, radial_spk(cx, cy, 3, 8, 11 + 5 * k, 0.22)), (cx, cy))
+
+# ---- 脉冲体：六边形，白核大；异体 = 六个角各一根短刺（像音箱的散热鳍）
+pulse = ngon(cx, cy, 10, 6)
+save("pulse", body(pulse, W, H, (cx, cy), 2.6), (cx, cy))
+for nm, k in (("pulse_spk1", 0.5), ("pulse_spk2", 1.0)):
+    save(nm, spikes(W, H, radial_spk(cx, cy, 6, 9, 10 + 4 * k, 0.2)), (cx, cy))
+
+# ---- 回声：八边形，空心环 + 小核；异体 = 八根细刺
+echo = ngon(cx, cy, 9, 8, math.pi / 8)
+eimg = body(echo, W, H, (cx, cy), 1.4)
+ring_m = disc(W, H, cx, cy, 5.0) & ~disc(W, H, cx, cy, 3.6)
+paint(eimg, ring_m, "c3")
+save("echo", eimg, (cx, cy))
+for nm, k in (("echo_spk1", 0.5), ("echo_spk2", 1.0)):
+    save(nm, spikes(W, H, radial_spk(cx, cy, 8, 8, 9 + 4 * k, 0.14, math.pi / 8), light=False), (cx, cy))
+
 print("shell sprites ->", os.path.abspath(OUT))

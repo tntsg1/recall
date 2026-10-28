@@ -665,8 +665,11 @@ func _in_focus() -> bool:
 	return Input.is_action_pressed("recall") or Input.is_action_pressed("recall_mouse")
 
 
-# 夺壳试玩: once the first wave is up, keep six chasers and two leeches in the room
-# (fresh ones walk in from the edges as others fall). You cannot lose here.
+# 夺壳试玩: once the first wave is up, keep three chasers and one of every other
+# seizable kind in the room (fresh ones walk in as others fall). You cannot lose here.
+const TRIAL_MIX := {Enemies.CHASER: 3, Enemies.LEECH: 1, Enemies.GUARD: 1, Enemies.CHARGER: 1, Enemies.PRISM: 1, Enemies.PULSE: 1, Enemies.ECHO: 1}
+
+
 func _trial_step(sdt: float) -> void:
 	dev_god = true
 	if wave_ctl.phase != Waves.FIGHT:
@@ -678,22 +681,15 @@ func _trial_step(sdt: float) -> void:
 	trial_cd -= sdt
 	if trial_cd > 0.0:
 		return
-	var chasers := 0
-	var leeches := 0
+	var have := {}
 	for e in enemies.list:
-		if e.state == Enemies.DEAD:
-			continue
-		if e.kind == Enemies.CHASER:
-			chasers += 1
-		elif e.kind == Enemies.LEECH:
-			leeches += 1
-		elif e.state == Enemies.ALIVE and e.kind != Enemies.CHASER and e.kind != Enemies.LEECH:
-			e.state = Enemies.DEAD      # the room is only for the two seizable kinds
+		if e.state != Enemies.DEAD:
+			have[e.kind] = have.get(e.kind, 0) + 1
 	var kind := -1
-	if leeches < 2:
-		kind = Enemies.LEECH
-	elif chasers < 6:
-		kind = Enemies.CHASER
+	for k in TRIAL_MIX:
+		if have.get(k, 0) < TRIAL_MIX[k]:
+			kind = k
+			break
 	if kind < 0:
 		return
 	trial_cd = 0.45
@@ -933,6 +929,7 @@ func _release() -> void:
 	focusing = false
 	var held := focus_time
 	var n := bullets.recall(player.pos)
+	possess.on_recall_release()
 	if n <= 0:
 		return
 	pass_focus = has("focus_lens") and held >= 0.8

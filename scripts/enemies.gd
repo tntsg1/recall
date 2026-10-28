@@ -59,6 +59,7 @@ class E:
 	var lag := 2.5
 	var orbit_a := 0.0
 	var bounce := 0.0           # knocked hard by a seized shell: a wall throws it back
+	var pinned := 0.0           # rammed into a wall by a seized guard: recalls cut it twice as hard
 
 var list: Array[E] = []
 var game
@@ -187,6 +188,10 @@ func sweep(a: Vector2, b: Vector2, bullet, ret: bool) -> void:
 			if e.kind == PULSE:
 				# its shell is open just after each beat
 				dmg *= 1.5 if game.sfx.beat_frac() < 0.35 else 0.25
+			if ret and e.pinned > 0.0:
+				dmg *= 2.0
+			if ret:
+				dmg *= game.possess.lane_bonus(q)
 			if ret and game.has("afterburn"):
 				e.burn = 2.0
 			if game.first_blood_ready:
@@ -373,6 +378,7 @@ func step(dt: float) -> void:
 				_die(e, Vector2.UP)
 		e.squash = maxf(0.0, e.squash - dt / 0.22)
 		e.red = maxf(0.0, e.red - dt / 1.2)
+		e.pinned = maxf(0.0, e.pinned - dt)
 		e.shield_flash = maxf(0.0, e.shield_flash - dt / 0.2)
 		var j := 0
 		while j < e.ghosts.size():
