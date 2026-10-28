@@ -153,6 +153,12 @@ func think(game) -> void:
 					move += v.normalized() * 2.2
 					if arm.mode == Arms.SWEEP and absf(wrapf(v.angle() - arm.a, -PI, PI)) < 0.35:
 						bot.dash = true
+	# the express's pressure wave off the platform: dash through its edge
+	if bs is Boss and bs.state == Boss.RUN and bs.station_t < Boss.WAVE_TIME:
+		var wr: float = Boss.WAVE_R0 + (Boss.WAVE_R1 - Boss.WAVE_R0) * Pal.ease_out(bs.station_t / Boss.WAVE_TIME)
+		var gap: float = p.distance_to(Boss.STATION) - wr
+		if gap > 0.0 and gap < 70.0:
+			bot.dash = true
 	# guide rails: keep off a powered one (it drags at your feet)
 	if game.maglev.active():
 		for rl in game.maglev.rails:

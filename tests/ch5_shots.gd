@@ -62,8 +62,8 @@ func _run() -> void:
 		game.lore.hold["w5_%s" % w[0]] = 9.0
 	await frames(40)
 	await shot("3_remnants")
-	game.player.pos = Vector2(820, 640)
-	var p = game.enemies.spawn(Enemies.CHARGER, Vector2(940, 640))
+	game.player.pos = Vector2(560, 440)
+	var p = game.enemies.spawn(Enemies.CHARGER, Vector2(680, 440))
 	p.state = Enemies.ALIVE
 	game.possess.mark(p)
 	bot.possess = true
@@ -79,9 +79,9 @@ func _run() -> void:
 	game.player.pos = Vector2(960, 700)
 	# wait for the engine to pass the platform
 	var bs = game.boss
-	while bs.at(bs.car_s(0)).distance_to(Boss.STATION) > 160.0:
+	# the moment it tears past the platform
+	while not (bs.station_t > 0.12 and bs.station_t < 0.3):
 		await process_frame
-	await frames(8)
 	await shot("5_express")
 	await frames(120)
 	await shot("6_express_rails")

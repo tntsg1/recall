@@ -17,6 +17,7 @@ var live := [false, false]
 var warn := [0.0, 0.0]
 var bend_flash: Array = []   # [point, t, dir]
 var drag_cd := 0.0
+var thrown: Array = []       # [bullet, from, t]: rounds a rail turned, drawn bold for a moment
 var t := 0.0
 var game
 
@@ -74,6 +75,13 @@ func step(dt: float) -> void:
 					drag_cd = 0.14
 					game.fx.ring(p, 8.0, 34.0, 0.3, Pal.ink(0.45, 1.4), 1.5)
 				break
+	var j2 := 0
+	while j2 < thrown.size():
+		thrown[j2][2] += dt
+		if thrown[j2][2] > 1.4:
+			thrown.remove_at(j2)
+		else:
+			j2 += 1
 	var i := 0
 	while i < bend_flash.size():
 		bend_flash[i][1] += dt
@@ -114,8 +122,10 @@ func cross(a: Vector2, b: Vector2, bullet) -> Dictionary:
 	return best
 
 
-func on_bend(at: Vector2, dir: Vector2 = Vector2.ZERO) -> void:
+func on_bend(at: Vector2, dir: Vector2 = Vector2.ZERO, bullet = null) -> void:
 	bend_flash.append([at, 0.0, dir])
+	if bullet != null:
+		thrown.append([bullet, at, 0.0])
 	game.fx.flash(at, 26.0, 0.12, Pal.ink(0.6, 2.0))
 	game.fx.sparks(at, Vector2.UP, 3, Pal.ink(0.9, 1.8), 220.0, 0.15, PI)
 	game.sfx.play("shield", randf_range(1.6, 1.8), -12.0)
@@ -124,6 +134,9 @@ func on_bend(at: Vector2, dir: Vector2 = Vector2.ZERO) -> void:
 func _draw() -> void:
 	var f: float = game.focus if game else 0.0
 	var dim := 1.0 - 0.45 * f
+	# under the chapter's title card the rails stay dim
+	if game and game.hud.intro_t >= 0.0:
+		dim *= clampf((game.hud.intro_t - 2.2) / 0.6, 0.25, 1.0)
 	var now: float = game.real_time if game else t
 	for r in rails:
 		var a: Vector2 = r[0]
@@ -173,6 +186,11 @@ func _draw() -> void:
 			draw_circle(e, 7.0, Pal.WALL)
 			draw_arc(e, 7.0, 0.0, TAU, 14, Pal.ink(0.55 * dim), 1.5)
 			draw_circle(e, 3.0, Pal.ink((1.0 if lit else (0.8 * w if w > 0.0 else 0.2)) * dim, 2.4 if lit else 1.0))
+	for th in thrown:
+		var tb = th[0]
+		var ka: float = 1.0 - th[2] / 1.4
+		draw_line(th[1], tb.pos, Pal.ink(0.2 * ka * dim, 1.4), 7.0)
+		draw_line(th[1], tb.pos, Pal.ink(0.9 * ka * dim, 2.0), 3.0)
 	for bf in bend_flash:
 		var k: float = bf[1] / 0.35
 		draw_arc(bf[0], 6.0 + 16.0 * k, 0.0, TAU, 16, Pal.ink((1.0 - k) * dim, 2.0), 2.0)

@@ -21,6 +21,9 @@ const SPEEDS := [360.0, 430.0, 500.0, 580.0]
 const OPEN_TIME := [3.8, 3.5, 3.2, 3.0]
 const BREAKS := [[1, 2], [3, 4], [5]]   # cars whose armour falls at 75 / 50 / 25 %
 const STATION := Vector2(960, 910)       # 13th Street's platform, on the loop's bottom run
+const WAVE_TIME := 0.7
+const WAVE_R0 := 40.0
+const WAVE_R1 := 380.0
 const STENCIL := ["直达", "中央", "沿途", "不停", "货运", "专列"]
 
 var game
@@ -44,6 +47,7 @@ var core_open := 0.0               # shutter 0..1 (eased)
 var core_flash := 0.0
 var station_cd := 0.0
 var station_t := 9.0               # seconds since it last tore past the platform
+var wave_hit := false              # this pass's pressure wave has already struck you
 var core_red := 0.0
 var stripped := []                 # per car: armour gone
 var strip_t := []                  # per car: time since stripped (for the burst)
@@ -433,6 +437,14 @@ func _run(dt: float) -> void:
 		speed = Pal.damp(speed, target_speed * (1.15 if game.maglev.any_lit() else 1.0), 1.2, dt)
 	head += speed * dir * dt
 	station_t += dt
+	# the wave of its passing: a red ring rolling out over the platform floor;
+	# caught on its edge you are struck (a dash goes through)
+	if station_t < WAVE_TIME and not wave_hit:
+		var wr := WAVE_R0 + (WAVE_R1 - WAVE_R0) * Pal.ease_out(station_t / WAVE_TIME)
+		var pl: Vector2 = game.player.pos
+		if absf(pl.distance_to(STATION) - wr) < 16.0 and game.player.dash_t <= 0.0:
+			wave_hit = true
+			game.on_player_hit((pl - STATION).normalized(), null)
 	# past the platform at 13th Street: the horn, and it does not slow
 	station_cd -= dt
 	if station_cd <= 0.0 and at(car_s(0)).distance_to(STATION) < 40.0:
@@ -441,7 +453,7 @@ func _run(dt: float) -> void:
 		game.sfx.play("horn", 0.95, -5.0)
 		game.cam.add_trauma(0.18)
 		# the blast of its passing rolls over the platform
-		game.fx.ring(STATION + Vector2(0, 40), 20.0, 420.0, 0.6, Pal.foe(0.5, 1.4), 3.0)
+		wave_hit = false
 		for j in 6:
 			game.fx.spark(STATION + Vector2(randf_range(-200, 200), 40.0), Vector2(randf_range(-80, 80), randf_range(40, 120)), 0.4, Pal.ink(0.4, 1.2), 1.0, 6.0)
 	if horn_t >= 0.0:
@@ -619,11 +631,35 @@ func _draw() -> void:
 		var lead_k := 0 if dir > 0.0 else CARS - 1
 		if car_visible(lead_k):
 			var ls := car_s(lead_k)
-			var tn := tangent(ls) * dir
-			var front := at(ls) + tn * (car_size(lead_k).x * 0.5 + 10.0)
-			var cone := PackedVector2Array([front, front + tn.rotated(-0.3) * 260.0, front + tn.rotated(0.3) * 260.0])
-			draw_polygon(cone, PackedColorArray([Pal.foe(0.1 * dim, 1.4), Pal.foe(0.0, 1.0), Pal.foe(0.0, 1.0)]))
+			var s0 := ls + dir * (car_size(lead_k).x * 0.5 + 6.0)
+			var front := at(s0)
+			# a beam that runs down the rails themselves, round the bends
+			var left := PackedVector2Array()
+			var right := PackedVector2Array()
+			var cl := PackedColorArray()
+			for j in 9:
+				var u := j / 8.0
+				var sj := s0 + dir * u * 300.0
+				var pj := at(sj)
+				var nj := tangent(sj).orthogonal()
+				var hw := 8.0 + 34.0 * u
+				left.append(pj + nj * hw)
+				right.append(pj - nj * hw)
+			var poly := PackedVector2Array(left)
+			var rr := right.duplicate()
+			rr.reverse()
+			poly.append_array(rr)
+			for j in poly.size():
+				var u2 := float(j if j < 9 else poly.size() - 1 - j) / 8.0
+				cl.append(Pal.foe(0.12 * (1.0 - u2) * dim, 1.4))
+			draw_polygon(poly, cl)
 			draw_circle(front, 6.0, Pal.foe(dim, 2.2))
+	# the pressure wave off the platform
+	if station_t < WAVE_TIME and state == RUN:
+		var k := station_t / WAVE_TIME
+		var wr := WAVE_R0 + (WAVE_R1 - WAVE_R0) * Pal.ease_out(k)
+		draw_arc(STATION, wr, PI * 1.05, TAU * 0.975, 64, Pal.red((1.0 - k) * dim, 2.2), 4.0)
+		draw_arc(STATION, wr - 10.0, PI * 1.05, TAU * 0.975, 64, Pal.red(0.3 * (1.0 - k) * dim, 1.4), 10.0)
 	# the lane ahead lights up while it brakes to reverse
 	if state == RUN and reverse_t > 0.0:
 		var lead := CARS - 1 if dir > 0.0 else 0
@@ -642,13 +678,20 @@ func _draw_core(r: Rect2, a: float) -> void:
 	if core == WARN:
 		warn = 0.5 + 0.5 * sin(core_t * 50.0)
 	# the core: a white hexagon that glows hot when open, red after a recall hit
-	var cc := Pal.foe(a, 1.1 + 0.7 * o + 0.6 * core_flash).lerp(Pal.red(a, 2.2), core_red * 0.9)
+	var cc := Pal.foe(a, 0.95 + 0.45 * o + 0.5 * core_flash).lerp(Pal.red(a, 2.0), core_red * 0.9)
 	var hex := PackedVector2Array()
 	for j in 6:
 		hex.append(Vector2.from_angle(TAU * j / 6.0 + game.real_time * (0.6 + 2.0 * o)) * CORE_R * (0.55 + 0.45 * o))
 	draw_colored_polygon(hex, cc)
 	if o > 0.05:
-		draw_arc(Vector2.ZERO, CORE_R + 4.0 + 3.0 * sin(game.real_time * 9.0), 0.0, TAU, 28, Pal.foe(0.6 * o * a, 1.5), 1.5, false)
+		# the louvre ring: slats round the core that turn open with it
+		var sl := PackedVector2Array()
+		for j in 10:
+			var aj := TAU * j / 10.0
+			var p0 := Vector2.from_angle(aj) * (CORE_R + 5.0)
+			sl.append(p0)
+			sl.append(p0 + Vector2.from_angle(aj + 0.6 * o) * 8.0)
+		draw_multiline(sl, Pal.foe(0.7 * o * a, 1.4), 2.0)
 	# shutters: two plates that slide apart along the car
 	var gap := o * (r.size.x / 2.0 - 4.0)
 	var plate_w := r.size.x / 2.0 - 2.0

@@ -290,7 +290,7 @@ func _remnant_hand(w: Array, shown: String, k: float, dim: float) -> void:
 
 # Sprayed along the top wall, in the strip between the wall and the track.
 func _remnant_hand_top(w: Array, shown: String, k: float, dim: float) -> void:
-	var at: Vector2 = (w[1] as Vector2) + Vector2(0, 66.0)
+	var at: Vector2 = (w[1] as Vector2) + Vector2(0, 56.0)
 	var sf := Fonts.get_font("SemiBold")
 	var x := at.x
 	var i := 0
@@ -472,10 +472,10 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 				full = w[4] if Txt.zh else w[5]
 		# four rows only fit a little smaller
 		var fs := 15
-		var rows := _rows(full, scr.size.x - 12.0, fs)
+		var rows := _split_rows(full, scr.size.x - 12.0, fs)
 		if rows.size() > 3:
 			fs = 13
-			rows = _rows(full, scr.size.x - 10.0, fs)
+			rows = _split_rows(full, scr.size.x - 10.0, fs)
 		var step := 21.0 if fs == 15 else 18.0
 		var budget := int(ceil(full.length() * clampf(wake * 1.6, 0.0, 1.0)))
 		var yy := scr.position.y + (24.0 if fs == 15 else 19.0)
@@ -612,6 +612,14 @@ func _rows(txt: String, width: float, size: int) -> Array:
 	if cur != "":
 		out.append(cur)
 	row_cache[key] = out
+	return out
+
+
+# rows broken first at the text's own dots, then by width
+func _split_rows(txt: String, width: float, size: int) -> Array:
+	var out: Array = []
+	for part in txt.split(" · "):
+		out.append_array(_rows(part, width, size))
 	return out
 
 
@@ -804,7 +812,9 @@ func _remnant_crate(w: Array, shown: String, full: String, k: float, dim: float)
 			lid = r.grow(-6.0)
 	draw_rect(lid, Color(0.05, 0.05, 0.055, k))
 	var sf := Fonts.get_font("SemiBold")
-	var rows := _rows(full, lid.size.x - 8.0, 13)
+	var rows: Array = []
+	for part in full.split(" · "):
+		rows.append_array(_rows(part, lid.size.x - 8.0, 13))
 	var budget := shown.length()
 	var yy := lid.position.y + 16.0
 	for row in rows:
@@ -861,7 +871,7 @@ func _draw_platform(dim: float) -> void:
 	var figs := PackedVector2Array()
 	var poses := [0, 1, 0, 2, 0, 1, 3, 0, 2, 1]
 	for j in poses.size():
-		var c := Vector2(170.0 + r.position.x + j * 38.0, r.position.y + 42.0)
+		var c := Vector2(162.0 + r.position.x + j * 33.0, r.position.y + 42.0)
 		c += Vector2(sin(j * 3.1 + passed * 30.0) * 3.0 * flinch, 6.0 * flinch)
 		var pose: int = poses[j]
 		var head_r := 7.0 if pose != 3 else 5.0
@@ -877,7 +887,7 @@ func _draw_platform(dim: float) -> void:
 			figs.append_array(PackedVector2Array([c + Vector2(sw, 0), c + Vector2(sw + 8.0, -18)]))
 	draw_multiline(figs, Pal.ink(0.5 * dim), 2.0)
 	# the sign: 本站不停, flashing as it passes; when woken, it runs the rule
-	var sg := Rect2(Vector2(r.end.x - 188.0, r.position.y + 22.0), Vector2(176, 40))
+	var sg := Rect2(Vector2(r.end.x - 212.0, r.position.y + 14.0), Vector2(200, 50))
 	draw_rect(sg, Color(0.02, 0.025, 0.03))
 	draw_rect(sg, Pal.ink(0.55 * dim), false, 1.5)
 	var wake: float = shows.get("w5_yellow", 0.0)
@@ -886,21 +896,20 @@ func _draw_platform(dim: float) -> void:
 		for w in Lore.walls(5):
 			if w[0] == "yellow":
 				full = w[4] if Txt.zh else w[5]
-		var fw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-		var off := fmod(t * 90.0, fw + sg.size.x)
-		var tx := sg.end.x - off
-		var clipped := ""
-		var cx := tx
-		for ch in full:
-			var chw := sf.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-			if cx >= sg.position.x + 4.0 and cx + chw <= sg.end.x - 4.0:
-				draw_string(sf, Vector2(cx, sg.position.y + 26.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.95 * wake * dim, 1.4))
-			cx += chw
+		# the rule in two lines, whole: the second is the one that bites
+		var parts := full.split(" · ")
+		var budget := int(ceil(full.length() * clampf(wake * 1.6, 0.0, 1.0)))
+		for li in parts.size():
+			var line: String = parts[li]
+			var part := line.substr(0, clampi(budget, 0, line.length()))
+			budget -= line.length() + 3
+			var lw := sf.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+			draw_string(sf, Vector2(sg.get_center().x - lw / 2.0, sg.position.y + 21.0 + li * 21.0), part, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Pal.ink((0.75 if li == 0 else 1.0) * wake * dim, 1.5))
 	else:
 		var hot := flinch > 0.0 and fmod(passed * 8.0, 1.0) < 0.5
 		var msg := Txt.t("no_stop")
 		var mw := sf.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
-		draw_string(sf, Vector2(sg.get_center().x - mw / 2.0, sg.position.y + 27.0), msg, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.foe((1.0 if hot else 0.6) * dim, 2.0 if hot else 1.2))
+		draw_string(sf, Vector2(sg.get_center().x - mw / 2.0, sg.position.y + 32.0), msg, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.foe((1.0 if hot else 0.6) * dim, 2.0 if hot else 1.2))
 
 
 # The four pillars are freight containers bound for the centre.
