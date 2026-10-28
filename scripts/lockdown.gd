@@ -19,15 +19,18 @@ const LAMP_HP := 220.0
 const LEG_HP := 160.0
 const CORE_HP := 450.0
 const HP := LAMP_HP * 2.0 + LEG_HP * 4.0 + CORE_HP
+# the drawing is laid out at 1:1 and shown a quarter larger (SIZE); radii below
+# are already at size
+const SIZE := 1.25
 const HULL := [Vector2(-80, 0), Vector2(0, 0), Vector2(80, 0)]   # armour circles, local
-const HULL_R := 56.0
+const HULL_R := 70.0
 const LAMPS := [Vector2(-190, 30), Vector2(190, 30)]
-const LAMP_R := 24.0
-const LAMP_HIT := 34.0          # a returning round only has to pass close
+const LAMP_R := 30.0
+const LAMP_HIT := 42.0          # a returning round only has to pass close
 const LEGS := [Vector2(-240, -20), Vector2(240, -20), Vector2(-160, 120), Vector2(160, 120)]
-const LEG_R := 30.0
-const CORE_R := 40.0
-const CORE_HIT := 52.0
+const LEG_R := 37.0
+const CORE_R := 50.0
+const CORE_HIT := 64.0
 const CONE_LEN := 1100.0
 const CONE_HALF := 0.16
 const LOCK_TIME := 0.8
@@ -102,7 +105,7 @@ func start() -> void:
 	state = ENTER
 	t = 0.0
 	_fresh()
-	pos = HOME + Vector2(0, -320)
+	pos = HOME + Vector2(0, -90)
 	game.sfx.play("horn", 0.8, -2.0)
 	game.cam.add_trauma(0.35)
 
@@ -153,7 +156,7 @@ func dev_strike() -> void:
 # ---------------------------------------------------------------- where things are
 
 func _local(p: Vector2) -> Vector2:
-	return pos + p.rotated(tilt)
+	return pos + (p * SIZE).rotated(tilt)
 
 
 func lamp_pos(k: int) -> Vector2:
@@ -432,9 +435,9 @@ func step(dt: float) -> void:
 	var pl: Vector2 = game.player.pos
 	match state:
 		ENTER:
-			# it drops in from the dark above the yard
+			# it settles out of the dark above the yard (never across the HUD)
 			var k := Pal.ease_in(clampf(t / 0.9, 0.0, 1.0))
-			pos = (HOME + Vector2(0, -320)).lerp(HOME, k)
+			pos = (HOME + Vector2(0, -90)).lerp(HOME, k)
 			if t >= 0.9 and t - dt < 0.9:
 				game.sfx.play("slam", 0.6, 2.0)
 				game.cam.add_trauma(0.7)
@@ -641,6 +644,8 @@ func _draw() -> void:
 		return
 	if state == DEAD:
 		return
+	if state == ENTER:
+		dim *= clampf(t / 0.9, 0.0, 1.0)
 	_draw_stripes(1.0, dim)
 	if phase == 2:
 		_draw_sockets(dim)
@@ -697,7 +702,16 @@ func _draw() -> void:
 		if state == RUN and arc_t < ARC_LIVE:
 			var end := _arc_end()
 			if not arc_live():
-				draw_line(pos, end, Pal.ink(0.25 * dim, 1.4), 1.0)
+				# the warning: a red fan over the ground the arc will sweep first
+				var wk := arc_t / ARC_WARN
+				var fan := PackedVector2Array([pos])
+				var fc := PackedColorArray([Pal.red(0.0)])
+				for j in 9:
+					var fa := arc_a + 0.5 * j / 8.0
+					fan.append(pos + Vector2.from_angle(fa) * ARC_LEN)
+					fc.append(Pal.red(0.14 * wk * dim, 1.4))
+				draw_polygon(fan, fc)
+				draw_line(pos, end, Pal.red((0.3 + 0.5 * wk) * dim, 2.0), 2.0)
 			var segs := PackedVector2Array()
 			var steps := 14 if arc_live() else 0
 			for j in steps:
@@ -707,7 +721,8 @@ func _draw() -> void:
 				segs.append(q0 + (jit if j > 0 else Vector2.ZERO))
 				segs.append(q1 + jit)
 			if segs.size() > 0:
-				draw_multiline(segs, Pal.ink(0.9 * dim, 2.6), 2.0)
+				draw_multiline(segs, Pal.red(0.9 * dim, 2.6), 6.0)
+				draw_multiline(segs, Pal.ink(dim, 2.8), 1.5)
 	# lamps on their arms
 	for k in 2:
 		var lp := lamp_pos(k)
@@ -729,8 +744,8 @@ func _draw() -> void:
 			draw_arc(pos, 70.0 + 30.0 * wk, 0.0, TAU, 48, Pal.red(0.5 * wk * dim, 2.0), 2.0, false)
 		else:
 			var ra: float = 1.0 - clampf(w[1] / 1.2, 0.0, 1.0)
-			draw_arc(pos, w[0], 0.0, TAU, 96, Pal.foe(ra * dim, 2.0), 4.0, false)
-			draw_arc(pos, maxf(0.0, w[0] - 12.0), 0.0, TAU, 96, Pal.foe(0.3 * ra * dim), 1.0, false)
+			draw_arc(pos, w[0], 0.0, TAU, 96, Pal.red(ra * dim, 2.4), 4.0, false)
+			draw_arc(pos, maxf(0.0, w[0] - 12.0), 0.0, TAU, 96, Pal.red(0.3 * ra * dim, 1.4), 1.0, false)
 	# charged rounds crackle where they sit
 	for b in charged:
 		if b.state == Bullets.EMBED:

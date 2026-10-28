@@ -7,6 +7,7 @@ extends Node2D
 
 const REVEAL_R := 110.0      # a returning round this close wakes a remnant
 const HOLD := 2.6
+const REMNANT_OFF := {"plate": 92.0, "screen": 60.0, "scrawl": 130.0, "notice": 90.0}
 
 var game
 var story := 1
@@ -126,71 +127,103 @@ func _draw() -> void:
 func _draw_remnant(w: Array, k: float, dim: float) -> void:
 	var at: Vector2 = w[1]
 	var n: Vector2 = w[2]
-	var txt: String = w[4] if Txt.zh else w[5]
-	var size := 15
-	var tw := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	# the words sit just inside the wall, reading along it
-	var p := at + n * (34.0 + 10.0 * k)
-	var origin := p - Vector2(tw / 2.0, -5.0)
+	var full: String = w[4] if Txt.zh else w[5]
+	var size := 18
+	var tw := font.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	# the words surface just inside the wall, clear of the prop that holds them
+	var off: float = REMNANT_OFF.get(w[3], 60.0)
+	var p: Vector2 = at + n * (off + 8.0 * k)
+	var origin: Vector2 = p - Vector2(tw / 2.0, -6.0)
 	if absf(n.x) > 0.5:
-		origin = Vector2(p.x if n.x > 0.0 else p.x - tw, p.y + 5.0)
-	if n.y > 0.5:
-		origin = Vector2(p.x - tw / 2.0, p.y + 10.0)
-	# a scan glitch as it surfaces, then steady
-	var flick := 1.0 if k > 0.9 else (0.6 + 0.4 * float(int(t * 30.0) % 2))
-	draw_string(font, origin + Vector2(1.5, 1.5), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(0, 0, 0, 0.7 * k))
-	draw_string(font, origin, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * flick * dim, 1.3))
-	draw_line(origin + Vector2(0, 7), origin + Vector2(tw * k, 7), Pal.ink(0.3 * k * dim), 1.0)
+		origin = Vector2(p.x if n.x > 0.0 else p.x - tw, p.y + 6.0)
+	# a sweep writes them in, letter by letter, then they hold and fade
+	var shown := full.substr(0, int(ceil(full.length() * clampf(k * 1.6, 0.0, 1.0))))
+	var flick := 1.0 if k > 0.9 else (0.7 + 0.3 * float(int(t * 30.0) % 2))
+	draw_rect(Rect2(origin + Vector2(-10, -20), Vector2(tw + 20, 30)), Color(0, 0, 0, 0.55 * k))
+	draw_string(font, origin, shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.95 * k * flick * dim, 1.4))
+	draw_line(origin + Vector2(-10, 10), origin + Vector2(-10 + (tw + 20) * k, 10), Pal.ink(0.35 * k * dim), 1.0)
 
 
-# The old-era door R-0 came out of: two heavy panels, one slid half open.
+# The old-era door R-0 came out of: two heavy panels, one slid half open,
+# hazard hatching, the stencilled 00, and a little light still inside.
 func _draw_door(c: Vector2, dim: float) -> void:
-	var w := 150.0
-	var h := 26.0
+	var w := 260.0
+	var h := 46.0
 	var top := c.y - h
-	draw_rect(Rect2(c.x - w / 2.0 - 8.0, top - 6.0, w + 16.0, h + 6.0), Color(0.03, 0.03, 0.035, 1.0))
-	draw_rect(Rect2(c.x - w / 2.0 - 8.0, top - 6.0, w + 16.0, h + 6.0), Pal.ink(0.5 * dim), false, 1.5)
-	# left panel shut, right panel pushed aside: a dark gap between
-	draw_rect(Rect2(c.x - w / 2.0, top, w * 0.42, h), Pal.ink(0.12 * dim))
-	draw_rect(Rect2(c.x - w / 2.0, top, w * 0.42, h), Pal.ink(0.45 * dim), false, 1.0)
-	draw_rect(Rect2(c.x + w * 0.22, top, w * 0.28, h), Pal.ink(0.12 * dim))
-	draw_rect(Rect2(c.x + w * 0.22, top, w * 0.28, h), Pal.ink(0.45 * dim), false, 1.0)
-	for j in 3:
-		var x := c.x - w / 2.0 + 10.0 + j * 18.0
-		draw_line(Vector2(x, top + 6.0), Vector2(x + 8.0, top + h - 6.0), Pal.ink(0.2 * dim), 1.0)
-	# a faint light still inside
-	var glow := 0.08 + 0.04 * sin(t * 1.3)
-	draw_rect(Rect2(c.x - w / 2.0 + w * 0.42, top + 2.0, w * 0.22 + w * 0.08, h - 4.0), Color(1, 1, 1, glow * dim))
+	var frame := Rect2(c.x - w / 2.0 - 12.0, top - 10.0, w + 24.0, h + 10.0)
+	draw_rect(frame, Color(0.03, 0.03, 0.035, 1.0))
+	draw_rect(frame, Pal.ink(0.6 * dim), false, 2.0)
+	# the inside: dark, a breath of light where the panel stands open
+	var gap := Rect2(c.x - 10.0, top + 2.0, 74.0, h - 4.0)
+	var glow := 0.10 + 0.05 * sin(t * 1.3)
+	draw_rect(gap, Color(1, 1, 1, glow * dim))
+	for j in 4:
+		draw_line(Vector2(gap.position.x + 8.0 + j * 16.0, gap.position.y + 4.0), Vector2(gap.position.x + 8.0 + j * 16.0, gap.end.y - 4.0), Color(1, 1, 1, 0.05 * dim), 1.0)
+	var left := Rect2(c.x - w / 2.0, top, w / 2.0 - 10.0, h)
+	var right := Rect2(c.x + 64.0, top, w / 2.0 - 64.0, h)
+	for r in [left, right]:
+		var rr: Rect2 = r
+		draw_rect(rr, Color(0.07, 0.07, 0.075, 1.0))
+		draw_rect(rr, Pal.ink(0.55 * dim), false, 1.5)
+		# hazard hatching along the panel's foot
+		var x := rr.position.x + 4.0
+		while x < rr.end.x - 10.0:
+			draw_line(Vector2(x, rr.end.y - 3.0), Vector2(x + 8.0, rr.end.y - 13.0), Pal.ink(0.3 * dim), 2.0)
+			x += 14.0
+	draw_string(Fonts.get_font("SemiBold"), Vector2(left.position.x + 16.0, top + 24.0), "00", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.55 * dim))
+	draw_line(Vector2(left.position.x + 50.0, top + 17.0), Vector2(left.end.x - 12.0, top + 17.0), Pal.ink(0.25 * dim), 1.0)
 
 
-# A propaganda screen, cracked, its image long gone to scanlines.
+# A propaganda screen on the left wall, cracked, still trying to say its line.
 func _draw_screen(c: Vector2, dim: float) -> void:
-	var r := Rect2(c.x + 4.0, c.y - 70.0, 16.0, 140.0)
+	var r := Rect2(c.x + 4.0, c.y - 110.0, 34.0, 220.0)
 	draw_rect(r, Color(0.04, 0.04, 0.045, 1.0))
-	draw_rect(r, Pal.ink(0.45 * dim), false, 1.5)
-	var y := r.position.y + 4.0
-	while y < r.end.y - 4.0:
-		var on := sin(y * 0.7 + t * 9.0) > 0.6
-		draw_line(Vector2(r.position.x + 3.0, y), Vector2(r.end.x - 3.0, y), Pal.ink((0.25 if on else 0.08) * dim), 1.0)
-		y += 5.0
-	draw_polyline(PackedVector2Array([r.position + Vector2(2, 40), r.position + Vector2(10, 58), r.position + Vector2(6, 76), r.position + Vector2(14, 96)]), Pal.ink(0.5 * dim), 1.0)
+	draw_rect(r, Pal.ink(0.6 * dim), false, 2.0)
+	draw_rect(r.grow(-4.0), Pal.ink(0.2 * dim), false, 1.0)
+	var y := r.position.y + 6.0
+	while y < r.end.y - 6.0:
+		var on := sin(y * 0.5 + t * 7.0) > 0.7
+		draw_line(Vector2(r.position.x + 6.0, y), Vector2(r.end.x - 6.0, y), Pal.ink((0.3 if on else 0.08) * dim), 1.0)
+		y += 6.0
+	# what is left of its slogan, running down the glass, stuttering
+	var on2 := int(t * 3.0) % 5 != 0
+	if on2:
+		draw_set_transform(Vector2(r.position.x + 24.0, r.position.y + 18.0), PI / 2.0, Vector2.ONE)
+		draw_string(Fonts.get_font("SemiBold"), Vector2.ZERO, Txt.t("prop_screen"), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.45 * dim, 1.3))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# the crack
+	draw_polyline(PackedVector2Array([r.position + Vector2(4, 70), r.position + Vector2(18, 92), r.position + Vector2(10, 118), r.position + Vector2(28, 150), r.position + Vector2(22, 172)]), Pal.ink(0.7 * dim, 1.2), 1.5)
 
 
+# Graffiti on the right wall: the Union's mark, crossed out, the paint running.
 func _draw_scrawl(c: Vector2, dim: float) -> void:
-	# a few hurried strokes on the right wall
-	for j in 5:
-		var y0 := c.y - 50.0 + j * 22.0
-		draw_line(Vector2(c.x - 6.0, y0), Vector2(c.x - 18.0 - (j % 3) * 6.0, y0 + 12.0), Pal.ink(0.28 * dim), 2.0)
+	var o := c + Vector2(-60.0, 0.0)
+	var col := Pal.ink(0.42 * dim)
+	# the mark: a circle with a bar (the Union's seal), sprayed rough
+	draw_arc(o, 34.0, 0.0, TAU, 28, col, 4.0, false)
+	draw_line(o + Vector2(-24, 0), o + Vector2(24, 0), col, 4.0)
+	# the cross through it
+	draw_line(o + Vector2(-44, -44), o + Vector2(44, 44), Pal.ink(0.55 * dim), 5.0)
+	draw_line(o + Vector2(44, -44), o + Vector2(-44, 44), Pal.ink(0.55 * dim), 5.0)
+	# drips
+	for j in 4:
+		var x := o.x - 30.0 + j * 20.0
+		var l := 14.0 + float((j * 7) % 13)
+		draw_line(Vector2(x, o.y + 40.0), Vector2(x, o.y + 40.0 + l), Pal.ink(0.3 * dim), 2.0)
 
 
+# A notice on the top wall, half torn, with the bureau's red stamp.
 func _draw_notice(c: Vector2, dim: float) -> void:
-	var r := Rect2(c.x - 26.0, c.y + 4.0, 52.0, 18.0)
-	draw_rect(r, Color(0.06, 0.06, 0.065, 1.0))
-	draw_rect(r, Pal.ink(0.4 * dim), false, 1.0)
-	for j in 3:
-		draw_line(r.position + Vector2(6, 5 + j * 4), r.position + Vector2(46 - j * 9, 5 + j * 4), Pal.ink(0.25 * dim), 1.0)
-	# one corner torn off
-	draw_line(r.end - Vector2(10, 0), r.end - Vector2(0, 8), Pal.ink(0.4 * dim), 1.0)
+	var r := Rect2(c.x - 48.0, c.y + 6.0, 96.0, 58.0)
+	draw_rect(r, Color(0.07, 0.07, 0.075, 1.0))
+	draw_rect(r, Pal.ink(0.55 * dim), false, 1.5)
+	draw_line(r.position + Vector2(10, 12), r.position + Vector2(60, 12), Pal.ink(0.5 * dim), 2.0)
+	for j in 4:
+		draw_line(r.position + Vector2(10, 24 + j * 7), r.position + Vector2(84 - (j % 2) * 20, 24 + j * 7), Pal.ink(0.22 * dim), 1.0)
+	draw_arc(r.position + Vector2(76, 42), 11.0, 0.0, TAU, 20, Pal.red(0.6 * dim, 1.4), 2.0, false)
+	# the torn corner
+	draw_colored_polygon(PackedVector2Array([r.end - Vector2(22, 0), r.end, r.end - Vector2(0, 18)]), Color(0.02, 0.02, 0.022, 1.0))
+	draw_line(r.end - Vector2(22, 0), r.end - Vector2(0, 18), Pal.ink(0.5 * dim), 1.0)
 
 
 # The maintenance worker: by the door as the chapter opens, then back inside.
@@ -199,10 +232,10 @@ func _draw_worker(dim: float) -> void:
 	var a := clampf(k / 0.6, 0.0, 1.0) * (1.0 - clampf((k - 4.6) / 0.6, 0.0, 1.0))
 	if a <= 0.01:
 		return
-	var x := 1070.0
+	var x := 1150.0
 	if k > 3.2:
-		x = lerpf(1070.0, 1000.0, Pal.ease_io(clampf((k - 3.2) / 1.4, 0.0, 1.0)))
-	var foot := Vector2(x, 990.0)
+		x = lerpf(1150.0, 1010.0, Pal.ease_io(clampf((k - 3.2) / 1.4, 0.0, 1.0)))
+	var foot := Vector2(x, 1000.0)
 	var c := Pal.ink(0.55 * a * dim)
 	# a plain figure in work clothes: head, shoulders, a lamp in hand
 	draw_circle(foot + Vector2(0, -38), 6.0, c)
@@ -226,13 +259,13 @@ func _draw_memory() -> void:
 	if sh == null:
 		return
 	var a := clampf(memory_t / 0.3, 0.0, 1.0) * (1.0 - clampf((memory_t - 2.8) / 0.6, 0.0, 1.0))
-	var size := 15
+	var size := 18
 	# typed out, a few characters at a time, like a log being read
 	var n := int(memory.length() * clampf(memory_t / 1.0, 0.0, 1.0))
 	var txt := memory.substr(0, n)
 	var tw := font.get_string_size(memory, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	var p: Vector2 = (sh.pos as Vector2) + Vector2(-tw / 2.0, -62.0)
+	var p: Vector2 = (sh.pos as Vector2) + Vector2(-tw / 2.0, -70.0)
 	p.x = clampf(p.x, Arena.ROOM.position.x + 10.0, Arena.ROOM.end.x - tw - 10.0)
-	mem_layer.draw_rect(Rect2(p + Vector2(-8, -18), Vector2(tw + 16, 26)), Color(0, 0, 0, 0.6 * a))
-	mem_layer.draw_line(p + Vector2(-8, -18), p + Vector2(-8, 8), Possess.cyan(a, 1.8), 2.0)
+	mem_layer.draw_rect(Rect2(p + Vector2(-12, -24), Vector2(tw + 24, 34)), Color(0, 0, 0, 0.7 * a))
+	mem_layer.draw_line(p + Vector2(-12, -24), p + Vector2(-12, 10), Possess.cyan(a, 1.8), 2.0)
 	mem_layer.draw_string(font, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Possess.cyan(0.95 * a, 1.4))

@@ -744,19 +744,29 @@ func _draw_radio(vp: Vector2) -> void:
 	if radio_t >= 0.0:
 		var a := clampf(radio_t / 0.3, 0.0, 1.0) * (1.0 - clampf((radio_t - 6.2) / 0.8, 0.0, 1.0))
 		var n := int(radio_text.length() * clampf((radio_t - 0.4) / 2.2, 0.0, 1.0))
-		var x := BAND_EDGE + 20.0
-		var y := 108.0
-		view.draw_rect(Rect2(x - 12.0, y - 30.0, 3.0, 40.0), Pal.ink(0.45 * a))
-		view.draw_string(font_b, Vector2(x, y - 14.0), Txt.t("radio_tag"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.5 * a))
-		# a dot that blinks while it speaks
-		if radio_t < 2.8 and int(radio_t * 4.0) % 2 == 0:
-			var tw := font_b.get_string_size(Txt.t("radio_tag"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-			view.draw_circle(Vector2(x + tw + 8.0, y - 19.0), 2.5, Pal.ink(0.7 * a, 1.6))
-		view.draw_string(font_s, Vector2(x, y + 6.0), radio_text.substr(0, n), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.82 * a))
+		var x := BAND_EDGE + 46.0
+		var y := 112.0
+		# a loudspeaker: a box and its horn, with waves while it speaks
+		var sp := Vector2(BAND_EDGE + 22.0, y - 10.0)
+		view.draw_rect(Rect2(sp + Vector2(-8, -5), Vector2(6, 10)), Pal.ink(0.7 * a))
+		view.draw_colored_polygon(PackedVector2Array([sp + Vector2(-2, -5), sp + Vector2(6, -11), sp + Vector2(6, 11), sp + Vector2(-2, 5)]), Pal.ink(0.7 * a))
+		if radio_t < 2.8:
+			for j in 2:
+				var on := int(radio_t * 6.0 + j) % 3 != 0
+				if on:
+					view.draw_arc(sp + Vector2(8, 0), 6.0 + j * 5.0, -0.7, 0.7, 8, Pal.ink(0.6 * a), 1.5, false)
+		view.draw_string(font_b, Vector2(x, y - 14.0), Txt.t("radio_tag"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.55 * a))
+		view.draw_string(font_s, Vector2(x, y + 10.0), radio_text.substr(0, n), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.88 * a))
 	if found_t >= 0.0:
 		var fa := clampf(found_t / 0.2, 0.0, 1.0) * (1.0 - clampf((found_t - 1.8) / 0.6, 0.0, 1.0))
 		var rise := (1.0 - Pal.ease_out(clampf(found_t / 0.4, 0.0, 1.0))) * 8.0
-		_text_c(font_b, Txt.t("lore_found"), Vector2(vp.x / 2.0, 96.0 + rise), 14, Pal.ink(0.75 * fa, 1.3))
+		# top right, clear of the timer and the boss bar
+		var lf := Txt.t("lore_found")
+		var lw := font_b.get_string_size(lf, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+		var lp := Vector2(vp.x - BAND_EDGE - 20.0 - lw, 112.0 + rise)
+		view.draw_rect(Rect2(lp + Vector2(-12, -20), Vector2(lw + 24, 30)), Color(0, 0, 0, 0.55 * fa))
+		view.draw_line(lp + Vector2(-12, -20), lp + Vector2(-12, 10), Pal.ink(0.7 * fa, 1.4), 2.0)
+		view.draw_string(font_b, lp, lf, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.85 * fa, 1.3))
 
 
 func chapter_intro() -> void:
@@ -1623,7 +1633,7 @@ func _draw_boss_bar(vp: Vector2, cx: float, y: float, appear: float) -> void:
 	view.draw_rect(Rect2(x0, by, w * boss_hp_shown, 4.0), Pal.ink(0.9 * a, 1.0 + 1.5 * boss_flash))
 	for q in [0.25, 0.5, 0.75]:
 		view.draw_line(Vector2(x0 + w * q, by - 3.0), Vector2(x0 + w * q, by + 7.0), Pal.ink(0.5 * a), 1.0)
-	view.draw_string(font_s, Vector2(x0, by - 8.0), Txt.t(game.boss.name_key()), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.55 * a))
+	view.draw_string(font_b, Vector2(x0, by - 9.0), Txt.t(game.boss.name_key()), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.8 * a))
 	if b.core_open > 0.5:
 		var pulse := 0.5 + 0.5 * sin(game.real_time * 10.0)
 		view.draw_string(font_b, Vector2(x0 + w - 60.0, by - 8.0), "CORE", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink((0.5 + 0.4 * pulse) * a, 1.3))

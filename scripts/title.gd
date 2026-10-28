@@ -640,6 +640,10 @@ func _draw_word(vp: Vector2) -> void:
 					break
 				acc += l
 	_text_c(font_s, "霓虹行者", Vector2(vp.x / 2.0, 395), 22, Pal.ink(0.55 * whole))
+	# where and when: the world in one line, lit a beat after the word
+	var era := clampf((t - 3.0) / 0.8, 0.0, 1.0)
+	if era > 0.0:
+		_text_c(font_s, Txt.t("t_era"), Vector2(vp.x / 2.0, 428), 14, Pal.ink(0.35 * era * whole))
 
 
 # The highlight: a soft band that springs between rows, a red underline that
@@ -743,8 +747,31 @@ func _unlock_text(key: String) -> String:
 	return key
 
 
-# The archive: every fragment of the world found so far, chapter by chapter;
-# the ones still out there keep their places as gaps.
+# The archive: every fragment of the world found so far, chapter by chapter,
+# in three columns by where it came from. What is still out there shows as a
+# blacked-out line of the same length, like a censored file.
+const ARCHIVE_COLS := [["w", "arch_walls"], ["s", "arch_seize"], ["r", "arch_radio"]]
+var _arch_wrap := {}
+
+
+func _arch_lines(txt: String, width: float, size: int) -> Array:
+	var key := "%d|%d|%s" % [size, int(width), txt]
+	if _arch_wrap.has(key):
+		return _arch_wrap[key]
+	var out: Array = []
+	var cur := ""
+	for ch in txt:
+		if font_s.get_string_size(cur + ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width and cur != "":
+			out.append(cur)
+			cur = ch.strip_edges(true, false)
+		else:
+			cur += ch
+	if cur != "":
+		out.append(cur)
+	_arch_wrap[key] = out
+	return out
+
+
 func _draw_archive(vp: Vector2) -> void:
 	var pk := _page_k("archive", 0)
 	if pk.x <= 0.01:
@@ -753,8 +780,7 @@ func _draw_archive(vp: Vector2) -> void:
 	var have := 0
 	var chapters: Array = []
 	for i in Chapters.count():
-		var st := Chapters.story(i)
-		var items := Lore.all_of(st)
+		var items := Lore.all_of(Chapters.story(i))
 		if items.is_empty():
 			continue
 		chapters.append([i, items])
@@ -762,33 +788,75 @@ func _draw_archive(vp: Vector2) -> void:
 			total += 1
 			if Lore.found(it[0]):
 				have += 1
-	_text_c(font_xl, Txt.t("t_archive") + "  %d / %d" % [have, total], Vector2(vp.x / 2.0, 120 + pk.y * 0.5), 34, Pal.ink(pk.x))
-	_text_c(font_s, Txt.t("archive_hint"), Vector2(vp.x / 2.0, 156 + pk.y * 0.5), 14, Pal.ink(0.45 * pk.x))
-	var x0 := vp.x / 2.0 - 420.0
-	var y := 210.0
+	# a dark sheet over the word behind
+	draw_rect(Rect2(0.0, 80.0, vp.x, vp.y - 140.0), Color(0.02, 0.02, 0.022, 0.96 * pk.x))
+	_text_c(font_xl, Txt.t("t_archive") + "  %d / %d" % [have, total], Vector2(vp.x / 2.0, 130 + pk.y * 0.5), 34, Pal.ink(pk.x))
+	_text_c(font_s, Txt.t("archive_hint"), Vector2(vp.x / 2.0, 166 + pk.y * 0.5), 15, Pal.ink(0.5 * pk.x))
+	var colw := 400.0
+	var gap := 44.0
+	var x0 := vp.x / 2.0 - (colw * 3.0 + gap * 2.0) / 2.0
+	var y := 236.0
 	var row := 0
-	# a dark sheet under the list, so the word behind does not read through
-	var rows_n := 0
 	for ch in chapters:
-		rows_n += 1 + (ch[1] as Array).size()
-	draw_rect(Rect2(0.0, y - 34.0, vp.x, rows_n * 30.0 + chapters.size() * 28.0 + 40.0), Color(0.02, 0.02, 0.022, 0.96 * pk.x))
-	for ch in chapters:
-		var ki := _page_k("archive", row)
+		var kc := _page_k("archive", row)
 		row += 1
-		view_label(Chapters.label(ch[0]) + "  ·  " + Chapters.title(ch[0]), Vector2(x0 + ki.y, y), 18, Pal.ink(0.9 * ki.x), font_b)
-		draw_line(Vector2(x0 + ki.y, y + 10.0), Vector2(x0 + 840.0 * ki.x, y + 10.0), Pal.ink(0.2 * ki.x), 1.0)
-		y += 40.0
-		for it in ch[1]:
-			var kj := _page_k("archive", row)
-			row += 1
-			var got := Lore.found(it[0])
-			var kind_mark: String = {"s": "▸", "w": "▪", "r": "◦"}.get(String(it[0]).substr(0, 1), "·")
-			view_label(kind_mark, Vector2(x0 + 8.0 + kj.y, y), 15, Pal.ink((0.6 if got else 0.2) * kj.x), font_s)
-			var line: String = it[1] if got else "？？？？？？"
-			view_label(line, Vector2(x0 + 34.0 + kj.y, y), 16, Pal.ink((0.85 if got else 0.22) * kj.x), font_s)
-			y += 30.0
-		y += 18.0
+		view_label(Chapters.label(ch[0]) + "  ·  " + Chapters.title(ch[0]), Vector2(x0 + kc.y, y), 20, Pal.ink(0.95 * kc.x), font_b)
+		draw_line(Vector2(x0, y + 12.0), Vector2(x0 + (colw * 3.0 + gap * 2.0) * kc.x, y + 12.0), Pal.ink(0.25 * kc.x), 1.0)
+		y += 52.0
+		var tallest := 0.0
+		for c in ARCHIVE_COLS.size():
+			var src: String = ARCHIVE_COLS[c][0]
+			var cx := x0 + c * (colw + gap)
+			var items: Array = []
+			var got_n := 0
+			for it in ch[1]:
+				if String(it[0]).begins_with(src):
+					items.append(it)
+					if Lore.found(it[0]):
+						got_n += 1
+			var kh := _page_k("archive", row + c)
+			_arch_icon(src, Vector2(cx + 8.0, y - 6.0), Pal.ink(0.7 * kh.x))
+			view_label(Txt.t(ARCHIVE_COLS[c][1]) + "   %d / %d" % [got_n, items.size()], Vector2(cx + 26.0 + kh.y, y), 15, Pal.ink(0.6 * kh.x), font_b)
+			var yy := y + 30.0
+			for it in items:
+				var kj := _page_k("archive", row + c + 1)
+				var got := Lore.found(it[0])
+				var lines := _arch_lines(String(it[1]), colw - 20.0, 16)
+				var top_y := yy - 15.0
+				for ln in lines:
+					if got:
+						var col := Possess.cyan(0.9 * kj.x, 1.3) if src == "s" else Pal.ink(0.85 * kj.x)
+						view_label(ln, Vector2(cx + 12.0 + kj.y, yy), 16, col, font_s)
+					else:
+						# blacked out: a bar as long as the words it hides
+						var lw := font_s.get_string_size(ln, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+						draw_rect(Rect2(cx + 12.0 + kj.y, yy - 13.0, lw, 15.0), Pal.ink(0.13 * kj.x))
+					yy += 24.0
+				draw_line(Vector2(cx + 4.0, top_y), Vector2(cx + 4.0, yy - 20.0), Possess.cyan(0.6 * kj.x) if (got and src == "s") else Pal.ink((0.5 if got else 0.15) * kj.x), 2.0)
+				yy += 12.0
+			tallest = maxf(tallest, yy - y)
+		row += 4
+		y += tallest + 26.0
 	_text_c(font_s, Txt.t("t_back"), Vector2(vp.x / 2.0, vp.y - 40), 15, Pal.ink(0.5 * pk.x))
+
+
+func _arch_icon(src: String, c: Vector2, col: Color) -> void:
+	match src:
+		"w":
+			# a wall with a mark on it
+			draw_rect(Rect2(c + Vector2(-7, -7), Vector2(14, 14)), col, false, 1.5)
+			draw_line(c + Vector2(-4, 3), c + Vector2(4, -3), col, 1.5)
+		"s":
+			# the seize corners
+			for k in 4:
+				var d := Vector2.from_angle(PI / 4.0 + TAU * k / 4.0)
+				var p := c + d * 8.0
+				draw_line(p, p + Vector2(-signf(d.x) * 5.0, 0), Possess.cyan(col.a, 1.6), 2.0)
+				draw_line(p, p + Vector2(0, -signf(d.y) * 5.0), Possess.cyan(col.a, 1.6), 2.0)
+		_:
+			# a loudspeaker
+			draw_rect(Rect2(c + Vector2(-8, -4), Vector2(5, 8)), col)
+			draw_colored_polygon(PackedVector2Array([c + Vector2(-3, -4), c + Vector2(5, -9), c + Vector2(5, 9), c + Vector2(-3, 4)]), col)
 
 
 func view_label(txt: String, at: Vector2, size: int, c: Color, f: Font) -> void:
