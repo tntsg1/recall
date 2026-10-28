@@ -620,8 +620,8 @@ func _draw_lanes(dim: float) -> void:
 		for j in 4:
 			draw_circle(sp + Vector2.from_angle(j * 1.9) * sr * 0.4, sr * (0.75 - j * 0.1), Color(0, 0, 0, 0.22 * dim))
 	var holes := PackedVector2Array()
-	for j in 26:
-		var hp := Vector2(560.0 + fmod(j * 377.0, 820.0), 760.0 + fmod(j * 131.0, 210.0))
+	for j in 40:
+		var hp := Vector2(460.0 + fmod(j * 377.0, 1020.0), 440.0 + fmod(j * 131.0, 530.0))
 		holes.append(hp - Vector2(2, 2))
 		holes.append(hp + Vector2(2, 2))
 		holes.append(hp + Vector2(-2, 2))
@@ -629,6 +629,24 @@ func _draw_lanes(dim: float) -> void:
 	draw_multiline(holes, Pal.ink(0.16 * dim), 1.0)
 	for cs: Vector2 in [Vector2(700, 905), Vector2(712, 914), Vector2(1135, 948), Vector2(1020, 780)]:
 		draw_line(cs, cs + Vector2(7, 3), Pal.ink(0.3 * dim), 2.0)
+	# the middle of the range: a painted firing line with its target boxes,
+	# and arrows down the lanes toward the platform
+	var fl := PackedVector2Array()
+	var fx := 460.0
+	while fx < 1460.0:
+		fl.append(Vector2(fx, 640.0))
+		fl.append(Vector2(fx + 26.0, 640.0))
+		fx += 40.0
+	for tb in 4:
+		var bx := 560.0 + tb * 260.0
+		if absf(bx - 785.0) < 70.0 or absf(bx - 1135.0) < 70.0:
+			continue
+		fl.append_array(PackedVector2Array([Vector2(bx - 26, 470), Vector2(bx + 26, 470), Vector2(bx + 26, 470), Vector2(bx + 26, 510),
+			Vector2(bx + 26, 510), Vector2(bx - 26, 510), Vector2(bx - 26, 510), Vector2(bx - 26, 470)]))
+	for ax: float in [520.0, 960.0, 1400.0]:
+		fl.append_array(PackedVector2Array([Vector2(ax - 12, 600), Vector2(ax, 586), Vector2(ax, 586), Vector2(ax + 12, 600)]))
+	draw_multiline(fl, Color(1, 1, 1, 0.06 * dim), 3.0)
+	draw_string(sf, Vector2(1470.0, 646.0), Txt.t("range_line"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 1, 1, 0.09 * dim))
 	# the test zone: a hatched band across the floor under the platform
 	var y0 := 330.0
 	var x := 700.0

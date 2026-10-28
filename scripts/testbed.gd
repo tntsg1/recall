@@ -366,7 +366,9 @@ func _run(dt: float) -> void:
 				game.sfx.play("slam", 0.7, -6.0)
 				game.cam.add_trauma(0.25)
 				game.cam.punch(0.02)
-				game.fx.flash(SCREEN.get_center() + _off(), 90.0, 0.12, Pal.red(0.4, 2.0))
+				game.fx.flash(SCREEN.get_center() + _off(), 80.0, 0.14, Pal.ink(0.3, 1.5))
+				game.fx.ring(SCREEN.get_center() + _off() + Vector2(56, 0), 10.0, 90.0, 0.3, Pal.red(0.8, 1.6), 3.0)
+				game.add_hitstop(0.05)
 		PASS:
 			_park_rail(dt)
 			if stage_t >= PASS_TIME:
@@ -707,13 +709,13 @@ func _draw_screen(o: Vector2, dim: float) -> void:
 		var tw := font.get_string_size(Txt.t("tb_ok"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
 		var box := Rect2(-tw / 2.0 - 8.0, -17.0, tw + 16.0, 30.0)
 		draw_rect(box, Color(0.08, 0.0, 0.0, 0.85 * sa))
-		draw_rect(box, Pal.red(sa * dim, 2.2), false, 3.0)
-		draw_rect(box.grow(-4.0), Pal.red(0.5 * sa * dim, 1.6), false, 1.0)
-		draw_string(font, Vector2(-tw / 2.0, 6.0), Txt.t("tb_ok"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.red(sa * dim, 2.4))
+		draw_rect(box, Pal.red(sa * dim, 1.3), false, 3.0)
+		draw_rect(box.grow(-4.0), Pal.red(0.5 * sa * dim, 1.1), false, 1.0)
+		draw_string(font, Vector2(-tw / 2.0, 6.0), Txt.t("tb_ok"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.red(sa * dim, 1.4))
 		# ink thrown off the edge where it struck
 		for j in 7:
 			var ip := Vector2(cos(j * 2.4) * (box.size.x * 0.5 + 6.0 + (j % 3) * 4.0), sin(j * 2.4) * (box.size.y * 0.5 + 4.0))
-			draw_circle(ip, 1.5 + (j % 2), Pal.red(0.8 * sa * dim, 1.8))
+			draw_circle(ip, 1.5 + (j % 2), Pal.red(0.8 * sa * dim, 1.1))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -876,9 +878,11 @@ func _draw_dangers(dim: float) -> void:
 				draw_multiline(seg, Pal.red(0.6 * dim, 1.6), 3.0)
 				continue
 			var a := _flame_angle(f, k2)
-			# the fan: a ragged rim that licks in and out, red at the edge
+			# the fan: thin fill, a sharp edge where it starts to burn, a ragged
+			# licking rim; brightest near the nozzle, thinning out with distance
 			var pts := PackedVector2Array([noz])
-			var cols := PackedColorArray([Pal.red(0.9 * dim, 2.6)])
+			var cols := PackedColorArray([Pal.red(0.5 * dim, 1.7)])
+			var rim := PackedVector2Array()
 			var rays := 15
 			var reach_mid := 0.0
 			for j in rays:
@@ -888,32 +892,57 @@ func _draw_dangers(dim: float) -> void:
 				var reach := _flame_reach(noz, aj) * minf(1.0, lick + 0.1 * (1.0 - absf(u - 0.5) * 2.0))
 				if j == rays / 2:
 					reach_mid = reach
-				pts.append(noz + Vector2.from_angle(aj) * reach)
-				cols.append(Pal.red(0.22 * dim, 1.4))
+				var tip := noz + Vector2.from_angle(aj) * reach
+				pts.append(tip)
+				rim.append(tip)
+				cols.append(Pal.red(0.07 * dim, 1.2))
 			draw_polygon(pts, cols)
+			draw_line(noz, rim[0], Pal.red(0.85 * dim, 2.0), 2.0)
+			draw_line(noz, rim[rim.size() - 1], Pal.red(0.85 * dim, 2.0), 2.0)
+			draw_polyline(rim, Pal.red(0.45 * dim, 1.6), 1.5)
 			# its heart: a narrow white-hot tongue
-			var core := PackedVector2Array([noz, noz + Vector2.from_angle(a - FLAME_HALF * 0.35) * reach_mid * 0.5,
-				noz + Vector2.from_angle(a) * reach_mid * 0.72, noz + Vector2.from_angle(a + FLAME_HALF * 0.35) * reach_mid * 0.5])
-			draw_polygon(core, PackedColorArray([Pal.ink(0.75 * dim, 1.7), Pal.red(0.45 * dim, 1.8), Pal.red(0.1 * dim, 1.4), Pal.red(0.45 * dim, 1.8)]))
-			# tongues of flame running outward along the fan
-			var tongues := PackedVector2Array()
+			var core := PackedVector2Array([noz, noz + Vector2.from_angle(a - FLAME_HALF * 0.35) * reach_mid * 0.4,
+				noz + Vector2.from_angle(a) * reach_mid * 0.55, noz + Vector2.from_angle(a + FLAME_HALF * 0.35) * reach_mid * 0.4])
+			draw_polygon(core, PackedColorArray([Pal.ink(0.75 * dim, 1.7), Pal.red(0.4 * dim, 1.7), Pal.red(0.05 * dim, 1.3), Pal.red(0.4 * dim, 1.7)]))
+			# tongues of flame running outward the whole way, thinning to embers
+			var near_t := PackedVector2Array()
+			var far_t := PackedVector2Array()
+			var embers := PackedVector2Array()
 			var splash := PackedVector2Array()
-			for j in 7:
-				var aj2 := a + lerpf(-FLAME_HALF * 0.8, FLAME_HALF * 0.8, j / 6.0)
+			for j in 9:
+				var aj2 := a + lerpf(-FLAME_HALF * 0.85, FLAME_HALF * 0.85, j / 8.0)
 				var rch := _flame_reach(noz, aj2)
-				var s4 := fmod(t * 900.0 + j * 57.0, 120.0) + 40.0
-				while s4 < rch - 20.0:
-					tongues.append(noz + Vector2.from_angle(aj2) * s4)
-					tongues.append(noz + Vector2.from_angle(aj2 + 0.02 * sin(t * 30.0 + s4)) * minf(rch, s4 + 34.0))
+				var s4 := fmod(t * 900.0 + j * 57.0, 120.0) + 30.0
+				while s4 < rch - 16.0:
+					var p0 := noz + Vector2.from_angle(aj2) * s4
+					var p1 := noz + Vector2.from_angle(aj2 + 0.02 * sin(t * 30.0 + s4)) * minf(rch, s4 + 34.0)
+					if s4 < rch * 0.55:
+						near_t.append(p0)
+						near_t.append(p1)
+					else:
+						far_t.append(p0)
+						far_t.append(p1.lerp(p0, 0.4))
+						if int(s4 + j * 13.0) % 3 == 0:
+							embers.append(p0 + Vector2.from_angle(aj2).orthogonal() * sin(t * 17.0 + s4) * 10.0)
 					s4 += 120.0
 				if _flame_cover(noz, aj2):
 					splash.append(noz + Vector2.from_angle(aj2) * rch)
-			if tongues.size() > 0:
-				draw_multiline(tongues, Pal.red(0.7 * dim, 2.6), 3.0)
-			# where cover stops it, the flame splashes white on the crate's face
-			for sp in splash:
-				draw_circle(sp, 7.0, Pal.ink(0.2 * dim, 1.6))
-				draw_circle(sp, 3.0, Pal.ink(0.8 * dim, 2.2))
+			if near_t.size() > 0:
+				draw_multiline(near_t, Pal.red(0.8 * dim, 2.6), 3.0)
+			if far_t.size() > 0:
+				draw_multiline(far_t, Pal.red(0.45 * dim, 1.8), 2.0)
+			for e in embers:
+				draw_circle(e, 2.0, Pal.red(0.9 * dim, 2.4))
+			# where cover stops it, the flame flashes along the crate's face
+			if splash.size() >= 2:
+				var sd := (splash[splash.size() - 1] - splash[0]).normalized()
+				var line := PackedVector2Array([splash[0] - sd * 14.0])
+				line.append_array(splash)
+				line.append(splash[splash.size() - 1] + sd * 14.0)
+				draw_polyline(line, Pal.ink(0.18 * dim, 1.4), 7.0)
+				draw_polyline(line, Pal.ink(0.75 * dim, 2.0), 2.0)
+			elif splash.size() == 1:
+				draw_arc(splash[0], 9.0, a + PI - 1.2, a + PI + 1.2, 10, Pal.ink(0.7 * dim, 2.0), 2.0)
 	if rail_mode == 1 or rail_mode == 2:
 		var m0 := _rail_muzzle()
 		var e0 := _rail_line_end()

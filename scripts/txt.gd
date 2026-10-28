@@ -112,6 +112,7 @@ const S := {
 	"range_zone": ["测试区 · 测试期间请保持站立", "TEST ZONE · REMAIN STANDING DURING TESTS"],
 	"crate_tag": ["仅限国内使用", "DOMESTIC USE ONLY"],
 	"term_log": ["测试记录", "TEST LOG"],
+	"range_line": ["射击线", "FIRING LINE"],
 	"tb_test_1": ["测试 01 · 远程压制", "TEST 01 · AREA DENIAL"],
 	"tb_test_2": ["测试 02 · 人群驱散", "TEST 02 · CROWD DISPERSAL"],
 	"tb_test_3": ["测试 03 · 重点清除", "TEST 03 · PRIORITY REMOVAL"],

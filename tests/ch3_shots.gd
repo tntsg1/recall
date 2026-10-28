@@ -91,10 +91,23 @@ func _run() -> void:
 	while bs.rail_mode != 2:
 		await process_frame
 	await shot("7_rail")
+	# the stamp coming down: the frame just after it lands
+	while bs.stage != Testbed.PASS:
+		await process_frame
+	await frames(3)
+	await shot("9_stamp")
 	while bs.stage != Testbed.VENT:
 		await process_frame
 	await frames(30)
 	game.player.pos = Vector2(960, 640)
 	await frames(2)
 	await shot("8_vent")
+	# the full demonstration, in the last phase
+	bs.phase = 2
+	bs.tests_run = 3
+	bs._announce()
+	game.player.pos = Vector2(1240, 800)
+	while not (bs.stage == Testbed.TEST and bs.stage_t > 1.2):
+		await process_frame
+	await shot("10_demo")
 	quit()

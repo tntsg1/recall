@@ -162,12 +162,18 @@ func _draw() -> void:
 					var q := Geometry2D.get_closest_point_to_segment(pp, a, b)
 					var near := clampf(1.0 - (q.distance_to(pp) - 40.0) / 140.0, 0.0, 1.0)
 					if near > 0.01:
+						# brightest across from you, fading out either way
 						var span4 := a.distance_to(b)
 						var u := a.distance_to(q)
-						var q0 := a + d * maxf(0.0, u - 160.0)
-						var q1 := a + d * minf(span4, u + 160.0)
-						draw_line(q0, q1, Pal.red(0.12 * near, 1.4), 12.0)
-						draw_line(q0, q1, Pal.red(near, 3.0), 2.5)
+						for k in 12:
+							var o0 := -180.0 + 30.0 * k
+							var s0 := clampf(u + o0, 0.0, span4)
+							var s1 := clampf(u + o0 + 30.0, 0.0, span4)
+							if s1 - s0 < 1.0:
+								continue
+							var fall := pow(1.0 - absf(o0 + 15.0) / 195.0, 1.6) * near
+							draw_line(a + d * s0, a + d * s1, Pal.red(0.1 * fall, 1.4), 12.0)
+							draw_line(a + d * s0, a + d * s1, Pal.red(0.5 + 0.5 * fall, 1.5 + 1.5 * fall), 2.0 + 0.5 * fall)
 			else:
 				draw_line(a, b, Pal.red(0.08, 1.2), 12.0)
 				draw_line(a, b, Pal.red(0.3, 1.6), 4.0)
