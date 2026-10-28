@@ -1641,7 +1641,7 @@ func _draw_boss_bar(vp: Vector2, cx: float, y: float, appear: float) -> void:
 	view.draw_string(font_b, Vector2(x0, by - 9.0), Txt.t(game.boss.name_key()), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.8 * a))
 	if b.core_open > 0.5:
 		var pulse := 0.5 + 0.5 * sin(game.real_time * 10.0)
-		view.draw_string(font_b, Vector2(x0 + w - 60.0, by - 8.0), "CORE", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink((0.5 + 0.4 * pulse) * a, 1.3))
+		view.draw_string(font_b, Vector2(x0 + w - 60.0, by - 8.0), Txt.t("core_label"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink((0.5 + 0.4 * pulse) * a, 1.3))
 	if boss_flash > 0.0:
 		var e := 1.0 - boss_flash
 		view.draw_rect(Rect2(x0 - 6.0 * e, by - 6.0 * e, w + 12.0 * e, 4.0 + 12.0 * e), Pal.ink(0.6 * boss_flash), false, 1.0)

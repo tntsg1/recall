@@ -172,9 +172,6 @@ func _draw() -> void:
 		_draw_platform(dim)
 		_draw_containers(dim)
 		_draw_terminal(Vector2(80, 300), dim, "w5_timetable")
-		if shows.get("w5_manifest", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 760), dim)
-		_draw_scrawl(Vector2(1840, 160), dim)
 	elif story == 4:
 		_draw_stations(dim)
 		_draw_presses(dim)
@@ -246,6 +243,10 @@ func _draw_remnant(w: Array, k: float, dim: float) -> void:
 			_remnant_hand(w, shown, k, dim)
 		"crate":
 			_remnant_crate(w, shown, full, k, dim)
+		"sign":
+			pass      # the platform's sign shows it on its own face
+		"scrawl_top":
+			_remnant_hand_top(w, shown, k, dim)
 		_:
 			_remnant_print(w, shown, full, k, dim)
 
@@ -276,6 +277,22 @@ func _remnant_hand(w: Array, shown: String, k: float, dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
 	var total := sf.get_string_size(shown + "  ", HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
 	var x := at.x - total
+	var i := 0
+	for ch in shown:
+		var rot := sin(i * 2.7) * 0.12
+		var dy := sin(i * 1.9) * 4.0
+		draw_set_transform(Vector2(x, at.y + dy), rot, Vector2.ONE)
+		draw_string(sf, Vector2.ZERO, ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Pal.ink(0.8 * k * dim, 1.1))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		x += sf.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x + 2.0
+		i += 1
+
+
+# Sprayed along the top wall, in the strip between the wall and the track.
+func _remnant_hand_top(w: Array, shown: String, k: float, dim: float) -> void:
+	var at: Vector2 = (w[1] as Vector2) + Vector2(0, 66.0)
+	var sf := Fonts.get_font("SemiBold")
+	var x := at.x
 	var i := 0
 	for ch in shown:
 		var rot := sin(i * 2.7) * 0.12
@@ -816,7 +833,10 @@ func _draw_floor_notice(c: Vector2, dim: float) -> void:
 # where they wait, facing a train that never stops.
 func _draw_platform(dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
-	var r := Rect2(640, 936, 640, 64)
+	var r := Rect2(600, 934, 720, 70)
+	var passed := 9.0
+	if game.boss is Boss and game.boss.alive():
+		passed = game.boss.station_t
 	draw_rect(r, Color(0.06, 0.06, 0.065))
 	draw_line(r.position, Vector2(r.end.x, r.position.y), Pal.ink(0.6 * dim), 2.0)
 	draw_rect(r, Pal.ink(0.3 * dim), false, 1.0)
@@ -828,26 +848,59 @@ func _draw_platform(dim: float) -> void:
 		yl.append(Vector2(x + 18.0, r.position.y + 10.0))
 		x += 28.0
 	draw_multiline(yl, Pal.ink(0.55 * dim, 1.2), 4.0)
-	# the name board at its middle
-	var nb := Rect2(Vector2(r.position.x + 12.0, r.position.y + 22.0), Vector2(120, 30))
+	# the name board at its left end
+	var nb := Rect2(Vector2(r.position.x + 12.0, r.position.y + 24.0), Vector2(128, 34))
 	draw_rect(nb, Color(0.09, 0.09, 0.095))
 	draw_rect(nb, Pal.ink(0.6 * dim), false, 1.5)
 	var nm := Txt.t("station_name")
 	var nw := sf.get_string_size(nm, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
 	draw_string(sf, Vector2(nb.get_center().x - nw / 2.0, nb.position.y + 22.0), nm, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.85 * dim, 1.2))
-	# the people waiting: outlines, a head and shoulders each, one with a child
+	# the people waiting, a long queue facing the track; as the express
+	# tears past they flinch back from the edge
+	var flinch := maxf(0.0, 1.0 - passed / 0.8)
 	var figs := PackedVector2Array()
-	for fx: float in [1185.0, 1222.0, 1259.0]:
-		var c := Vector2(fx, r.position.y + 36.0)
-		draw_circle(c + Vector2(0, -8), 6.0, Pal.ink(0.3 * dim))
-		figs.append(c + Vector2(-10, 12))
-		figs.append(c + Vector2(-8, 0))
-		figs.append(c + Vector2(-8, 0))
-		figs.append(c + Vector2(8, 0))
-		figs.append(c + Vector2(8, 0))
-		figs.append(c + Vector2(10, 12))
-	draw_multiline(figs, Pal.ink(0.35 * dim), 2.0)
-	draw_circle(Vector2(1203, r.position.y + 38.0), 4.0, Pal.ink(0.3 * dim))
+	var poses := [0, 1, 0, 2, 0, 1, 3, 0, 2, 1]
+	for j in poses.size():
+		var c := Vector2(170.0 + r.position.x + j * 38.0, r.position.y + 42.0)
+		c += Vector2(sin(j * 3.1 + passed * 30.0) * 3.0 * flinch, 6.0 * flinch)
+		var pose: int = poses[j]
+		var head_r := 7.0 if pose != 3 else 5.0
+		var hy := -12.0 if pose != 3 else -4.0
+		draw_circle(c + Vector2(0, hy), head_r, Pal.ink(0.42 * dim))
+		var sw := 11.0 if pose != 3 else 7.0
+		figs.append_array(PackedVector2Array([c + Vector2(-sw - 2.0, 16), c + Vector2(-sw, 0), c + Vector2(-sw, 0), c + Vector2(sw, 0), c + Vector2(sw, 0), c + Vector2(sw + 2.0, 16)]))
+		if pose == 1:
+			# a bag in hand
+			figs.append_array(PackedVector2Array([c + Vector2(sw + 3.0, 6), c + Vector2(sw + 3.0, 14), c + Vector2(sw + 3.0, 14), c + Vector2(sw + 10.0, 14), c + Vector2(sw + 10.0, 14), c + Vector2(sw + 10.0, 6)]))
+		elif pose == 2:
+			# an arm raised, waving at a train that does not stop
+			figs.append_array(PackedVector2Array([c + Vector2(sw, 0), c + Vector2(sw + 8.0, -18)]))
+	draw_multiline(figs, Pal.ink(0.5 * dim), 2.0)
+	# the sign: 本站不停, flashing as it passes; when woken, it runs the rule
+	var sg := Rect2(Vector2(r.end.x - 188.0, r.position.y + 22.0), Vector2(176, 40))
+	draw_rect(sg, Color(0.02, 0.025, 0.03))
+	draw_rect(sg, Pal.ink(0.55 * dim), false, 1.5)
+	var wake: float = shows.get("w5_yellow", 0.0)
+	if wake > 0.01:
+		var full := ""
+		for w in Lore.walls(5):
+			if w[0] == "yellow":
+				full = w[4] if Txt.zh else w[5]
+		var fw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+		var off := fmod(t * 90.0, fw + sg.size.x)
+		var tx := sg.end.x - off
+		var clipped := ""
+		var cx := tx
+		for ch in full:
+			var chw := sf.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+			if cx >= sg.position.x + 4.0 and cx + chw <= sg.end.x - 4.0:
+				draw_string(sf, Vector2(cx, sg.position.y + 26.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.95 * wake * dim, 1.4))
+			cx += chw
+	else:
+		var hot := flinch > 0.0 and fmod(passed * 8.0, 1.0) < 0.5
+		var msg := Txt.t("no_stop")
+		var mw := sf.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+		draw_string(sf, Vector2(sg.get_center().x - mw / 2.0, sg.position.y + 27.0), msg, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.foe((1.0 if hot else 0.6) * dim, 2.0 if hot else 1.2))
 
 
 # The four pillars are freight containers bound for the centre.
@@ -867,6 +920,9 @@ func _draw_containers(dim: float) -> void:
 		draw_string(sf, ins.position + Vector2(4, 14), "CX-%04d" % (n * 4127 % 9973), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.55 * dim))
 		if ins.size.y > 40.0:
 			draw_string(sf, Vector2(ins.position.x + 4, ins.end.y - 6), Txt.t("cx_dest"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.4 * dim))
+		else:
+			var dw := sf.get_string_size(Txt.t("cx_dest"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+			draw_string(sf, Vector2(ins.end.x - dw - 4.0, ins.position.y + 14), Txt.t("cx_dest"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.4 * dim))
 
 
 # ---------------------------------------------------------------- the production union

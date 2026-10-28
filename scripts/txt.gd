@@ -88,6 +88,8 @@ const S := {
 	"station_name": ["第十三街站", "13TH STREET"],
 	"yellow_line": ["黄线", "YELLOW LINE"],
 	"cx_dest": ["至：中央储备", "TO: CENTRAL RESERVE"],
+	"no_stop": ["本站不停", "NOT STOPPING"],
+	"core_label": ["核心", "CORE"],
 	"boss_2": ["镜面守卫", "THE MIRROR WARDEN"],
 	"boss_3": ["战略储备回收机", "RESERVE INTAKE"],
 	"boss_4": ["节拍器", "THE METRONOME"],

@@ -674,7 +674,7 @@ func _fly(b: B, dt: float) -> void:
 		# a powered guide rail grips the round and turns it along the rail
 		game.enemies.sweep(a, mg.point, b, false)
 		_bend(b, mg.point, mg.dir)
-		game.maglev.on_bend(mg.point)
+		game.maglev.on_bend(mg.point, mg.dir)
 		return
 	var ph: Dictionary = game.enemies.prism_hit(a, end, b)
 	if ph:

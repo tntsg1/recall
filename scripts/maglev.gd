@@ -15,7 +15,8 @@ const HALF_W := 18.0
 var rails: Array = []     # [a, b, group]
 var live := [false, false]
 var warn := [0.0, 0.0]
-var bend_flash: Array = []   # [point, t]
+var bend_flash: Array = []   # [point, t, dir]
+var drag_cd := 0.0
 var t := 0.0
 var game
 
@@ -67,6 +68,11 @@ func step(dt: float) -> void:
 		for r in rails:
 			if live[r[2]] and Geometry2D.get_closest_point_to_segment(p, r[0], r[1]).distance_to(p) < HALF_W + Player.R * 0.5:
 				game.player.pos -= game.player.vel * dt * 0.45
+				# the field drags: ripples at your feet while you push through
+				drag_cd -= dt
+				if drag_cd <= 0.0 and game.player.vel.length() > 40.0:
+					drag_cd = 0.14
+					game.fx.ring(p, 8.0, 34.0, 0.3, Pal.ink(0.45, 1.4), 1.5)
 				break
 	var i := 0
 	while i < bend_flash.size():
@@ -108,8 +114,8 @@ func cross(a: Vector2, b: Vector2, bullet) -> Dictionary:
 	return best
 
 
-func on_bend(at: Vector2) -> void:
-	bend_flash.append([at, 0.0])
+func on_bend(at: Vector2, dir: Vector2 = Vector2.ZERO) -> void:
+	bend_flash.append([at, 0.0, dir])
 	game.fx.flash(at, 26.0, 0.12, Pal.ink(0.6, 2.0))
 	game.fx.sparks(at, Vector2.UP, 3, Pal.ink(0.9, 1.8), 220.0, 0.15, PI)
 	game.sfx.play("shield", randf_range(1.6, 1.8), -12.0)
@@ -141,18 +147,24 @@ func _draw() -> void:
 		for side: float in [-1.0, 1.0]:
 			draw_line(a + n * HALF_W * side, b + n * HALF_W * side, Pal.ink(0.5 * dim), 1.5)
 		if lit:
-			# powered: a white running core and pulses travelling both ways
-			draw_line(a, b, Pal.ink(0.12 * dim, 1.4), 12.0)
-			draw_line(a, b, Pal.ink(0.9 * dim, 2.4), 2.0)
-			var pulses := PackedVector2Array()
-			var ps := fmod(now * 300.0, 60.0)
-			while ps < span:
-				pulses.append(a + d * ps)
-				pulses.append(a + d * minf(span, ps + 14.0))
-				pulses.append(b - d * ps)
-				pulses.append(b - d * minf(span, ps + 14.0))
-				ps += 60.0
-			draw_multiline(pulses, Pal.ink(dim, 3.0), 3.0)
+			# powered: a thin bright core and chevrons running out from the middle
+			# both ways, the way the field throws a round
+			draw_line(a, b, Pal.ink(0.05 * dim, 1.2), 8.0)
+			draw_line(a, b, Pal.ink(0.75 * dim, 1.6), 1.5)
+			var chev := PackedVector2Array()
+			var mid := span * 0.5
+			var ps := fmod(now * 160.0, 46.0)
+			while ps < mid:
+				for sd: float in [-1.0, 1.0]:
+					var q := a + d * (mid + sd * ps)
+					var fw := d * sd
+					chev.append(q - fw * 6.0 + n * 8.0)
+					chev.append(q + fw * 2.0)
+					chev.append(q + fw * 2.0)
+					chev.append(q - fw * 6.0 - n * 8.0)
+				ps += 46.0
+			if chev.size() > 0:
+				draw_multiline(chev, Pal.ink(0.7 * dim, 1.8), 2.0)
 		elif w > 0.0:
 			var fl := 0.5 + 0.5 * sin(now * (20.0 + 24.0 * w))
 			draw_line(a, b, Pal.ink((0.15 + 0.5 * w) * fl * dim, 1.8), 1.5 + 2.0 * w)
@@ -163,4 +175,10 @@ func _draw() -> void:
 			draw_circle(e, 3.0, Pal.ink((1.0 if lit else (0.8 * w if w > 0.0 else 0.2)) * dim, 2.4 if lit else 1.0))
 	for bf in bend_flash:
 		var k: float = bf[1] / 0.35
-		draw_arc(bf[0], 6.0 + 22.0 * k, 0.0, TAU, 16, Pal.ink((1.0 - k) * dim, 2.0), 2.0)
+		draw_arc(bf[0], 6.0 + 16.0 * k, 0.0, TAU, 16, Pal.ink((1.0 - k) * dim, 2.0), 2.0)
+		var bd: Vector2 = bf[2]
+		if bd != Vector2.ZERO:
+			# an arrow runs off the turn, the way the round went
+			var tip: Vector2 = bf[0] + bd * (20.0 + 90.0 * k)
+			var bn := bd.orthogonal()
+			draw_polyline(PackedVector2Array([tip - bd * 12.0 + bn * 9.0, tip, tip - bd * 12.0 - bn * 9.0]), Pal.ink((1.0 - k) * dim, 2.2), 3.0)

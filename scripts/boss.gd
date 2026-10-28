@@ -14,9 +14,9 @@ enum { CLOSED, WARN, OPEN }
 const TRACK := Rect2(240, 170, 1440, 740)
 const CORNER := 170.0
 const CARS := 7
-const SPACING := 82.0
+const SPACING := 106.0
 const HP := 500.0
-const CORE_R := 20.0
+const CORE_R := 25.0
 const SPEEDS := [360.0, 430.0, 500.0, 580.0]
 const OPEN_TIME := [3.8, 3.5, 3.2, 3.0]
 const BREAKS := [[1, 2], [3, 4], [5]]   # cars whose armour falls at 75 / 50 / 25 %
@@ -43,6 +43,7 @@ var core_t := 0.0
 var core_open := 0.0               # shutter 0..1 (eased)
 var core_flash := 0.0
 var station_cd := 0.0
+var station_t := 9.0               # seconds since it last tore past the platform
 var core_red := 0.0
 var stripped := []                 # per car: armour gone
 var strip_t := []                  # per car: time since stripped (for the burst)
@@ -133,7 +134,7 @@ func car_s(k: int) -> float:
 
 
 func car_size(k: int) -> Vector2:
-	return Vector2(88, 40) if k == 0 else Vector2(68, 34)
+	return Vector2(114, 52) if k == 0 else Vector2(88, 44)
 
 
 func car_xform(k: int) -> Transform2D:
@@ -431,12 +432,16 @@ func _run(dt: float) -> void:
 	else:
 		speed = Pal.damp(speed, target_speed * (1.15 if game.maglev.any_lit() else 1.0), 1.2, dt)
 	head += speed * dir * dt
+	station_t += dt
 	# past the platform at 13th Street: the horn, and it does not slow
 	station_cd -= dt
 	if station_cd <= 0.0 and at(car_s(0)).distance_to(STATION) < 40.0:
 		station_cd = 3.0
+		station_t = 0.0
 		game.sfx.play("horn", 0.95, -5.0)
-		game.cam.add_trauma(0.12)
+		game.cam.add_trauma(0.18)
+		# the blast of its passing rolls over the platform
+		game.fx.ring(STATION + Vector2(0, 40), 20.0, 420.0, 0.6, Pal.foe(0.5, 1.4), 3.0)
 		for j in 6:
 			game.fx.spark(STATION + Vector2(randf_range(-200, 200), 40.0), Vector2(randf_range(-80, 80), randf_range(40, 120)), 0.4, Pal.ink(0.4, 1.2), 1.0, 6.0)
 	if horn_t >= 0.0:
@@ -536,25 +541,20 @@ func _draw_rails() -> void:
 	while s <= upto:
 		var p := at(s)
 		var n := tangent(s).orthogonal()
-		inner.append(p + n * 13.0)
-		outer.append(p - n * 13.0)
+		inner.append(p + n * 17.0)
+		outer.append(p - n * 17.0)
 		tie_acc += step_len
 		if tie_acc >= 30.0:
 			tie_acc = 0.0
-			ties.append(p + n * 19.0)
-			ties.append(p - n * 19.0)
+			ties.append(p + n * 25.0)
+			ties.append(p - n * 25.0)
 		s += step_len
 	if inner.size() > 1:
 		rails.draw_polyline(inner, Pal.foe(0.28), 1.5, false)
 		rails.draw_polyline(outer, Pal.foe(0.28), 1.5, false)
 	if ties.size() > 0:
 		rails.draw_multiline(ties, Pal.foe(0.09), 3.0)
-	# the gate the train comes through
-	if track_draw >= 1.0:
-		var g := at(0.0)
-		var gn := tangent(0.0).orthogonal()
-		rails.draw_line(g + gn * 30.0, g + gn * 22.0, Pal.foe(0.7), 3.0)
-		rails.draw_line(g - gn * 30.0, g - gn * 22.0, Pal.foe(0.7), 3.0)
+
 
 
 func _draw() -> void:
@@ -614,6 +614,16 @@ func _draw() -> void:
 		if k > 0 and car_visible(k - 1):
 			draw_line(Vector2(r.end.x, 0), Vector2(r.end.x + (SPACING - (car_size(k).x + car_size(k - 1).x) / 2.0), 0), Pal.foe(0.5 * dim), 2.0)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# the headlight: a cone thrown down the track ahead of whichever end leads
+	if state == RUN or state == ENTER:
+		var lead_k := 0 if dir > 0.0 else CARS - 1
+		if car_visible(lead_k):
+			var ls := car_s(lead_k)
+			var tn := tangent(ls) * dir
+			var front := at(ls) + tn * (car_size(lead_k).x * 0.5 + 10.0)
+			var cone := PackedVector2Array([front, front + tn.rotated(-0.3) * 260.0, front + tn.rotated(0.3) * 260.0])
+			draw_polygon(cone, PackedColorArray([Pal.foe(0.1 * dim, 1.4), Pal.foe(0.0, 1.0), Pal.foe(0.0, 1.0)]))
+			draw_circle(front, 6.0, Pal.foe(dim, 2.2))
 	# the lane ahead lights up while it brakes to reverse
 	if state == RUN and reverse_t > 0.0:
 		var lead := CARS - 1 if dir > 0.0 else 0

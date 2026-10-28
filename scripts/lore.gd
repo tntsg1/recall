@@ -74,9 +74,9 @@ const WALL := {
 	],
 	5: [
 		["timetable", Vector2(80, 300), Vector2(1, 0), "screen", "下一班：中央专列 · 本站不停 · 候车：无限期", "NEXT: CENTRAL EXPRESS · DOES NOT STOP HERE · WAIT: INDEFINITE"],
-		["yellow", Vector2(960, 1010), Vector2(0, -1), "floor", "请勿越过黄线 · 越线者按货物处理", "DO NOT CROSS THE YELLOW LINE · THOSE WHO DO ARE CARGO"],
-		["manifest", Vector2(1840, 760), Vector2(-1, 0), "notice", "货单：民生物资 1200 吨 · 收货方：中央储备", "MANIFEST: GOODS FOR THE PEOPLE, 1,200 T · CONSIGNEE: CENTRAL RESERVE"],
-		["scrawl", Vector2(1840, 160), Vector2(-1, 0), "scrawl", "它每天都经过。我们一次也没上去。", "IT PASSES EVERY DAY. WE HAVE NEVER BEEN ON IT."],
+		["yellow", Vector2(1185, 1010), Vector2(0, -1), "sign", "请勿越过黄线 · 越线者按货物处理", "DO NOT CROSS THE YELLOW LINE · THOSE WHO DO ARE CARGO"],
+		["manifest", Vector2(1525, 530), Vector2(0, -1), "crate", "货单：民生物资 1200 吨 · 收货方：中央储备", "MANIFEST: GOODS FOR THE PEOPLE, 1,200 T · CONSIGNEE: CENTRAL RESERVE"],
+		["scrawl", Vector2(300, 70), Vector2(0, 1), "scrawl_top", "它每天都经过。我们一次也没上去。", "IT PASSES EVERY DAY. WE HAVE NEVER BEEN ON IT."],
 	],
 }
 
