@@ -24,6 +24,7 @@ var mem_layer: Node2D
 var mem_shown := false
 var tick := 0.0
 var focus_last := 0.0
+var row_cache := {}
 
 
 func _ready() -> void:
@@ -111,13 +112,15 @@ func _draw() -> void:
 	var dim := 1.0 - 0.45 * f
 	if story == 1:
 		_draw_floor(dim)
+		_draw_crates(dim)
 		# the door stands in the left wall, read as if the wall were its floor
 		draw_set_transform(Vector2(80, 790), PI / 2.0, Vector2.ONE)
 		_draw_door(Vector2.ZERO, dim)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		_draw_screen(Vector2(80, 300), dim)
 		_draw_scrawl(Vector2(1840, 780), dim)
-		_draw_notice(Vector2(1500, 70), dim)
+		if shows.get("w1_notice", 0.0) <= 0.01:
+			_draw_notice(Vector2(1500, 70), dim)
 		if worker_t >= 0.0:
 			_draw_worker(dim)
 	for w in Lore.walls(story):
@@ -128,37 +131,106 @@ func _draw() -> void:
 		_draw_remnant(w, Pal.ease_out(k), dim)
 
 
-# Paint on the yard's floor, worn almost away: the street's number and a lane.
+# Paint on the yard's floor, worn almost away: the street's number and a lane,
+# down in the corner where no words are ever written over it.
 func _draw_floor(dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
-	var c := Color(1, 1, 1, 0.022 * dim)
-	draw_string(sf, Vector2(960.0 - sf.get_string_size("13", HORIZONTAL_ALIGNMENT_LEFT, -1, 260).x / 2.0, 640.0), "13", HORIZONTAL_ALIGNMENT_LEFT, -1, 260, c)
+	var c := Color(1, 1, 1, 0.03 * dim)
+	draw_string(sf, Vector2(1440.0, 980.0), "13", HORIZONTAL_ALIGNMENT_LEFT, -1, 170, c)
 	var x := 260.0
-	while x < 1660.0:
-		if x < 860.0 or x > 1060.0:
-			draw_line(Vector2(x, 690.0), Vector2(x + 40.0, 690.0), c, 6.0)
+	while x < 1360.0:
+		draw_line(Vector2(x, 900.0), Vector2(x + 40.0, 900.0), c, 6.0)
 		x += 80.0
-	draw_string(sf, Vector2(1480.0, 724.0), "B3 →", HORIZONTAL_ALIGNMENT_LEFT, -1, 30, c)
+	draw_string(sf, Vector2(1230.0, 888.0), "B3 →", HORIZONTAL_ALIGNMENT_LEFT, -1, 28, c)
+
+
+# The yard's cover is freight left where it stood: braced crates, each with
+# its stencilled number, a strip of hazard tape, a dent.
+func _draw_crates(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	var n := 0
+	for r: Rect2 in game.arena.inner:
+		n += 1
+		var ins := r.grow(-9.0)
+		var c := Pal.ink(0.2 * dim)
+		draw_line(ins.position, ins.end, c, 1.0)
+		draw_line(Vector2(ins.end.x, ins.position.y), Vector2(ins.position.x, ins.end.y), c, 1.0)
+		draw_string(sf, ins.position + Vector2(4, 14), "FCU-%02d" % (n * 7 % 97), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+		# hazard tape across one corner
+		var o := ins.end
+		for j in 3:
+			var d := 8.0 + j * 9.0
+			draw_line(o - Vector2(d, 0), o - Vector2(0, d), Pal.ink((0.55 if j % 2 == 0 else 0.25) * dim), 4.0)
+		if n % 2 == 0:
+			# a dent in its side
+			draw_polyline(PackedVector2Array([Vector2(r.position.x, r.position.y + r.size.y * 0.35), Vector2(r.position.x + 7.0, r.position.y + r.size.y * 0.45), Vector2(r.position.x, r.position.y + r.size.y * 0.55)]), Pal.ink(0.6 * dim), 1.5)
 
 
 func _draw_remnant(w: Array, k: float, dim: float) -> void:
-	var at: Vector2 = w[1]
-	var n: Vector2 = w[2]
 	var full: String = w[4] if Txt.zh else w[5]
-	var size := 18
+	# a sweep writes the words in, letter by letter, in the hand of what holds them
+	var n := int(ceil(full.length() * clampf(k * 1.6, 0.0, 1.0)))
+	var shown := full.substr(0, n)
+	match w[3]:
+		"plate":
+			_remnant_stencil(w, shown, k, dim)
+		"screen":
+			pass      # the screen shows it on its own glass (_draw_screen)
+		"scrawl":
+			_remnant_hand(w, shown, k, dim)
+		_:
+			_remnant_print(w, shown, full, k, dim)
+
+
+# Stencilled beside the door, letters spaced as if sprayed through a plate.
+func _remnant_stencil(w: Array, shown: String, k: float, dim: float) -> void:
+	var at: Vector2 = (w[1] as Vector2) + (w[2] as Vector2) * 70.0
+	var sf := Fonts.get_font("SemiBold")
+	# down the wall in two columns, above the door, never into the floor's edge
+	var x := at.x
+	var y0 := at.y - 360.0
+	var y := y0
+	var i := 0
+	for ch in shown:
+		if ch == " " or ch == "·":
+			continue
+		draw_string(sf, Vector2(x, y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Pal.ink(0.85 * k * dim, 1.2))
+		y += 26.0
+		i += 1
+		if i == 6:
+			x += 30.0
+			y = y0
+
+
+# Sprayed by hand: each letter a little off its line, larger, rough.
+func _remnant_hand(w: Array, shown: String, k: float, dim: float) -> void:
+	var at: Vector2 = (w[1] as Vector2) + (w[2] as Vector2) * 150.0
+	var sf := Fonts.get_font("SemiBold")
+	var total := sf.get_string_size(shown + "  ", HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
+	var x := at.x - total
+	var i := 0
+	for ch in shown:
+		var rot := sin(i * 2.7) * 0.12
+		var dy := sin(i * 1.9) * 4.0
+		draw_set_transform(Vector2(x, at.y + dy), rot, Vector2.ONE)
+		draw_string(sf, Vector2.ZERO, ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Pal.ink(0.8 * k * dim, 1.1))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		x += sf.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x + 2.0
+		i += 1
+
+
+# Printed on the notice's own paper, which unfolds to hold it.
+func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float) -> void:
+	var at: Vector2 = w[1]
+	var size := 16
 	var tw := font.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	# the words surface just inside the wall, clear of the prop that holds them
-	var off: float = REMNANT_OFF.get(w[3], 60.0)
-	var p: Vector2 = at + n * (off + 8.0 * k)
-	var origin: Vector2 = p - Vector2(tw / 2.0, -6.0)
-	if absf(n.x) > 0.5:
-		origin = Vector2(p.x if n.x > 0.0 else p.x - tw, p.y + 6.0)
-	# a sweep writes them in, letter by letter, then they hold and fade
-	var shown := full.substr(0, int(ceil(full.length() * clampf(k * 1.6, 0.0, 1.0))))
-	var flick := 1.0 if k > 0.9 else (0.7 + 0.3 * float(int(t * 30.0) % 2))
-	draw_rect(Rect2(origin + Vector2(-10, -20), Vector2(tw + 20, 30)), Color(0, 0, 0, 0.55 * k))
-	draw_string(font, origin, shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.95 * k * flick * dim, 1.4))
-	draw_line(origin + Vector2(-10, 10), origin + Vector2(-10 + (tw + 20) * k, 10), Pal.ink(0.35 * k * dim), 1.0)
+	var r := Rect2(at.x - 60.0, at.y + 22.0, 120.0 + (tw + 30.0 - 120.0) * Pal.ease_out(k), 72.0)
+	r.position.x = minf(r.position.x, Arena.ROOM.end.x - r.size.x - 8.0)
+	draw_rect(r, Color(0.08, 0.08, 0.085, 1.0))
+	draw_rect(r, Pal.ink(0.6 * dim), false, 1.5)
+	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
+	draw_string(font, r.position + Vector2(15, 54), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * dim, 1.2))
+	draw_arc(r.end - Vector2(24, 22), 12.0, 0.0, TAU, 20, Pal.red(0.6 * k * dim, 1.4), 2.0, false)
 
 
 # The old-era door R-0 came out of: two heavy panels, one slid half open,
@@ -203,6 +275,21 @@ func _draw_screen(c: Vector2, dim: float) -> void:
 		draw_line(Vector2(r.position.x + 6.0, y), Vector2(r.end.x - 6.0, y), Pal.ink((0.3 if on else 0.08) * dim), 1.0)
 		y += 6.0
 	# what is left of its slogan, running down the glass, stuttering
+	var wake: float = shows.get("w1_screen", 0.0)
+	if wake > 0.01:
+		# its real line, in rows down the glass, flickering in
+		var full: String = Txt.t("screen_full")
+		var rows: Array = Array(full.split("\n"))
+		full = full.replace("\n", "")
+		var n := int(ceil(full.length() * clampf(wake * 1.6, 0.0, 1.0)))
+		var yy := r.position.y + 30.0
+		var used := 0
+		for ln in rows:
+			var part: String = ln.substr(0, clampi(n - used, 0, ln.length()))
+			used += ln.length()
+			draw_string(font, Vector2(r.position.x + 7.0, yy), part, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.9 * wake * dim, 1.5))
+			yy += 21.0
+		return
 	var on2 := int(t * 3.0) % 5 != 0
 	if on2:
 		var sf := Fonts.get_font("SemiBold")
@@ -214,6 +301,24 @@ func _draw_screen(c: Vector2, dim: float) -> void:
 	# the crack
 	draw_polyline(PackedVector2Array([r.position + Vector2(6, 40), r.position + Vector2(40, 88), r.position + Vector2(26, 130), r.position + Vector2(70, 176), r.position + Vector2(58, 220)]), Pal.ink(0.7 * dim, 1.2), 1.5)
 	draw_line(r.position + Vector2(40, 88), r.position + Vector2(86, 102), Pal.ink(0.5 * dim, 1.2), 1.0)
+
+
+func _rows(txt: String, width: float, size: int) -> Array:
+	var key := "%d|%d|%s" % [size, int(width), txt]
+	if row_cache.has(key):
+		return row_cache[key]
+	var out: Array = []
+	var cur := ""
+	for ch in txt:
+		if font.get_string_size(cur + ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width and cur != "":
+			out.append(cur)
+			cur = ch
+		else:
+			cur += ch
+	if cur != "":
+		out.append(cur)
+	row_cache[key] = out
+	return out
 
 
 # Graffiti on the right wall: the Union's mark, crossed out, the paint running.

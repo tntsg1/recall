@@ -645,6 +645,12 @@ func _draw() -> void:
 	if state == DEAD:
 		return
 	if state == ENTER:
+		# the lockdown comes down: a red curtain sweeps the yard top to bottom
+		var ck := Pal.ease_io(clampf(t / 1.1, 0.0, 1.0))
+		var cy := lerpf(Arena.ROOM.position.y, Arena.ROOM.end.y, ck)
+		var ca := 1.0 - clampf((t - 0.9) / 0.4, 0.0, 1.0)
+		draw_line(Vector2(Arena.ROOM.position.x, cy), Vector2(Arena.ROOM.end.x, cy), Pal.red(0.9 * ca, 2.6), 3.0)
+		draw_rect(Rect2(Arena.ROOM.position.x, cy - 60.0, Arena.ROOM.size.x, 60.0), Pal.red(0.06 * ca, 1.4))
 		dim *= clampf(t / 0.9, 0.0, 1.0)
 	if phase == 2:
 		_draw_sockets(dim)
@@ -663,14 +669,18 @@ func _draw() -> void:
 			var root := _local((LEGS[k] as Vector2) * 0.35)
 			if leg_hp[k] > 0.0:
 				var lc := Pal.foe(dim, 1.0 + 1.2 * leg_flash[k])
-				draw_line(root, lp, lc, 4.0)
-				draw_arc(lp, LEG_R, 0.0, TAU, 24, lc, 2.5, false)
-				draw_arc(lp, LEG_R - 8.0, 0.0, TAU, 20, Pal.foe(0.3 * dim), 1.0, false)
-				# how much is left: a bar of ticks round the pad
-				var n := int(ceil(leg_hp[k] / LEG_HP * 8.0))
-				for j in n:
-					var a := -PI / 2.0 + TAU * j / 8.0
-					draw_line(lp + Vector2.from_angle(a) * (LEG_R + 5.0), lp + Vector2.from_angle(a) * (LEG_R + 10.0), Pal.foe(0.7 * dim), 2.0)
+				draw_line(root, lp, lc, 5.0)
+				# a barrier clamp planted in the floor: a block with hazard stripes
+				var cl := Rect2(lp - Vector2(LEG_R, LEG_R * 0.7), Vector2(LEG_R * 2.0, LEG_R * 1.4))
+				draw_rect(cl, Color(0.06, 0.06, 0.065, 1.0))
+				var sx := cl.position.x + 6.0
+				while sx < cl.end.x - 8.0:
+					draw_line(Vector2(sx, cl.end.y - 4.0), Vector2(sx + 10.0, cl.position.y + 4.0), Pal.red(0.55 * dim, 1.3), 4.0)
+					sx += 16.0
+				draw_rect(cl, lc, false, 2.5)
+				# how much is left: a bar under the clamp
+				var g2: float = leg_hp[k] / LEG_HP
+				draw_line(Vector2(cl.position.x, cl.end.y + 7.0), Vector2(cl.position.x + cl.size.x * g2, cl.end.y + 7.0), Pal.foe(0.75 * dim), 3.0)
 			else:
 				draw_line(root, root.lerp(lp, 0.4), Pal.foe(0.25 * dim), 2.0)
 	# hull: a long low shape with ribbing; in overload it splits open
@@ -687,9 +697,17 @@ func _draw() -> void:
 		for j in 4:
 			var x: float = side * (30.0 + j * 24.0)
 			draw_line(_local(Vector2(x, -38.0) + sh), _local(Vector2(x, 34.0) + sh), Pal.foe(0.22 * dim), 1.0)
-	# the red warning band across its face
+	# the lockdown's mark across its face: a barrier band in red stripes
 	if open < 0.5:
-		draw_line(_local(Vector2(-110, -30)), _local(Vector2(110, -30)), Pal.red(0.85 * dim, 2.0), 3.0)
+		var b0 := _local(Vector2(-112, -36))
+		var b1 := _local(Vector2(112, -36))
+		var bn := (b1 - b0).normalized().orthogonal()
+		draw_line(b0, b1, Pal.red(0.9 * dim, 1.8), 2.0)
+		draw_line(b0 + bn * 14.0, b1 + bn * 14.0, Pal.red(0.9 * dim, 1.8), 2.0)
+		var steps := 14
+		for j in steps:
+			var q := b0.lerp(b1, (j + 0.5) / steps)
+			draw_line(q, q + bn * 14.0 + (b1 - b0).normalized() * 8.0, Pal.red(0.8 * dim, 1.6), 3.0)
 	# the core
 	if open > 0.01:
 		var cr := CORE_R * Pal.back(open)
@@ -736,7 +754,7 @@ func _draw() -> void:
 			box.append(box[0])
 			var hc := Pal.red(dim, 2.4) if lamp_aim[k] >= 0.0 else Pal.foe(dim, 1.4 + 1.4 * lamp_flash[k])
 			draw_polyline(box, hc, 2.5, false)
-			draw_line(lp + face * LAMP_R * 0.6 - side * LAMP_R * 0.75, lp + face * LAMP_R * 0.6 + side * LAMP_R * 0.75, Pal.ink(dim, 2.6 if lamp_aim[k] < 0.0 else 3.4), 6.0)
+			draw_line(lp + face * LAMP_R * 0.6 - side * LAMP_R * 0.75, lp + face * LAMP_R * 0.6 + side * LAMP_R * 0.75, Pal.ink(dim, 1.5) if lamp_aim[k] < 0.0 else Pal.red(dim, 2.2), 6.0)
 			# glass left: a broken ring that closes as it fills
 			var g: float = lamp_hp[k] / LAMP_HP
 			draw_arc(lp, LAMP_R + 6.0, -PI / 2.0, -PI / 2.0 + TAU * g, 24, Pal.foe(0.6 * dim), 1.5, false)

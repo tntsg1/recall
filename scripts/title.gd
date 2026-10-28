@@ -806,7 +806,7 @@ func _draw_archive(vp: Vector2) -> void:
 		var fw := font_s.get_string_size(fh, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
 		var fx := x0 + colw * 3.0 + gap * 2.0
 		view_label(fh, Vector2(fx - fw - 96.0, y), 14, Pal.ink(0.5 * kc.x), font_s)
-		var sc := Vector2(fx - 44.0, y - 8.0)
+		var sc := Vector2(fx - 44.0, y - 30.0)
 		draw_arc(sc, 30.0, 0.0, TAU, 32, Pal.red(0.75 * kc.x, 1.4), 2.0, false)
 		draw_arc(sc, 25.0, 0.0, TAU, 32, Pal.red(0.4 * kc.x, 1.2), 1.0, false)
 		draw_set_transform(sc, -0.25, Vector2.ONE)
@@ -843,14 +843,34 @@ func _draw_archive(vp: Vector2) -> void:
 						# blacked out: solid black, as long as the words it hides
 						var lw := font_s.get_string_size(ln, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
 						var bar := Rect2(cx + 12.0 + kj.y, yy - 14.0, lw, 17.0)
-						draw_rect(bar, Color(0, 0, 0, kj.x))
-						draw_rect(bar, Pal.ink(0.22 * kj.x), false, 1.0)
+						draw_rect(bar, Color(0.1, 0.1, 0.11, kj.x))
+						var hx := bar.position.x
+						while hx < bar.end.x:
+							draw_line(Vector2(hx, bar.end.y), Vector2(minf(hx + 10.0, bar.end.x), bar.position.y), Pal.ink(0.14 * kj.x), 1.0)
+							hx += 7.0
 					yy += 24.0
 				draw_line(Vector2(cx + 4.0, top_y), Vector2(cx + 4.0, yy - 20.0), Possess.cyan(0.6 * kj.x) if (got and src == "s") else Pal.ink((0.5 if got else 0.15) * kj.x), 2.0)
 				yy += 12.0
 			tallest = maxf(tallest, yy - y)
 		row += 4
 		y += tallest + 26.0
+	# the files not yet opened: one sealed row for each chapter still ahead
+	y += 10.0
+	for i in Chapters.count():
+		if not Lore.all_of(Chapters.story(i)).is_empty():
+			continue
+		var kl := _page_k("archive", row)
+		row += 1
+		var lc := Pal.ink(0.35 * kl.x)
+		var ic := Vector2(x0 + 8.0 + kl.y, y - 6.0)
+		draw_rect(Rect2(ic + Vector2(-7, -2), Vector2(14, 11)), lc, false, 1.5)
+		draw_arc(ic + Vector2(0, -3), 5.0, PI, TAU, 8, lc, 1.5, false)
+		view_label(Chapters.label(i) + "  ·  " + Chapters.title(i), Vector2(x0 + 26.0 + kl.y, y), 17, Pal.ink(0.45 * kl.x), font_b)
+		var sealed := Txt.t("arch_sealed")
+		var sw := font_s.get_string_size(sealed, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+		view_label(sealed, Vector2(x0 + colw * 3.0 + gap * 2.0 - sw, y), 14, Pal.ink(0.3 * kl.x), font_s)
+		draw_line(Vector2(x0, y + 10.0), Vector2(x0 + (colw * 3.0 + gap * 2.0) * kl.x, y + 10.0), Pal.ink(0.08 * kl.x), 1.0)
+		y += 38.0
 	_text_c(font_s, Txt.t("t_back"), Vector2(vp.x / 2.0, vp.y - 40), 15, Pal.ink(0.5 * pk.x))
 
 

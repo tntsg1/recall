@@ -1568,7 +1568,7 @@ func _draw_over(vp: Vector2) -> void:
 	var y := vp.y * 0.3
 	_text_stagger(font_xl, Txt.t("shattered"), Vector2(cx, y), 52, Pal.ink(1.0, 1.1), t - 0.1, -1.0, 0.07)
 	if over_line != "":
-		_text_c(font_s, over_line, Vector2(cx, y + 62.0), 17, Pal.ink(0.6 * clampf((t - 0.5) / 0.6, 0.0, 1.0)))
+		_text_c(font_s, over_line, Vector2(cx, y + 66.0), 22, Pal.ink(0.8 * clampf((t - 0.5) / 0.6, 0.0, 1.0)))
 	view.draw_line(Vector2(cx - 240.0 * a, y + 28.0), Vector2(cx + 240.0 * a, y + 28.0), Pal.ink(0.4 * a), 1.0)
 	var rk := Pal.ease_out(clampf((t - 0.45) / 0.9, 0.0, 1.0))
 	var rows := [
