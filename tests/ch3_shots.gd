@@ -1,56 +1,99 @@
 extends SceneTree
-# Stills of the Maw (off-screen, no video): leeches carrying rounds,
-# the devourer breathing in, its open core.
+# Stills of chapter 3 (off-screen): the laser range at the opening, the fences
+# lit, every remnant awake, a seized echo's memory, and the testbed running
+# each of its tests and venting. -> proofs/lore/ch3_*.png
 # Usage: tools/run_test.sh tests/ch3_shots.gd --fixed-fps 60
 
 const Cap = preload("res://tests/cap.gd")
 var game
-var brain
-var frame := 0
-var bot := {"move": Vector2.ZERO, "aim": Vector2(960, 300), "fire": false, "focus": false, "dash": false}
-var taken := {}
+var bot := {"move": Vector2.ZERO, "aim": Vector2(960, 300), "fire": false, "focus": false, "dash": false, "possess": false}
 
 
 func _initialize() -> void:
+	Meta.test_mode = true
+	seed(3)
 	root.add_child(preload("res://tests/test_window.gd").new())
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://proofs/m8"))
-	seed(9)
-	var scene: Node = load("res://scenes/main.tscn").instantiate()
-	scene.bot = bot
-	root.add_child(scene)
-	game = scene
-	brain = preload("res://tests/brain.gd").new(bot)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://proofs/lore"))
+	game = load("res://scenes/main.tscn").instantiate()
+	game.bot = bot
+	root.add_child(game)
+	_run.call_deferred()
 
 
-func _shot(k: String) -> void:
-	if not taken.has(k):
-		taken[k] = true
-		Cap.save(root, "res://proofs/m8/%s.png" % k)
+func frames(n: int) -> void:
+	for i in n:
+		await process_frame
 
 
-func _process(_dt: float) -> bool:
-	frame += 1
-	if frame == 3:
+func shot(name: String) -> void:
+	await process_frame
+	await RenderingServer.frame_post_draw
+	Cap.save(root, "res://proofs/lore/ch3_%s.png" % name)
+	print(name, " saved")
+
+
+func _run() -> void:
+	await frames(2)
+	while Chapters.story(game.chapter) < 3:
 		game.next_chapter()
-		game.next_chapter()
-		game.lv = {"bounce": 1, "split": 1, "orbit": 1, "magnet": 1, "blast": 0, "charge": 0, "shadow": 0, "chain": 0, "possess": 0}
-	if frame < 4:
-		return false
-	brain.think(game)
-	if frame == 160:
-		_shot("1_intro")
-	var w = game.wave_ctl
-	if w.index == 1 and w.phase == Waves.FIGHT and w.t > 4.0:
-		_shot("2_leeches")
-		if w.t > 4.1:
-			game.dev_jump(Waves.BOSS)
-	var b = game.boss
-	if b is Devourer:
-		if b.state == Devourer.RUN and b.mode == Devourer.INHALE and b.mode_t > 0.4:
-			_shot("3_inhale")
-		if b.state == Devourer.RUN and b.held() >= 6:
-			_shot("4_full")
-		if b.phase >= 1 and b.held() >= 3 and taken.has("3_inhale"):
-			_shot("5_phase2")
-			return true
-	return frame > 60 * 240
+	await frames(80)
+	game.player.pos = Vector2(960, 860)
+	await frames(10)
+	await shot("1_open")
+	while game.wave_ctl.phase != Waves.FIGHT:
+		await process_frame
+	game.dev_god = true
+	game.lasers.force(true)
+	game.player.pos = Vector2(760, 780)
+	await frames(70)
+	await shot("2_lasers")
+	game.lasers.release()
+	for w in Lore.walls(3):
+		game.lore.hold["w3_%s" % w[0]] = 9.0
+	await frames(40)
+	await shot("3_remnants")
+	game.wave_ctl.queue.clear()
+	for e in game.enemies.list:
+		e.state = Enemies.DEAD
+	var anchor = game.enemies.spawn(Enemies.GUARD, Arena.ROOM.position + Vector2(60, 60))
+	anchor.state = Enemies.ALIVE
+	anchor.hp = 1e9
+	game.player.pos = Vector2(820, 600)
+	var p = game.enemies.spawn(Enemies.ECHO, Vector2(940, 580))
+	p.state = Enemies.ALIVE
+	game.possess.mark(p)
+	bot.possess = true
+	await frames(2)
+	bot.possess = false
+	await frames(60)
+	await shot("4_memory")
+	game.possess.t_left = 0.01
+	await frames(20)
+	game.dev_jump(Waves.BOSS)
+	while game.boss.state != Testbed.RUN:
+		await process_frame
+	var bs = game.boss
+	game.player.pos = Vector2(1100, 820)
+	while not (bs.stage == Testbed.TEST and bs.stage_t > 1.6):
+		await process_frame
+	await shot("5_missiles")
+	bs.tests_run = 1
+	bs.missiles.clear()
+	bs._announce()
+	game.player.pos = Vector2(700, 800)
+	while not (bs.stage == Testbed.TEST and bs.flame_t > 1.6):
+		await process_frame
+	await shot("6_flames")
+	bs.tests_run = 2
+	bs._announce()
+	game.player.pos = Vector2(1200, 760)
+	while bs.rail_mode != 2:
+		await process_frame
+	await shot("7_rail")
+	while bs.stage != Testbed.VENT:
+		await process_frame
+	await frames(30)
+	game.player.pos = Vector2(960, 640)
+	await frames(2)
+	await shot("8_vent")
+	quit()

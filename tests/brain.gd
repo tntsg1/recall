@@ -116,11 +116,46 @@ func think(game) -> void:
 			var ahead: float = wrapf((p - bs.pos).angle() - bs.arc_a, -PI, PI)
 			if bs.arc_live() and ahead > 0.0 and ahead < 0.12:
 				bot.dash = true
+	if bs is Testbed and bs.state == Testbed.RUN:
+		# keep below the platform; out of missile marks, the flame and the rail line
+		if p.y < 420.0:
+			move += Vector2(0, 1.2)
+		for m in bs.missiles:
+			var md: float = (m[1] as Vector2).distance_to(p)
+			if md < Testbed.MIS_R + 40.0:
+				move += (p - (m[1] as Vector2)) / maxf(md, 1.0) * 2.4
+				if m[2] > Testbed.MIS_FALL - 0.2 and md < Testbed.MIS_R + 10.0:
+					bot.dash = true
+		if bs.stage == Testbed.TEST and bs.test == 1:
+			for f in bs.flames:
+				var noz: Vector2 = Testbed.NOZZLES[f[0]]
+				var k: float = clampf((bs.flame_t - 0.45) / Testbed.FLAME_TIME, 0.0, 1.0)
+				var a: float = bs._flame_angle(f, k)
+				var off: float = wrapf((p - noz).angle() - a, -PI, PI)
+				var sweep: float = signf(f[2] - f[1])
+				# it comes toward you: get ahead of it, dash through when it arrives
+				if off * sweep > 0.0 and off * sweep < 0.45:
+					move += (p - noz).orthogonal().normalized() * sweep * 1.5
+					if off * sweep < 0.22:
+						bot.dash = true
+		if bs.rail_mode == 1 or bs.rail_mode == 2:
+			var dir := Vector2.from_angle(bs.rail_a)
+			move += dir.orthogonal() * (1.6 if int(frame / 90) % 2 == 0 else -1.6)
+			if bs.rail_mode == 2 and bs.rail_t > Testbed.RAIL_HOLD - 0.12:
+				bot.dash = true
+	# laser fences: stand clear of a beam that is lit or about to be
+	if game.lasers.active():
+		for fe in game.lasers.fences:
+			if game.lasers.live[fe[2]] or game.lasers.warn[fe[2]] > 0.0:
+				var q3 := Geometry2D.get_closest_point_to_segment(p, fe[0], fe[1])
+				var fd: float = q3.distance_to(p)
+				if fd < 80.0:
+					move += (p - q3) / maxf(fd, 1.0) * (80.0 - fd) / 20.0
 	if bs is Lockdown and bs.state == Lockdown.RUN:
 		var lcp: Vector2 = bs.core_pos()
 		nearest = {"pos": lcp, "vel": Vector2.ZERO}
-	elif (bs is Boss and (bs.state == Boss.RUN or bs.state == Boss.ENTER)) or (bs is Warden and bs.state == Warden.RUN) or (bs is Devourer and bs.state == Devourer.RUN) or (bs is Metronome and bs.state == Metronome.RUN) or (bs is Zero and bs.state == Zero.RUN):
-		if bs.core_open > 0.5 or not (bs is Boss):
+	elif (bs is Boss and (bs.state == Boss.RUN or bs.state == Boss.ENTER)) or (bs is Warden and bs.state == Warden.RUN) or (bs is Devourer and bs.state == Devourer.RUN) or (bs is Metronome and bs.state == Metronome.RUN) or (bs is Zero and bs.state == Zero.RUN) or (bs is Testbed and bs.state == Testbed.RUN):
+		if bs.core_open > 0.5 or not (bs is Boss or bs is Testbed):
 			var cp: Vector2 = bs.core_pos()
 			nearest = {"pos": cp, "vel": bs.core_vel()}
 			nd = cp.distance_to(p)

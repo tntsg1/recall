@@ -45,7 +45,8 @@ func _process(_dt: float) -> bool:
 			_ok(game.boss.state == Boss.RUN or game.boss.state == Boss.ENTER, "train is running")
 		400:
 			for i in 4:
-				game.boss.guard_t = 0.0
+				if "guard_t" in game.boss:
+					game.boss.guard_t = 0.0
 				game.boss.dev_strike()
 		402:
 			_ok(game.boss.state == Boss.DYING or game.boss.state == Boss.DEAD, "K strikes down the boss (state %d)" % game.boss.state)

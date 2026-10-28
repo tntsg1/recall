@@ -19,6 +19,7 @@ var boss                      # the current chapter's boss (train, warden, ...)
 var bosses: Array = []
 var bosses_by := {}           # boss name (Chapters) -> node
 var lore: LoreProps          # the world's fragments in this room (design/LORE.md)
+var lasers: Lasers           # the laser range's fences (chapter 3)
 var radio_n := 0
 var wave_ctl: Waves
 var fx: Fx
@@ -171,6 +172,9 @@ func _ready() -> void:
 	arena = Arena.new()
 	arena.game = self
 	add_child(arena)
+	lasers = Lasers.new()
+	lasers.game = self
+	add_child(lasers)
 	player = Player.new()
 	player.game = self
 	add_child(player)
@@ -180,7 +184,7 @@ func _ready() -> void:
 	possess = Possess.new()
 	possess.game = self
 	add_child(possess)
-	for pair in [["lockdown", Lockdown], ["warden", Warden], ["devourer", Devourer], ["train", Boss], ["metronome", Metronome], ["zero", Zero]]:
+	for pair in [["lockdown", Lockdown], ["warden", Warden], ["testbed", Testbed], ["devourer", Devourer], ["train", Boss], ["metronome", Metronome], ["zero", Zero]]:
 		var bn = pair[1].new()
 		bn.game = self
 		add_child(bn)
@@ -977,6 +981,7 @@ func _run_frame(dt: float) -> void:
 		player.step(sdt, dt, move, aim_world())
 	possess.step(sdt, dt)
 	lore.step(dt)
+	lasers.step(sdt)
 	if prof_on:
 		_lap("player+possess")
 	trail.append([sim_time, player.pos])
@@ -1666,7 +1671,7 @@ func run_snapshot() -> Dictionary:
 		"assist_retries_used": assist_retries_used, "assist_damage": assist_damage,
 		"plan": wave_ctl.plan.duplicate(true), "phoenix_used": phoenix_used,
 		"undying_used": undying_used, "waves_cleared": waves_cleared,
-		"v": 2, "chapter": chapter, "wave": wave_ctl.index, "gun": Loadout.gun, "stake": Loadout.stake,
+		"v": 3, "chapter": chapter, "story": Chapters.story(chapter), "wave": wave_ctl.index, "gun": Loadout.gun, "stake": Loadout.stake,
 		"cracks": cracks, "max_cracks": max_cracks, "relics": relics.duplicate(), "lv": lv.duplicate(),
 		"armed": armed.duplicate(), "rerolls": rerolls, "run_time": run_time, "kills": kills,
 		"hits_taken": hits_taken, "chapter_hits": chapter_hits, "max_combo": max_combo, "crosses": crosses,
@@ -1677,9 +1682,7 @@ func run_snapshot() -> Dictionary:
 
 func _resume(snap: Dictionary) -> void:
 	# runs saved before the story-order table counted the old five chapters
-	var ch := int(snap.get("chapter", 0))
-	if int(snap.get("v", 1)) < 2:
-		ch = Chapters.OLD_RUN[clampi(ch, 0, Chapters.OLD_RUN.size() - 1)]
+	var ch := Chapters.from_save(snap)
 	for i in ch:
 		next_chapter()
 	assist_retries_used = int(snap.get("assist_retries_used", 0))
@@ -1737,6 +1740,7 @@ func next_chapter() -> void:
 	boss = bosses_by[Chapters.boss(chapter)]
 	boss.reset()
 	arena.setup(Chapters.room(chapter))
+	lasers.setup(Chapters.room(chapter))
 	lore.start_chapter(chapter)
 	sfx.start_chapter(Chapters.music(chapter))
 	sfx.play("chapter", 1.0, -2.0)
@@ -1761,7 +1765,9 @@ func on_chapter_clear() -> void:
 		ach("all_s_chapter")
 	if chapter == 0 and sum <= 150.0:
 		ach("fast_ch1")
-	ach("boss_%d" % (chapter + 1))
+	var badge: String = Chapters.BOSS_ACH.get(Chapters.boss(chapter), "")
+	if badge != "":
+		ach(badge)
 	if Loadout.at_least(7):
 		rerolls = maxi(rerolls, 0 if Loadout.at_least(2) else 1) + (1 if has("lucky") else 0)
 		undying_used = false

@@ -7,14 +7,36 @@ class_name Chapters
 const LIST := [
 	{"story": 1, "room": 0, "pool": 0, "music": 0, "boss": "lockdown", "note": "note_boss_lockdown", "par": [90.0, 130.0]},
 	{"story": 2, "room": 1, "pool": 1, "music": 1, "boss": "warden", "note": "note_boss_2", "par": [45.0, 70.0]},
+	{"story": 3, "room": 5, "pool": 6, "music": 1, "boss": "testbed", "note": "note_boss_testbed", "par": [80.0, 120.0]},
 	{"story": 4, "room": 2, "pool": 2, "music": 2, "boss": "devourer", "note": "note_boss_3", "par": [45.0, 70.0]},
 	{"story": 5, "room": 0, "pool": 5, "music": 0, "boss": "train", "note": "note_boss", "par": [70.0, 105.0]},
 	{"story": 7, "room": 3, "pool": 3, "music": 3, "boss": "metronome", "note": "note_boss_4", "par": [70.0, 100.0]},
 	{"story": 12, "room": 4, "pool": 4, "music": 4, "boss": "zero", "note": "note_boss_5", "par": [60.0, 90.0]},
 ]
 
-# saved runs from before this table: chapter i of the old five-chapter run
-const OLD_RUN := [0, 1, 2, 4, 5]
+# The boss achievements keep the names they were earned under.
+const BOSS_ACH := {"train": "boss_1", "warden": "boss_2", "devourer": "boss_3", "metronome": "boss_4", "zero": "boss_5"}
+
+# Saved runs record the story number (v3). Older ones kept a position in the
+# list of their day: v1 the first five chapters, v2 the six of the first table.
+const V1_STORY := [1, 2, 4, 7, 12]
+const V2_STORY := [1, 2, 4, 5, 7, 12]
+
+
+# Where a saved run's chapter now sits in the run.
+static func from_save(snap: Dictionary) -> int:
+	var v := int(snap.get("v", 1))
+	var st := 1
+	if v >= 3:
+		st = int(snap.get("story", 1))
+	else:
+		var i := int(snap.get("chapter", 0))
+		var old: Array = V1_STORY if v < 2 else V2_STORY
+		st = old[clampi(i, 0, old.size() - 1)]
+	for k in LIST.size():
+		if int(LIST[k].story) >= st:
+			return k
+	return LIST.size() - 1
 
 
 static func count() -> int:

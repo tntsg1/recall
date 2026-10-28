@@ -2,7 +2,7 @@ extends SceneTree
 # Real play, real frame times: the bot plays the opening of a run (vsync off,
 # no fixed fps) and every frame over the budget is printed with where its time
 # went. Ends with the average, the 99th percentile and the worst frame.
-# Usage: tools/run_test.sh tests/play_perf.gd -- [seconds] [budget_ms] [cold]
+# Usage: tools/run_test.sh tests/play_perf.gd -- [seconds] [budget_ms] [cold] [story=N] [boss]
 # (cold: skip the title's warm-up, to see what it saves)
 
 const BUDGET := 7.0
@@ -56,6 +56,15 @@ func _initialize() -> void:
 	root.add_child(scene)
 	game = scene
 	game.prof_on = true
+	# story=N: start in that story chapter; boss: straight to its boss
+	for a in args:
+		if a.begins_with("story="):
+			await process_frame
+			while Chapters.story(game.chapter) < int(a.substr(6)) and game.chapter < Chapters.count() - 1:
+				game.next_chapter()
+	if "boss" in args:
+		await process_frame
+		game.dev_jump(Waves.BOSS)
 	brain = preload("res://tests/brain.gd").new(bot)
 	_watch.call_deferred(game)
 

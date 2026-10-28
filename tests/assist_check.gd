@@ -95,6 +95,7 @@ func run() -> void:
 		Meta.test_mode = true
 		var boss_snap := snap.duplicate(true)
 		boss_snap.chapter = chapter
+		boss_snap.story = Chapters.story(chapter)
 		boss_snap.wave = Waves.BOSS
 		boss_snap.cracks = 3
 		boss_snap.assist_retries_used = 0

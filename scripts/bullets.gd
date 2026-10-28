@@ -652,6 +652,9 @@ func _fly(b: B, dt: float) -> void:
 			b.pos = to
 			b.set_head(to)
 		return
+	var burn: Dictionary = game.lasers.cut(a, to)
+	if burn:
+		to = burn.point
 	var h: Dictionary = game.arena.raycast(a, to)
 	var end: Vector2 = h.point if h else to
 	var sh: Dictionary = {} if Loadout.gun == "rail" else game.enemies.shield_hit(a, end)
@@ -695,6 +698,9 @@ func _fly(b: B, dt: float) -> void:
 	if b.just_bent:
 		b.just_bent = false
 		return
+	if burn and not h:
+		_burn(b, end)
+		return
 	if h and h.mirror and b.path.size() < 12:
 		# mirror panels turn rounds away without using up a ricochet
 		_bend(b, h.point, b.dir.bounce(h.normal), h.normal)
@@ -733,6 +739,21 @@ func _fly(b: B, dt: float) -> void:
 	else:
 		b.pos = to
 		b.set_head(to)
+
+
+# A lit laser fence burns the round where it crosses: a flare there, and the
+# round is back in the magazine (a split-off one is simply gone).
+func _burn(b: B, at: Vector2) -> void:
+	b.pos = at
+	b.set_head(at)
+	b.state = FADE
+	b.t = 0.0
+	b.settled = false
+	game.fx.sparks(at, -b.dir, 6, Pal.red(1.0, 3.2), 300.0, 0.2, 0.9)
+	game.fx.flash(at, 20.0, 0.1, Pal.red(0.7, 2.6))
+	game.sfx.play("expire", randf_range(1.5, 1.7), -11.0)
+	if not b.child:
+		game.on_ammo_home(b)
 
 
 func _bend(b: B, at: Vector2, new_dir: Vector2, nudge: Vector2 = Vector2.ZERO) -> void:
@@ -791,6 +812,12 @@ func _return(b: B, dt: float) -> void:
 				b.pos = bh.point
 				_go_home(b)
 				return
+		var lc: Dictionary = game.lasers.cut(pts[k], pts[k + 1])
+		if lc:
+			game.enemies.sweep(pts[k], lc.point, b, true)
+			b.charge = 0
+			_burn(b, lc.point)
+			return
 		game.enemies.sweep(pts[k], pts[k + 1], b, true)
 	b.s = s1
 	var np := pts[pts.size() - 1]

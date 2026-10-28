@@ -46,6 +46,12 @@ func setup(ch: int) -> void:
 			for c in [Vector2(320, 260), Vector2(1600, 260), Vector2(320, 820), Vector2(1600, 820)]:
 				inner.append(Rect2(c - Vector2(36, 36), Vector2(72, 72)))
 			inner.append(Rect2(880, 960, 160, 30))
+		5:
+			# the laser range: the four posts the beams hang from, two crate stacks low down
+			for c in [Vector2(624, 420), Vector2(1296, 420), Vector2(396, 700), Vector2(1524, 700)]:
+				inner.append(Rect2(c - Vector2(24, 24), Vector2(48, 48)))
+			inner.append(Rect2(230, 860, 110, 64))
+			inner.append(Rect2(1580, 860, 110, 64))
 		2:
 			# the Maw: six blocks in a ring, the middle left for what lives there
 			for k in 6:

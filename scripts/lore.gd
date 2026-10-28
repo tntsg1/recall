@@ -22,6 +22,13 @@ const SEIZE := {
 		Enemies.CHARGER: [["退休窗口今日不开放。明天也不。", "THE RETIREMENT WINDOW IS CLOSED TODAY. AND TOMORROW."]],
 		Enemies.PRISM: [["我把光折进镜子里，让每个人看起来都很幸福。", "I BEND THE LIGHT INTO THE MIRRORS SO EVERYONE LOOKS HAPPY."]],
 	},
+	3: {
+		Enemies.CHASER: [["测试对象编号 R-0。处置等级：无需审批。", "TEST SUBJECT R-0. DISPOSAL LEVEL: NO APPROVAL NEEDED."],
+			["出厂说明：对外防御。验收地点：第十三街。", "FACTORY NOTE: FOR EXTERNAL DEFENCE. ACCEPTANCE SITE: 13TH STREET."]],
+		Enemies.ECHO: [["它走过的路我都记得。我被造出来就是为了这个。", "I REMEMBER EVERY STEP IT TOOK. THAT IS WHAT I WAS MADE FOR."]],
+		Enemies.GUARD: [["防暴盾第九版：更轻，更结实，更朝向人群。", "RIOT SHIELD V9: LIGHTER, STRONGER, MORE FACING THE CROWD."]],
+		Enemies.CHARGER: [["靶纸上画的不是敌军。是排队的人。", "THE TARGETS DON'T SHOW ENEMY SOLDIERS. THEY SHOW PEOPLE IN A QUEUE."]],
+	},
 }
 
 # remnants: [id, wall point, inward normal, kind of mark, zh, en]
@@ -38,6 +45,12 @@ const WALL := {
 		["queue", Vector2(1240, 1010), Vector2(0, -1), "floor", "等候区 · 请勿越线 · 请勿思考", "WAITING AREA · DO NOT CROSS · DO NOT THINK"],
 		["retire", Vector2(1840, 760), Vector2(-1, 0), "notice", "本年度退休申请批准 0 份。感谢您的耐心。", "RETIREMENT APPLICATIONS APPROVED THIS YEAR: 0. THANK YOU FOR YOUR PATIENCE."],
 	],
+	3: [
+		["log", Vector2(80, 600), Vector2(1, 0), "screen", "第 4127 次测试：目标为非武装人员。结果：合格。", "TEST 4127: TARGET UNARMED. RESULT: PASSED."],
+		["target", Vector2(1840, 600), Vector2(-1, 0), "print", "C 型靶标：成人 · 手无寸铁 · 排队姿势", "TARGET TYPE C: ADULT · UNARMED · QUEUEING"],
+		["crate", Vector2(285, 860), Vector2(0, -1), "floor", "人民卫士 Ⅳ 型 · 仅限国内使用", "PEOPLE'S GUARDIAN MK IV · DOMESTIC USE ONLY"],
+		["safety", Vector2(1490, 1010), Vector2(0, -1), "notice", "试射期间请勿抗议。抗议者将被视为测试目标。", "DO NOT PROTEST DURING LIVE FIRE. PROTESTERS WILL BE TREATED AS TARGETS."],
+	],
 }
 
 const RADIO := {
@@ -50,6 +63,11 @@ const RADIO := {
 		"wave": [["资产管理中心今日接待股东十二万人次，满意度 100%。", "THE ASSET CENTRE RECEIVED 120,000 SHAREHOLDERS TODAY. SATISFACTION 100%."],
 			["近日有不明设备擅入登记大厅。资产安全不受影响。", "AN UNKNOWN DEVICE ENTERED THE REGISTRATION HALL. ASSETS REMAIN SECURE."]],
 		"boss": [["镜面守卫提前结束服役。大厅将换上更明亮的镜子。", "THE MIRROR WARDEN HAS RETIRED EARLY. THE HALL WILL GET BRIGHTER MIRRORS."]],
+	},
+	3: {
+		"wave": [["仿生军械研究院今日完成例行测试。一切武器均用于守护和平。", "THE BIONIC ORDNANCE INSTITUTE FINISHED ROUTINE TESTS. ALL WEAPONS SERVE PEACE."],
+			["请勿靠近研究院围墙。围墙后面就是和平。", "KEEP AWAY FROM THE INSTITUTE WALLS. BEHIND THEM IS PEACE."]],
+		"boss": [["军械试验平台已完成全部测试项目，即将投入民用。", "THE ORDNANCE TESTBED HAS PASSED EVERY TEST. CIVILIAN SERVICE BEGINS SOON."]],
 	},
 }
 

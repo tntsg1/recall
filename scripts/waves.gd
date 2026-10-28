@@ -18,7 +18,7 @@ const BOSS := 6
 const COST := {C: 1, G: 5, H: 4, P: 3, L: 3, U: 4, E: 3}
 const BUDGET := [16, 22, 28, 32, 40, 48]
 # the waves' own notes, by enemy pool (the boss wave's note comes from Chapters)
-const NOTES := [{2: "note_guard", 3: "note_charger"}, {0: "note_mirror", 1: "note_prism"}, {1: "note_leech"}, {1: "note_pulse"}, {1: "note_echo"}, {}]
+const NOTES := [{2: "note_guard", 3: "note_charger"}, {0: "note_mirror", 1: "note_prism"}, {1: "note_leech"}, {1: "note_pulse"}, {}, {}, {0: "note_lasers", 1: "note_echo"}]
 const SIDES := ["T", "B", "L", "R"]
 
 var game
@@ -64,7 +64,7 @@ func _build_plan() -> void:
 		match i:
 			0:
 				pass
-			1 when pool == 0 or pool == 5:
+			1 when pool == 0 or pool == 5 or pool == 4:
 				pass
 			1 when pool == 1:
 				kinds.append(P)
@@ -79,10 +79,12 @@ func _build_plan() -> void:
 				for k in 3:
 					kinds.append(U)
 				left -= COST[U] * 3
-			1:
+			1 when pool == 6:
 				for k in 3:
 					kinds.append(E)
 				left -= COST[E] * 3
+			1:
+				pass
 			2 when pool == 0:
 				kinds.append(G)
 				left -= COST[G]
@@ -101,6 +103,8 @@ func _build_plan() -> void:
 					mix = [G, H, H, P, L]
 				elif pool == 3:
 					mix = [G, H, L, U, U]
+				elif pool == 6:
+					mix = [G, H, H, P, E]
 				elif pool == 4:
 					mix = [G, H, P, L, U, E, E]
 				for k in specials:

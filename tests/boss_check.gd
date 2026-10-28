@@ -1,6 +1,6 @@
 extends SceneTree
 # Headless: jump straight to a boss, let the bot fight it, print the result.
-# Usage: godot --headless --path . -s tests/boss_check.gd --fixed-fps 60 -- [runs] [max] [boss=lockdown|warden|devourer|train|metronome|zero]
+# Usage: godot --headless --path . -s tests/boss_check.gd --fixed-fps 60 -- [runs] [max] [boss=lockdown|warden|testbed|devourer|train|metronome|zero]
 
 var game
 var brain
