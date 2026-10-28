@@ -111,4 +111,9 @@ func _run() -> void:
 	while not (bs.stage == Testbed.TEST and bs.stage_t > 1.5 and fmod(bs.t * 4.0, 1.0) < 0.3 and bs.missiles.size() >= 3):
 		await process_frame
 	await shot("10_demo")
+	# the demonstration passes: the stamp lands, the hull goes dark, the beams drop
+	while bs.stage != Testbed.PASS:
+		await process_frame
+	await frames(14)
+	await shot("11_passed")
 	quit()

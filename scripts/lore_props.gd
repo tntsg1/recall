@@ -646,8 +646,8 @@ func _draw_lanes(dim: float) -> void:
 		var bx := 560.0 + tb * 260.0
 		if absf(bx - 785.0) < 70.0 or absf(bx - 1135.0) < 70.0:
 			continue
-		fl.append_array(PackedVector2Array([Vector2(bx - 26, 470), Vector2(bx + 26, 470), Vector2(bx + 26, 470), Vector2(bx + 26, 510),
-			Vector2(bx + 26, 510), Vector2(bx - 26, 510), Vector2(bx - 26, 510), Vector2(bx - 26, 470)]))
+		fl.append_array(PackedVector2Array([Vector2(bx - 34, 462), Vector2(bx + 34, 462), Vector2(bx + 34, 462), Vector2(bx + 34, 514),
+			Vector2(bx + 34, 514), Vector2(bx - 34, 514), Vector2(bx - 34, 514), Vector2(bx - 34, 462)]))
 	for ax: float in [520.0, 960.0, 1400.0]:
 		fl.append_array(PackedVector2Array([Vector2(ax - 12, 600), Vector2(ax, 586), Vector2(ax, 586), Vector2(ax + 12, 600)]))
 	draw_multiline(fl, Color(1, 1, 1, 0.06 * dim), 3.0)
@@ -657,9 +657,11 @@ func _draw_lanes(dim: float) -> void:
 		var bx2 := 560.0 + tb * 260.0
 		if absf(bx2 - 785.0) < 70.0 or absf(bx2 - 1135.0) < 70.0:
 			continue
-		draw_string(sf, Vector2(bx2 - 22.0, 466.0), "A-%d" % (tb + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 1, 1, 0.12 * dim))
-		draw_circle(Vector2(bx2, 482.0), 5.0, Color(1, 1, 1, 0.07 * dim))
-		draw_polyline(PackedVector2Array([Vector2(bx2 - 12, 506), Vector2(bx2 - 10, 492), Vector2(bx2 + 10, 492), Vector2(bx2 + 12, 506)]), Color(1, 1, 1, 0.08 * dim), 2.0)
+		draw_string(sf, Vector2(bx2 - 30.0, 456.0), "A-%d" % (tb + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 1, 0.22 * dim))
+		# the figure that stood here, queueing, and the tick that cleared it
+		draw_circle(Vector2(bx2 - 6.0, 478.0), 7.0, Color(1, 1, 1, 0.16 * dim))
+		draw_polyline(PackedVector2Array([Vector2(bx2 - 22, 510), Vector2(bx2 - 19, 491), Vector2(bx2 + 7, 491), Vector2(bx2 + 10, 510)]), Color(1, 1, 1, 0.18 * dim), 2.0)
+		draw_polyline(PackedVector2Array([Vector2(bx2 + 14, 482), Vector2(bx2 + 20, 489), Vector2(bx2 + 30, 472)]), Pal.ink(0.45 * dim), 2.5)
 	# the test zone: a hatched band across the floor under the platform
 	var y0 := 330.0
 	var x := 700.0

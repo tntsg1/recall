@@ -361,6 +361,7 @@ func _run(dt: float) -> void:
 				stage_t = 0.0
 				stamp = 1.0
 				tests_run += 1
+				game.lasers.force(false)
 				# the stamp comes down hard
 				game.sfx.play("stamp", 0.8, 0.0)
 				game.sfx.play("slam", 0.7, -6.0)
@@ -659,17 +660,20 @@ func _draw() -> void:
 	for k in 2:
 		_draw_nozzle(k, o, dim)
 	_draw_turret(o, dim, col)
+	_draw_stamp(o, dim)
 
 
 # The full demonstration: the whole range's edge pulses red in time with
 # the hull, and warning chevrons run along the top and bottom walls.
 func _draw_alarm(dim: float) -> void:
-	var on := fmod(t * 4.0, 1.0) < 0.5
-	var k := (1.0 if on else 0.35) * dim
+	var ph := fmod(t * 4.0, 1.0)
+	if ph >= 0.5:
+		return
+	var k := sin(ph * 2.0 * PI) * dim
 	var r := Arena.ROOM
-	for j in 4:
-		var w := 6.0 + j * 10.0
-		var a := (0.14 - j * 0.03) * k
+	for j in 2:
+		var w := 4.0 + j * 8.0
+		var a := (0.12 - j * 0.05) * k
 		draw_rect(Rect2(r.position, Vector2(r.size.x, w)), Pal.red(a, 1.4))
 		draw_rect(Rect2(Vector2(r.position.x, r.end.y - w), Vector2(r.size.x, w)), Pal.red(a, 1.4))
 		draw_rect(Rect2(r.position, Vector2(w, r.size.y)), Pal.red(a, 1.4))
@@ -683,7 +687,7 @@ func _draw_alarm(dim: float) -> void:
 			ch.append(Vector2(x + 12.0, y - 8.0))
 			ch.append(Vector2(x + 24.0, y))
 		x += 60.0
-	draw_multiline(ch, Pal.red(0.6 * k, 1.8), 3.0)
+	draw_multiline(ch, Pal.red(0.45 * k, 1.4), 2.0)
 
 
 func _draw_screen(o: Vector2, dim: float) -> void:
@@ -734,7 +738,12 @@ func _draw_screen(o: Vector2, dim: float) -> void:
 		sl.append(Vector2(r.end.x - 1.0, y))
 		y += 4.0
 	draw_multiline(sl, Color(0, 0, 0, 0.25), 1.0)
-	# the stamp: 合格, slanted, fading out
+
+
+# The 合格 stamp, over everything on the deck, at the screen's corner.
+func _draw_stamp(o: Vector2, dim: float) -> void:
+	var r := Rect2(SCREEN.position + o, SCREEN.size)
+	var font := Fonts.get_font("SemiBold")
 	if stamp > 0.0 and state != DYING:
 		var sa := minf(1.0, stamp * 2.0)
 		var sc := r.position + Vector2(r.size.x - 22.0, r.size.y + 4.0)
@@ -877,14 +886,15 @@ func _draw_dangers(dim: float) -> void:
 		var at: Vector2 = m[1]
 		var k: float = m[2] / MIS_FALL
 		# the fill is the timer: it reaches the rim as the round lands
-		draw_circle(at, MIS_R * k, Pal.ink(0.03 + 0.09 * k))
+		# (linear-light blending: a little alpha already reads as a fair grey)
+		draw_circle(at, MIS_R * maxf(k, 0.0), Pal.ink(0.004 + 0.01 * k))
 		var dash := PackedVector2Array()
 		for j in 16:
 			var a0 := TAU * j / 16.0 + t * 0.9
 			for q in 3:
 				dash.append(at + Vector2.from_angle(a0 + 0.12 * q) * MIS_R)
 				dash.append(at + Vector2.from_angle(a0 + 0.12 * (q + 1)) * MIS_R)
-		draw_multiline(dash, Pal.red((0.5 + 0.45 * k) * dim, 1.5), 2.0)
+		draw_multiline(dash, Pal.red((0.6 + 0.4 * k) * dim, 2.2), 2.5)
 		var cr := 12.0
 		draw_multiline(PackedVector2Array([at - Vector2(cr, 0), at + Vector2(cr, 0), at - Vector2(0, cr), at + Vector2(0, cr)]), Pal.ink(0.6 * dim), 1.5)
 		# the round itself on its arc from the pod: white, with a short trail
