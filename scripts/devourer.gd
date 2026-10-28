@@ -412,22 +412,22 @@ func _draw_counter(dim: float, appear: float, full: bool) -> void:
 	if appear < 0.3:
 		return
 	var font := Fonts.get_font("SemiBold")
-	var r := Rect2(pos + Vector2(-110.0, -R - 120.0), Vector2(220.0, 56.0))
+	var r := Rect2(pos + Vector2(-136.0, -R - 134.0), Vector2(272.0, 70.0))
 	draw_rect(r, Color(0.02, 0.025, 0.03, appear))
 	draw_rect(r, Pal.foe(0.55 * dim * appear), false, 1.5)
 	draw_line(Vector2(r.get_center().x, r.end.y), pos + Vector2(0, -R - 46.0), Pal.ink(0.35 * dim), 2.0)
 	if full:
 		if fmod(t * 3.0, 1.0) < 0.6:
-			var w := font.get_string_size(Txt.t("intake_full"), HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
-			draw_string(font, Vector2(r.get_center().x - w / 2.0, r.position.y + 25.0), Txt.t("intake_full"), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.red(dim, 2.0))
+			var w := font.get_string_size(Txt.t("intake_full"), HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
+			draw_string(font, Vector2(r.get_center().x - w / 2.0, r.position.y + 30.0), Txt.t("intake_full"), HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Pal.red(dim, 2.0))
 		# the share runs past every decimal it has
 		var wild := "%.4f%%" % (99.9 + 0.0999 * fmod(t * 7.3, 1.0))
-		var w2 := font.get_string_size(wild, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-		draw_string(font, Vector2(r.get_center().x - w2 / 2.0, r.position.y + 47.0), wild, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.foe(0.9 * dim, 1.6))
+		var w2 := font.get_string_size(wild, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
+		draw_string(font, Vector2(r.get_center().x - w2 / 2.0, r.position.y + 58.0), wild, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.foe(0.9 * dim, 1.6))
 		return
 	# the reserve share ticks up past 99.7 and never down
 	var share := 99.7 + 0.05 * minf(held(), 6.0)
-	draw_string(font, r.position + Vector2(10, 22), Txt.t("intake_count"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.foe(0.6 * dim))
-	draw_string(font, r.position + Vector2(96, 24), "%.1f%%" % share, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.foe(0.95 * dim, 1.6))
-	draw_string(font, r.position + Vector2(10, 46), Txt.t("intake_civil"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.45 * dim))
-	draw_string(font, r.position + Vector2(96, 47), "%.1f%%" % (100.0 - share), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.6 * dim))
+	draw_string(font, r.position + Vector2(12, 28), Txt.t("intake_count"), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Pal.foe(0.65 * dim))
+	draw_string(font, r.position + Vector2(122, 30), "%.1f%%" % share, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Pal.foe(0.95 * dim, 1.6))
+	draw_string(font, r.position + Vector2(12, 58), Txt.t("intake_civil"), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Pal.ink(0.6 * dim))
+	draw_string(font, r.position + Vector2(122, 59), "%.1f%%" % (100.0 - share), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.9 * dim, 1.3))

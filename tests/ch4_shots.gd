@@ -103,4 +103,11 @@ func _run() -> void:
 	await frames(160)
 	print("FULL crate ", game.arms.crate.size(), " carry ", game.arms.carry.size())
 	await shot("8_full")
+	# the intake falls; the quota window rolls up on an empty tray
+	bs.guard_t = 0.0
+	bs.damage(bs.HP * Loadout.boss_hp(), false, bs.pos, Vector2.UP)
+	while game.lore.shutter_up < 1.0:
+		await process_frame
+	await frames(20)
+	await shot("9_quota")
 	quit()

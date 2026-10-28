@@ -26,6 +26,7 @@ var tick := 0.0
 var focus_last := 0.0
 var row_cache := {}
 var mirror_tick := 0.0
+var shutter_up := 0.0        # chapter 4: the quota window opens once the intake falls
 
 
 func _ready() -> void:
@@ -43,6 +44,7 @@ func start_chapter(ch: int) -> void:
 	story = Chapters.story(ch)
 	shows.clear()
 	hold.clear()
+	shutter_up = 0.0
 	memory_t = -1.0
 	worker_t = 0.0 if story == 1 else -1.0
 
@@ -86,7 +88,11 @@ func step(dt: float) -> void:
 		mem_layer.queue_redraw()
 	mem_shown = memory_t >= 0.0
 	# the props only flicker: ten redraws a second do; anything moving gets all
-	var busy: bool = worker_t >= 0.0 or focus_last != game.focus or (story == 4 and _full())
+	if story == 4 and game.boss is Devourer and game.boss.state == Devourer.DEAD and shutter_up < 1.0:
+		shutter_up = minf(1.0, shutter_up + dt / 2.0)
+		if shutter_up == dt / 2.0 or shutter_up < dt:
+			game.sfx.play("windup", 0.5, -10.0)
+	var busy: bool = worker_t >= 0.0 or focus_last != game.focus or (story == 4 and (_full() or (shutter_up > 0.0 and shutter_up < 1.0)))
 	for k in shows:
 		if shows[k] > 0.0:
 			busy = true
@@ -810,7 +816,7 @@ func _draw_stations(dim: float) -> void:
 		draw_string(sf, r.position + Vector2(4, -4), Txt.t("station") % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 1, 1, 0.12 * dim))
 		# each station's lamp: off, or red when the line runs flat out
 		var lamp := Vector2(r.end.x - 6.0, r.position.y - 8.0)
-		if _full() and (n == 2 or n == 5) and fmod(t * 3.0 + n * 0.17, 1.0) < 0.6:
+		if _full() and (n == 2 or n == 5):
 			draw_circle(lamp, 5.0, Pal.red(dim, 2.4))
 		else:
 			draw_circle(lamp, 4.0, Pal.ink(0.2 * dim))
@@ -852,30 +858,48 @@ func _draw_stations(dim: float) -> void:
 # badges dropped by people who gave up, and the window's board.
 func _draw_quota(dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
-	var w := Rect2(424, 832, 178, 40)
+	# the window: its board on top, a roller shutter below. When the intake
+	# falls the shutter rolls up on what the quota was: one empty tray.
+	var w := Rect2(424, 860, 178, 72)
 	draw_rect(w, Color(0.06, 0.06, 0.065))
 	draw_rect(w, Pal.ink(0.5 * dim), false, 1.5)
-	draw_string(sf, w.position + Vector2(8, 17), Txt.t("quota_window"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.7 * dim))
-	draw_string(sf, w.position + Vector2(8, 34), Txt.t("quota_today"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.5 * dim))
-	# the shutter, down
-	var sh := PackedVector2Array()
-	for q in 4:
-		sh.append(Vector2(w.end.x - 34.0, w.position.y + 6.0 + q * 8.0))
-		sh.append(Vector2(w.end.x - 6.0, w.position.y + 6.0 + q * 8.0))
-	draw_multiline(sh, Pal.ink(0.4 * dim), 1.5)
+	draw_string(sf, w.position + Vector2(8, 16), Txt.t("quota_window"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.7 * dim))
+	draw_string(sf, w.position + Vector2(8, 31), Txt.t("quota_today"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.5 * dim))
+	var hole := Rect2(w.position.x + 10.0, w.position.y + 38.0, w.size.x - 20.0, 28.0)
+	draw_rect(hole, Color(0.02, 0.02, 0.022))
+	# behind it: a counter, and on it a tray with nothing on it
+	var tray := Rect2(hole.get_center() - Vector2(22, 6), Vector2(44, 12))
+	draw_rect(tray, Pal.ink(0.55 * dim), false, 1.5)
+	draw_line(tray.position + Vector2(4, 3), tray.position + Vector2(18, 3), Pal.ink(0.7 * dim, 1.2), 1.0)
+	var up := clampf(shutter_up, 0.0, 1.0)
+	var sh_h := hole.size.y * (1.0 - Pal.ease_io(up))
+	if sh_h > 0.5:
+		var shr := Rect2(hole.position, Vector2(hole.size.x, sh_h))
+		draw_rect(shr, Color(0.07, 0.07, 0.075))
+		var sl := PackedVector2Array()
+		var y := shr.position.y + 4.0
+		while y < shr.end.y - 1.0:
+			sl.append(Vector2(shr.position.x + 2.0, y))
+			sl.append(Vector2(shr.end.x - 2.0, y))
+			y += 5.0
+		if sl.size() > 0:
+			draw_multiline(sl, Pal.ink(0.32 * dim), 1.0)
+		# the handle at its foot
+		draw_line(Vector2(shr.get_center().x - 10.0, shr.end.y - 2.0), Vector2(shr.get_center().x + 10.0, shr.end.y - 2.0), Pal.ink(0.7 * dim), 2.5)
+	draw_rect(hole, Pal.ink(0.4 * dim), false, 1.0)
 	# the queue: a dashed line out across the floor, footprints along it
 	var q2 := PackedVector2Array()
 	var x := 616.0
 	while x < 830.0:
-		q2.append(Vector2(x, 866.0))
-		q2.append(Vector2(x + 12.0, 866.0))
+		q2.append(Vector2(x, 914.0))
+		q2.append(Vector2(x + 12.0, 914.0))
 		x += 22.0
 	draw_multiline(q2, Color(1, 1, 1, 0.1 * dim), 2.0)
 	for fx: float in [610.0, 670.0, 730.0, 790.0]:
 		for fs: float in [-1.0, 1.0]:
-			var fp := Vector2(fx + fs * 5.0, 852.0)
+			var fp := Vector2(fx + fs * 5.0, 900.0)
 			draw_colored_polygon(PackedVector2Array([fp + Vector2(-3, -6), fp + Vector2(3, -6), fp + Vector2(4, 6), fp + Vector2(-4, 6)]), Color(1, 1, 1, 0.06 * dim))
-	for bd in [[Vector2(650, 892), 0.4], [Vector2(735, 830), -0.6], [Vector2(812, 888), 1.1]]:
+	for bd in [[Vector2(650, 936), 0.4], [Vector2(735, 884), -0.6], [Vector2(812, 930), 1.1]]:
 		draw_set_transform(bd[0], bd[1], Vector2.ONE)
 		draw_rect(Rect2(-8, -11, 16, 22), Color(0.09, 0.09, 0.095))
 		draw_rect(Rect2(-8, -11, 16, 22), Pal.ink(0.5 * dim), false, 1.2)
