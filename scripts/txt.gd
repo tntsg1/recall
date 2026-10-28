@@ -178,6 +178,8 @@ const S := {
 	"k_left": ["左", "LEFT"],
 	"k_right": ["右", "RIGHT"],
 	"k_recall": ["回收", "RECALL"],
+	"possess_combo": ["连击", "COMBO"],
+	"possess_hint": ["回收贯穿过的敌人带青色标记 · 按 E 夺壳，变成它", "A RECALL LEAVES A CYAN MARK · PRESS E TO SEIZE IT AND BECOME IT"],
 	"k_dash": ["闪避", "DASH"],
 	"k_pause": ["暂停", "PAUSE"],
 	"r_combo": ["最大连击", "BEST PIERCE"],

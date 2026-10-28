@@ -21,6 +21,8 @@ var wave_ctl: Waves
 var fx: Fx
 var cam: Cam
 var player: Player
+var possess: Possess
+var possess_prev := false
 var hud: Hud
 var sfx: Sfx
 var floor_rect: ColorRect
@@ -184,6 +186,9 @@ func _ready() -> void:
 	enemies = Enemies.new()
 	enemies.game = self
 	add_child(enemies)
+	possess = Possess.new()
+	possess.game = self
+	add_child(possess)
 	for cls in [Boss, Warden, Devourer, Metronome, Zero]:
 		var bn = cls.new()
 		bn.game = self
@@ -222,7 +227,7 @@ func _ready() -> void:
 func _setup_input() -> void:
 	var keys := {
 		"left": [KEY_A, KEY_LEFT], "right": [KEY_D, KEY_RIGHT], "up": [KEY_W, KEY_UP], "down": [KEY_S, KEY_DOWN],
-		"recall": [KEY_Q], "dash": [KEY_SPACE, KEY_SHIFT], "pause": [KEY_ESCAPE], "fullscreen": [KEY_F11], "quit": [KEY_BACKSPACE], "restart": [KEY_R], "pick1": [KEY_1], "pick2": [KEY_2], "pick3": [KEY_3],
+		"recall": [KEY_Q], "possess": [KEY_E], "dash": [KEY_SPACE, KEY_SHIFT], "pause": [KEY_ESCAPE], "fullscreen": [KEY_F11], "quit": [KEY_BACKSPACE], "restart": [KEY_R], "pick1": [KEY_1], "pick2": [KEY_2], "pick3": [KEY_3],
 	}
 	for a in keys:
 		if not InputMap.has_action(a):
@@ -239,7 +244,7 @@ func _setup_input() -> void:
 		jm.axis_value = pad[a2][1]
 		if not InputMap.action_has_event(a2, jm):
 			InputMap.action_add_event(a2, jm)
-	for pair in [["dash", JOY_BUTTON_A], ["pause", JOY_BUTTON_START], ["recall", JOY_BUTTON_LEFT_SHOULDER]]:
+	for pair in [["dash", JOY_BUTTON_A], ["pause", JOY_BUTTON_START], ["recall", JOY_BUTTON_LEFT_SHOULDER], ["possess", JOY_BUTTON_Y]]:
 		var jb := InputEventJoypadButton.new()
 		jb.button_index = pair[1]
 		if not InputMap.action_has_event(pair[0], jb):
@@ -654,6 +659,23 @@ func _in_focus() -> bool:
 	return Input.is_action_pressed("recall") or Input.is_action_pressed("recall_mouse")
 
 
+func _in_possess() -> bool:
+	if tutorial != null:
+		return false
+	if bot != null:
+		return bot.get("possess", false)
+	return Input.is_action_pressed("possess")
+
+
+# The left button while seized: the shell's own attack.
+func _in_ability() -> bool:
+	if bot != null:
+		return bot.fire
+	if is_instance_valid(dev_panel) and dev_panel.over:
+		return false
+	return Input.is_action_pressed("fire")
+
+
 func _in_dash() -> bool:
 	if tutorial != null and tutorial.stage != TutorialGate.DASH:
 		return false
@@ -783,14 +805,22 @@ func _process(dt: float) -> void:
 	stasis_t = maxf(0.0, stasis_t - sdt)
 
 	var move := _in_move()
-	var dash := _in_dash()
+	var pnow := _in_possess()
+	if pnow and not possess_prev and not picking and replacing.is_empty() and wave_ctl.phase == Waves.FIGHT and not lost:
+		possess.press()
+	possess_prev = pnow
+	var dash := _in_dash() and not possess.busy()
 	if dash and not dash_prev and player.try_dash(move):
 		if tutorial != null:
 			tutorial.dashed = true
 		sfx.play("dash", randf_range(0.95, 1.05), -6.0)
 		fx.ring(player.pos, 10.0, 34.0, 0.25, Pal.ink(0.5), 1.2)
 	dash_prev = dash
-	player.step(sdt, dt, move, aim_world())
+	if possess.hosting():
+		possess.host_step(sdt, dt, move, aim_world(), _in_ability() and not picking)
+	elif not possess.busy():
+		player.step(sdt, dt, move, aim_world())
+	possess.step(sdt, dt)
 	trail.append([sim_time, player.pos])
 	while trail.size() > 2 and sim_time - trail[0][0] > 4.0:
 		trail.pop_front()
@@ -907,7 +937,7 @@ func _update_fire(sdt: float, dt: float) -> void:
 	fire_cd -= sdt
 	empty_cd -= dt
 	pick_cd -= dt
-	if focusing or picking or pick_cd > 0.0 or not _in_fire() or fire_cd > 0.0:
+	if focusing or picking or pick_cd > 0.0 or possess.busy() or not _in_fire() or fire_cd > 0.0:
 		return
 	if lv.orbit >= 3 and bullets.orbit_count() > 0:
 		# lv3 orbit: the ring empties first and the magazine is untouched
@@ -1109,6 +1139,9 @@ func on_target_die(p: Vector2, kind: int) -> void:
 func on_player_hit(dir: Vector2, _e) -> bool:
 	if tutorial != null:
 		return false
+	if possess.busy():
+		# seized: the shell takes it (and costs no crack); in flight, nothing lands
+		return possess.shell_hit(dir)
 	if player.invuln > 0.0 or wave_ctl.phase != Waves.FIGHT or dev_god or lost:
 		return false
 	if has("lightstep") and player.dash_t > 0.0:
@@ -1632,6 +1665,7 @@ func on_return_arrive(b) -> void:
 
 
 func on_ammo_home(_b) -> void:
+	possess.on_round_home()
 	if tutorial != null and not _b.child:
 		tutorial.returned = true
 	if ammo >= mag:

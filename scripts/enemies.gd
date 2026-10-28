@@ -4,7 +4,7 @@ extends Node2D
 # wind up and dash. Every body is a white polygon whose edges break away as
 # its armour goes; it shatters into those edges when it dies.
 
-enum { WARN, SPAWN, ALIVE, DEAD }
+enum { WARN, SPAWN, ALIVE, DEAD, HOST }   # HOST: seized by you (Possess drives it)
 enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO }
 enum { APPROACH, WINDUP, DASH, STUN, RECOVER }
 
@@ -58,6 +58,7 @@ class E:
 	var burn := 0.0
 	var lag := 2.5
 	var orbit_a := 0.0
+	var bounce := 0.0           # knocked hard by a seized shell: a wall throws it back
 
 var list: Array[E] = []
 var game
@@ -72,7 +73,7 @@ func _ready() -> void:
 func remaining() -> int:
 	var n := 0
 	for e in list:
-		if e.state != DEAD:
+		if e.state != DEAD and e.state != HOST:
 			n += 1
 	return n
 
@@ -172,6 +173,8 @@ func sweep(a: Vector2, b: Vector2, bullet, ret: bool) -> void:
 		var q := Geometry2D.get_closest_point_to_segment(e.pos, a, b)
 		if q.distance_to(e.pos) <= e.r + 3.0:
 			bullet.hit[e.id] = true
+			if ret:
+				game.possess.mark(e)
 			var d: Vector2 = (b - a).normalized() if b.distance_squared_to(a) > 0.01 else bullet.dir
 			var dmg: float = bullet.dmg * (game.ret_mult() if ret else game.out_mult())
 			if game.has("hunter") and e.hp >= e.maxhp:
@@ -432,6 +435,17 @@ func step(dt: float) -> void:
 				e.knock *= exp(-7.0 * dt)
 				e.pos = game.arena.push_circle(intended, e.r)
 				e.pos = e.pos.clamp(Arena.ROOM.position + Vector2(e.r, e.r), Arena.ROOM.end - Vector2(e.r, e.r))
+				if e.bounce > 0.0:
+					e.bounce -= dt
+					if e.pos.distance_to(intended) > 2.0 and e.knock.length() > 150.0:
+						# thrown into a wall by a seized shell: it bounces back and takes more
+						var n := (e.pos - intended).normalized()
+						e.knock = e.knock.bounce(n) * 0.6
+						e.bounce = 0.0
+						game.possess.wall_slam(e, e.pos - n * e.r, n)
+						if e.state == DEAD:
+							i += 1
+							continue
 				if e.kind == CHARGER and e.mode == DASH and e.pos.distance_to(intended) > 2.0:
 					_slam(e)
 				_contact(e, pl)
@@ -711,7 +725,7 @@ func _draw() -> void:
 	var f: float = game.focus
 	var dim := 1.0 - 0.5 * f
 	for e in list:
-		if e.state == DEAD:
+		if e.state == DEAD or e.state == HOST:
 			continue
 		if e.state == WARN:
 			_draw_warn(e)

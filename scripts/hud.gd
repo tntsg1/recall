@@ -16,6 +16,7 @@ var combo_pop := 0.0
 var combo_t := -1.0       # time since the recall ended; <0 while it runs or hidden
 var combo_live := false
 var combo_stamp := 0.0
+var combo_seize := false   # counting a seized shell's hits (cyan, "combo") instead of pierces
 var hint_a := 1.0
 var hint_fade := false
 var hint_timer := 0.0
@@ -165,8 +166,9 @@ func recall_pull() -> void:
 	ret_dot.kick(14.0)
 
 
-func combo_hit(n: int) -> void:
+func combo_hit(n: int, seize: bool = false) -> void:
 	combo = n
+	combo_seize = seize
 	combo_s.kick(5.0)
 	combo_live = true
 	combo_t = -1.0
@@ -320,14 +322,14 @@ func _draw_view() -> void:
 			a *= lerpf(0.3, 1.0, ps.distance_to(cp) / 170.0)
 		view.draw_set_transform(cp, 0.0, Vector2(k, k))
 		combo_odo.set_text(cs, 1.0)
-		combo_odo.draw(view, font_b, 0.0, 22.0, csz, Pal.red(a, 2.4 + 2.0 * combo_stamp), 0)
+		combo_odo.draw(view, font_b, 0.0, 22.0, csz, Possess.cyan(a, 2.4 + 2.0 * combo_stamp) if combo_seize else Pal.red(a, 2.4 + 2.0 * combo_stamp), 0)
 		view.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		var lab := Txt.t("pierce")
+		var lab := Txt.t("possess_combo" if combo_seize else "pierce")
 		var lw := font_s.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
 		view.draw_string(font_s, cp + Vector2(-lw / 2.0, 56.0), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.55 * a))
 		if combo_stamp > 0.0:
 			var e := 1.0 - combo_stamp
-			view.draw_arc(cp, lerpf(40.0, 150.0, Pal.ease_out(e)), 0.0, TAU, 64, Pal.red(combo_stamp * 0.8, 2.0), 2.0, false)
+			view.draw_arc(cp, lerpf(40.0, 150.0, Pal.ease_out(e)), 0.0, TAU, 64, Possess.cyan(combo_stamp * 0.8, 2.0) if combo_seize else Pal.red(combo_stamp * 0.8, 2.0), 2.0, false)
 	if game.tutorial == null:
 		_draw_timer(vp)
 		_draw_title(vp)

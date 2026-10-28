@@ -65,6 +65,7 @@ class B:
 	var shadow := false
 	var first_bonus := false
 	var last_hit := Vector2.ZERO
+	var via_done := false       # bent once through a seized leech's well on the way home
 
 	func total() -> float:
 		return cum[cum.size() - 1]
@@ -457,6 +458,7 @@ func recall(from: Vector2) -> int:
 		b.delay = i * gap
 		b.light = 1.0
 		b.hit.clear()
+		b.via_done = false
 		b.dmg = RET_DMG * (0.6 if b.child and not b.foe else 1.0)
 		b.home_zero = b.foe
 		b.zero_pass = false
@@ -573,9 +575,19 @@ func step(dt: float, real_dt: float) -> void:
 				var f := b.t / b.home_dur
 				var to: Vector2 = game.boss.core_pos() if b.home_zero else game.player.pos
 				var ctrl := b.home_from.lerp(to, 0.5) + (to - b.home_from).orthogonal().normalized() * b.home_from.distance_to(to) * 0.32 * b.home_side
+				var via = game.possess.home_through() if not b.home_zero else null
+				if via != null:
+					# a seized leech's well: the way home bends through the knot and cuts it
+					ctrl = via * 2.0 - (b.home_from + to) * 0.5
+					if not b.via_done:
+						b.via_done = true
+						b.hit.clear()
+						b.dmg *= 1.5
 				var e := Pal.ease_io(f)
 				var p := b.home_from.lerp(ctrl, e).lerp(ctrl.lerp(to, e), e)
-				if game.has("mirror") and not b.child:
+				if via != null:
+					game.enemies.sweep(b.pos, p, b, true)
+				elif game.has("mirror") and not b.child:
 					# Mirror Arc: the way home cuts too
 					b.dmg = RET_DMG
 					game.enemies.sweep(b.pos, p, b, true)

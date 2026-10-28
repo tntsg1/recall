@@ -5,7 +5,7 @@ extends Node
 # volumes follow the fight. The music muffles while you hold Q and drops back
 # in on release.
 
-const NAMES := ["shot", "embed", "hit", "pierce", "focus", "release", "home", "die", "spawn", "empty", "expire", "lit", "dash", "arrive", "hurt", "title", "stamp", "shield", "windup", "dash_e", "slam", "tick", "card", "pick", "split", "horn", "brake", "core", "armor", "boss_die", "crack", "mend", "reroll", "relic", "item", "over", "chapter", "cross", "crit"]
+const NAMES := ["shot", "embed", "hit", "pierce", "focus", "release", "home", "die", "spawn", "empty", "expire", "lit", "dash", "arrive", "hurt", "title", "stamp", "shield", "windup", "dash_e", "slam", "tick", "card", "pick", "split", "horn", "brake", "core", "armor", "boss_die", "crack", "mend", "reroll", "relic", "item", "over", "chapter", "cross", "crit", "p_possess", "p_grow", "p_drill", "p_finish", "p_blast", "p_slam", "p_well", "p_hit", "p_kill", "p_bounce", "p_ready"]
 const VOICES := 18
 const LAYERS := ["base", "pulse", "glass", "boss"]
 const LAYER_DB := {"base": 0.0, "pulse": -2.0, "glass": -5.0, "boss": -2.0}
