@@ -118,7 +118,7 @@ func shard(pos: Vector2, a: Vector2, b: Vector2, vel: Vector2, spin: float, dur:
 func number(pos: Vector2, value: float, ret: bool) -> void:
 	if numbers.size() >= 48:
 		numbers.remove_at(0)
-	var size := 30 if ret else 20
+	var size := 32 if ret else 24
 	# hits landing together on one spot add up into one number that pops again,
 	# instead of a pile of "10"s on top of each other
 	for n in numbers:
@@ -228,7 +228,8 @@ func _draw() -> void:
 		var size: int = n[5]
 		var w := num_font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 		draw_set_transform(n[1], 0.0, Vector2(pop, pop))
-		draw_string(num_font, Vector2(-w / 2.0 + 1.5, size * 0.35 + 1.5), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(0, 0, 0, 0.6 * a2))
+		# a dark outline keeps it reading over sparks and shells
+		draw_string_outline(num_font, Vector2(-w / 2.0, size * 0.35), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 4, Color(0, 0, 0, 0.75 * a2))
 		draw_string(num_font, Vector2(-w / 2.0, size * 0.35), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(c4.r, c4.g, c4.b, a2))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 

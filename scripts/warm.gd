@@ -20,8 +20,8 @@ var glyph_jobs: Array = []      # [font, size, chars]: a few characters at a tim
 const GLYPHS := "0123456789×+.:/ S A B C CORE Q 贯穿连击负荷第章波裂痕夺壳"
 # the sizes each weight is drawn at in the run (a new size costs a few ms the
 # first time, for its glyph atlas)
-const SIZES := {"Regular": [12, 13, 14, 15, 16, 17, 18, 20, 22], "SemiBold": [13, 14, 15, 16, 18, 20, 22, 24, 26, 30, 120],
-	"Medium": [17, 22, 24, 28, 30, 34, 52, 60], "Light": [22, 24, 28, 56]}
+const SIZES := {"Regular": [12, 13, 14, 15, 16, 17, 18, 20, 22], "SemiBold": [13, 14, 15, 16, 18, 20, 22, 24, 26, 30, 32, 120],
+	"Medium": [17, 22, 24, 28, 30, 34, 46, 52, 56, 60], "Light": [22, 24, 28, 56]}
 # Then, without holding anything up, every character the menus, cards and pages
 # can show, at the sizes those use — so no page opens on a rasterising stall.
 const PAGE_SIZES := {"Regular": [13, 14, 15, 16, 18, 20, 22], "SemiBold": [14, 15, 16, 18, 20, 22], "Medium": [24, 28, 30, 34], "Light": [22, 24, 28]}
@@ -182,6 +182,9 @@ func _draw_kinds(n: Node2D) -> void:
 		n.draw_texture_rect(Fx.make_dot_texture(), Rect2(0, 0, 2, 2), false, c)
 	if not fonts.is_empty():
 		n.draw_string(fonts[0], Vector2(0, 2), "0", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c)
+		# the damage numbers' outlines are glyphs of their own
+		for size in [24, 32]:
+			n.draw_string_outline(fonts[2], Vector2(0, -200), "0123456789", HORIZONTAL_ALIGNMENT_LEFT, -1, size, 4, c)
 
 
 func _draw() -> void:

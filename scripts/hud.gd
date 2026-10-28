@@ -305,8 +305,8 @@ func step(dt: float) -> void:
 # a soft fade to black there keeps the HUD reading over whatever passes beneath.
 func _draw_band_shade(vp: Vector2) -> void:
 	var clear := Color(0, 0, 0, 0)
-	var dark := Color(0, 0, 0, 0.72)
-	var deep := Color(0, 0, 0, 0.86)
+	var dark := Color(0, 0, 0, 0.9)
+	var deep := Color(0, 0, 0, 0.94)
 	# fades in over 50 px, then holds under the band's row
 	var bt := vp.y - 120.0
 	var bm := vp.y - 70.0
@@ -359,12 +359,12 @@ func _draw_view() -> void:
 		view.draw_string(font_s, base + Vector2(6.0, 0) + sink, "/ %d" % game.mag, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.35 * mine))
 	var emb: int = game.bullets.count_state(Bullets.EMBED)
 	if emb > 0 and mine > 0.01:
-		var qa := (0.35 + 0.25 * sin(game.real_time * 3.0)) * mine
+		var qa := (0.62 + 0.2 * sin(game.real_time * 3.0)) * mine
 		var qc := Pal.ink(qa).lerp(Pal.red(mine, 2.0), f)
 		var qs := "Q  " + str(emb)
-		view.draw_string(font_b, base + Vector2(60.0, 0), qs, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, qc)
+		view.draw_string(font_b, base + Vector2(56.0, 0), qs, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, qc)
 	if game.tutorial == null:
-		_draw_seize_key(base + Vector2(124.0, -14.0), mine)
+		_draw_seize_key(base + Vector2(124.0, -14.0), 1.0)
 	if hk > 0.01:
 		_draw_host(vp, base, hk)
 	# pierce counter
@@ -465,8 +465,8 @@ func _draw_timer(vp: Vector2) -> void:
 	view.draw_string(font_s, Vector2(cx - 150.0, y + 4.0), "%02d" % (w.index + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.4 * appear))
 	# what the two small marks are, on the same line, outboard of them
 	var wc := Txt.t("cap_wave")
-	view.draw_string(font_s, Vector2(cx - 158.0 - font_s.get_string_size(wc, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x, y + 3.0), wc, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.28 * appear))
-	view.draw_string(font_s, Vector2(cx + 160.0, y + 3.0), Txt.t("cap_grade"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.28 * appear))
+	view.draw_string(font_s, Vector2(cx - 158.0 - font_s.get_string_size(wc, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x, y + 3.0), wc, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.4 * appear))
+	view.draw_string(font_s, Vector2(cx + 160.0, y + 3.0), Txt.t("cap_grade"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.4 * appear))
 	view.draw_line(Vector2(cx - 120.0, y - 2.0), Vector2(cx - 70.0, y - 2.0), Pal.ink(0.18 * appear), 1.0)
 	view.draw_line(Vector2(cx + 70.0, y - 2.0), Vector2(cx + 120.0, y - 2.0), Pal.ink(0.18 * appear), 1.0)
 	# the grade still within reach, flipping over as each threshold passes
@@ -1249,6 +1249,13 @@ func _draw_seize_key(c: Vector2, a: float) -> void:
 	var pz = game.possess
 	var cooling: bool = pz.cooldown > 0.0 and not pz.endless
 	var ready: bool = e_ready_last
+	if pz.busy():
+		# in use: the key holds its place, a steady cyan outline with a full line
+		var ru := Rect2(c - Vector2(12, 12), Vector2(24, 24))
+		view.draw_rect(ru, Possess.cyan(0.55 * a, 1.4), false, 1.0)
+		_text_c(font_b, "E", c + Vector2(0, 5.0), 14, Possess.cyan(0.7 * a, 1.6))
+		view.draw_line(Vector2(ru.position.x, ru.end.y + 6.0), Vector2(ru.end.x, ru.end.y + 6.0), Possess.cyan(0.6 * a, 1.6), 2.0)
+		return
 	var r := Rect2(c - Vector2(12, 12), Vector2(24, 24))
 	var line: Color = Possess.cyan(0.95 * a, 2.0) if ready else Pal.ink((0.22 if cooling else 0.32) * a)
 	view.draw_rect(r, line, false, 1.0)
@@ -1919,6 +1926,9 @@ func _draw_pause(vp: Vector2) -> void:
 		return
 	var a := pause_a
 	view.draw_rect(Rect2(Vector2.ZERO, vp), Color(0, 0, 0, 0.35 * a))
+	# the bands step back too: the menu is the only thing in focus
+	view.draw_rect(Rect2(0, vp.y - 110.0, vp.x, 110.0), Color(0, 0, 0, 0.5 * a))
+	view.draw_rect(Rect2(0, 0, vp.x, 80.0), Color(0, 0, 0, 0.5 * a))
 	var drop := (1.0 - Pal.ease_out(clampf(pause_t / 0.4, 0.0, 1.0))) * -30.0 if paused else 0.0
 	var pt := Txt.t("paused")
 	_text_c(font_l, pt, Vector2(vp.x / 2.0, vp.y * 0.34 + drop), 56, Pal.ink(a))
@@ -1932,7 +1942,7 @@ func _draw_pause(vp: Vector2) -> void:
 		var r := _pause_rect(i, vp)
 		var lift: float = pause_k[i].x
 		var c := Pal.ink((0.55 + 0.4 * lift) * a * ki)
-		view.draw_set_transform(r.get_center() + Vector2((1.0 - ki) * 50.0 + lift * 10.0, 0), 0.0, Vector2.ONE * (1.0 + 0.03 * lift))
+		view.draw_set_transform(r.get_center() + Vector2((1.0 - ki) * 50.0, 0), 0.0, Vector2.ONE * (1.0 + 0.03 * lift))
 		_text_c(font_xl, Txt.t("p_" + PAUSE_ROWS[i]), Vector2(0, 9), 24, c)
 		view.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	_text_c(font_s, Txt.t("pause_keys"), Vector2(vp.x / 2.0, vp.y * 0.44 + 350.0), 14, Pal.ink(0.4 * a))
