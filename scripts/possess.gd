@@ -145,11 +145,12 @@ func _ready() -> void:
 static func cyan(a: float = 1.0, k: float = 1.0) -> Color:
 	if Pal.ldr:
 		a = pow(clampf(a, 0.0, 1.0), Pal.LDR_ALPHA)
-	var c := Color(0.17, 0.77, 0.84)
+	var c := Color(0.42, 0.78, 0.86)
 	if k <= 1.0:
 		return Color(c.r * k, c.g * k, c.b * k, a)
-	# above 1 the light goes mostly into green and blue, so the glow stays cyan
-	return Color(c.r * (1.0 + (k - 1.0) * 0.4), c.g * k, c.b * k, a)
+	# compressed like the rest of the palette, leaning toward white rather than paint
+	k = Pal._soft(k)
+	return Color(c.r * (1.0 + (k - 1.0) * 0.7), c.g * k, c.b * k, a)
 
 
 func hosting() -> bool:

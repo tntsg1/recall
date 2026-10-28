@@ -42,12 +42,12 @@ void fragment() {
 	float near = exp(-length(p - player) / 260.0);
 	float a = 0.16 + 0.16 * near + 0.7 * glow;
 	a *= 1.0 - 0.55 * focus;
-	vec3 ink = vec3(0.5, 0.52, 0.95);     // violet-blue dots
-	vec3 red = vec3(1.5, 0.3, 1.1);       // recall magenta
+	vec3 ink = vec3(0.58, 0.6, 0.74);     // cool grey-blue dots
+	vec3 red = vec3(1.15, 0.5, 0.85);     // recall rose
 	vec3 col = mix(ink, red, clamp(glow * 1.4, 0.0, 1.0));
 	// faint long-period breathing so the room is never perfectly still
 	a *= 0.9 + 0.1 * sin(t * 0.6 + (p.x + p.y) * 0.004);
-	vec3 bg = vec3(0.03, 0.027, 0.058);
+	vec3 bg = vec3(0.036, 0.036, 0.048);
 	vec3 srgb = mix(bg, col, dot_a * a);
 	float inf = 0.0;
 	for (int i = 0; i < 8; i++) {
@@ -67,7 +67,7 @@ void fragment() {
 		vec2 sub = floor((q - cid * sp) / 4.0);
 		float h = hash(cid * 13.0 + sub + floor(t * 5.0));
 		float stray = step(1.0 - (inf - 0.55) * 0.05, h) * step(0.55, inf);
-		vec3 cyan = vec3(0.25, 1.05, 1.2);
+		vec3 cyan = vec3(0.4, 0.85, 0.95);
 		float pa = clamp(sq * (0.3 + 0.4 * inf) * (0.6 + 0.4 * flick) + stray * 0.45 * inf, 0.0, 1.0);
 		srgb = mix(srgb * (1.0 - 0.5 * inf * sq), cyan, pa * inf);
 	}

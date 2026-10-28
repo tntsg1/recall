@@ -1,16 +1,23 @@
 class_name Pal
-# NEON RAID: a deep blue-violet night. Cyan is you (your body, your rounds, the
-# shells you seize), red is everything that hunts you, magenta is the recall's
-# own signal, and the walls glow a cold violet-blue. White ink stays for text.
-# Values above 1.0 feed the HDR glow pass.
+# NEON RAID, kept quiet: a near-black night with a hint of blue. Cyan is you
+# (your body, your rounds, the shells you seize), red is everything that hunts
+# you, a dusty rose-magenta is the recall's own signal, and the walls are a cool
+# grey-blue. All of them are held back from full saturation, and brightness
+# above 1 is compressed and leans toward white, so the glow reads as light
+# rather than paint. White ink stays for text.
 
-const BG := Color(0.03, 0.027, 0.058)
-const WALL := Color(0.058, 0.05, 0.105)
-const INK := Color(0.925, 0.93, 0.95)
-const RED := Color(1.0, 0.24, 0.72)       # the recall signal (magenta; the name stays for the call sites)
-const YOU := Color(0.32, 0.9, 1.0)
-const FOE := Color(1.0, 0.27, 0.3)
-const LINE := Color(0.46, 0.48, 1.0)
+const BG := Color(0.036, 0.036, 0.048)
+const WALL := Color(0.068, 0.066, 0.085)
+const INK := Color(0.925, 0.93, 0.94)
+const RED := Color(0.86, 0.38, 0.64)      # the recall signal (rose-magenta; the name stays for the call sites)
+const YOU := Color(0.5, 0.84, 0.92)
+const FOE := Color(0.88, 0.37, 0.38)
+const LINE := Color(0.6, 0.62, 0.8)
+
+
+# Brightness above 1 is compressed so nothing blooms too hard.
+static func _soft(k: float) -> float:
+	return k if k <= 1.0 else 1.0 + (k - 1.0) * 0.55
 
 # The browser build (Compatibility renderer) draws into a plain sRGB buffer:
 # no HDR, so faint lines blend much darker and nothing goes above 1. Alphas
@@ -32,7 +39,8 @@ static func red(a: float = 1.0, k: float = 1.0) -> Color:
 		a = pow(clampf(a, 0.0, 1.0), LDR_ALPHA)
 	if k <= 1.0:
 		return Color(RED.r * k, RED.g * k, RED.b * k, a)
-	return Color(RED.r * k, RED.g * (1.0 + (k - 1.0) * 0.1), RED.b * k, a)
+	k = _soft(k)
+	return Color(RED.r * k, RED.g * (1.0 + (k - 1.0) * 0.45), RED.b * (1.0 + (k - 1.0) * 0.85), a)
 
 
 # Enemies and bosses: brightness into the red channel only, or it turns pink.
@@ -41,7 +49,8 @@ static func foe(a: float = 1.0, k: float = 1.0) -> Color:
 		a = pow(clampf(a, 0.0, 1.0), LDR_ALPHA)
 	if k <= 1.0:
 		return Color(FOE.r * k, FOE.g * k, FOE.b * k, a)
-	return Color(FOE.r * k, FOE.g * (1.0 + (k - 1.0) * 0.08), FOE.b * (1.0 + (k - 1.0) * 0.05), a)
+	k = _soft(k)
+	return Color(FOE.r * k, FOE.g * (1.0 + (k - 1.0) * 0.3), FOE.b * (1.0 + (k - 1.0) * 0.3), a)
 
 
 # You: brightness into green and blue so the glow stays cyan.
@@ -50,7 +59,8 @@ static func you(a: float = 1.0, k: float = 1.0) -> Color:
 		a = pow(clampf(a, 0.0, 1.0), LDR_ALPHA)
 	if k <= 1.0:
 		return Color(YOU.r * k, YOU.g * k, YOU.b * k, a)
-	return Color(YOU.r * (1.0 + (k - 1.0) * 0.35), YOU.g * k, YOU.b * k, a)
+	k = _soft(k)
+	return Color(YOU.r * (1.0 + (k - 1.0) * 0.7), YOU.g * k, YOU.b * k, a)
 
 
 # The walls' cold violet-blue neon.
@@ -59,7 +69,8 @@ static func line(a: float = 1.0, k: float = 1.0) -> Color:
 		a = pow(clampf(a, 0.0, 1.0), LDR_ALPHA)
 	if k <= 1.0:
 		return Color(LINE.r * k, LINE.g * k, LINE.b * k, a)
-	return Color(LINE.r * (1.0 + (k - 1.0) * 0.5), LINE.g * (1.0 + (k - 1.0) * 0.5), LINE.b * k, a)
+	k = _soft(k)
+	return Color(LINE.r * k, LINE.g * k, LINE.b * k, a)
 
 
 static func ease_out(x: float) -> float:

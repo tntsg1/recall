@@ -144,7 +144,7 @@ func is_free(p: Vector2, rad: float) -> bool:
 
 func _draw() -> void:
 	var f: float = game.focus if game else 0.0
-	var edge := Pal.line(0.9 - 0.35 * f, 1.35)
+	var edge := Pal.line(0.85 - 0.35 * f, 1.05)
 	var faint := Pal.line(0.16 - 0.06 * f)
 	# boundary: dark mass outside the room, a single crisp inner edge and a hairline inset
 	var big := ROOM.grow(OUTER)
