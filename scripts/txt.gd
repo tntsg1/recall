@@ -106,6 +106,8 @@ const S := {
 	"crate_reserve": ["战略储备", "STRATEGIC RESERVE"],
 	"term_output": ["产出统计", "OUTPUT"],
 	"station": ["工位 %02d", "STATION %02d"],
+	"quota_window": ["民用配额领取处", "CIVIL QUOTA WINDOW"],
+	"quota_today": ["本月配额 0.3% · 已领完", "THIS MONTH 0.3% · ALL TAKEN"],
 	"note_leech": ["吸附者 · 会把墙上的子弹拔走（最多 4 颗），打死它就掉回来", "LEECH · PULLS ROUNDS OUT OF THE WALLS (UP TO 4) — KILL IT TO DROP THEM"],
 	"chapter_4": ["中央生产联合体", "CENTRAL PRODUCTION UNION"],
 	"chapter_4_sub": ["这里每天生产的一切，都不属于做出它的人。", "EVERYTHING MADE HERE EACH DAY BELONGS TO SOMEONE OTHER THAN ITS MAKERS."],

@@ -190,7 +190,7 @@ func _step_carry(dt: float) -> void:
 			c.append(PackedVector2Array())
 		var tr: PackedVector2Array = c[5]
 		tr.append(p)
-		if tr.size() > 9:
+		if tr.size() > 22:
 			tr.remove_at(0)
 		c[5] = tr
 		b.pos = p
@@ -251,8 +251,13 @@ func _draw() -> void:
 	for c in carry:
 		if c.size() > 5 and (c[5] as PackedVector2Array).size() >= 2:
 			var tr: PackedVector2Array = c[5]
-			draw_polyline(tr, Pal.ink(0.25 * dim, 1.4), 3.0)
-			draw_polyline(tr, Pal.ink(0.85 * dim, 2.0 if not c[4] else 2.6), 1.5 if not c[4] else 2.5)
+			# a long trail that fades toward its tail
+			var cols := PackedColorArray()
+			var nn := tr.size()
+			for q in nn:
+				var u := float(q) / float(nn - 1)
+				cols.append(Pal.ink(0.9 * u * u * dim, 2.0 if not c[4] else 2.6))
+			draw_polyline_colors(tr, cols, 2.0 if not c[4] else 3.0)
 	for arm in arms:
 		_draw_arm(arm, dim)
 	if _full_capacity():
@@ -269,7 +274,7 @@ func _draw_beacons(dim: float) -> void:
 		var beam := PackedVector2Array([c, c + Vector2.from_angle(a - 0.22) * 260.0, c + Vector2.from_angle(a + 0.22) * 260.0])
 		draw_polygon(beam, PackedColorArray([Pal.red(0.1 * dim, 1.2), Pal.red(0.0, 1.0), Pal.red(0.0, 1.0)]))
 		draw_circle(c, 9.0, Pal.WALL)
-		draw_circle(c, 5.0, Pal.red(0.8 * dim, 1.6))
+		draw_arc(c, 6.0, 0.0, TAU, 14, Pal.red(0.55 * dim, 1.2), 2.0)
 		k += 1
 
 

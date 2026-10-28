@@ -98,6 +98,7 @@ func _run() -> void:
 	# keep the crate's stock fresh so it is still there to be fed
 	for b in game.arms.crate:
 		b.life = 0.0
+	game.player.pos = Vector2(1180, 760)
 	game.arms.feed_cd = 2.3
 	await frames(160)
 	print("FULL crate ", game.arms.crate.size(), " carry ", game.arms.carry.size())

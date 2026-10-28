@@ -165,6 +165,7 @@ func _draw() -> void:
 		if shows.get("w4_notice", 0.0) <= 0.01:
 			_draw_notice(Vector2(1500, 70), dim)
 		_draw_floor_wear(dim)
+		_draw_quota(dim)
 		_draw_scrawl(Vector2(1840, 820), dim)
 	for w in Lore.walls(story):
 		var id := "w%d_%s" % [story, w[0]]
@@ -816,24 +817,70 @@ func _draw_stations(dim: float) -> void:
 	draw_multiline(lines, Color(1, 1, 1, 0.07 * dim), 2.0)
 	# what the people at these stations left behind: a lunch box half eaten
 	# (four minutes was not enough), a cup, a badge on the belt's edge
-	for lb: Vector2 in [Vector2(398, 372), Vector2(1598, 372)]:
-		var box := Rect2(lb - Vector2(13, 8), Vector2(26, 16))
+	for lb: Vector2 in [Vector2(404, 376), Vector2(1604, 376)]:
+		var box := Rect2(lb - Vector2(20, 12), Vector2(40, 24))
 		draw_rect(box, Color(0.08, 0.08, 0.085))
-		draw_rect(box, Pal.ink(0.5 * dim), false, 1.5)
-		draw_line(box.position + Vector2(13, 0), box.position + Vector2(13, 16), Pal.ink(0.35 * dim), 1.0)
-		draw_circle(box.position + Vector2(6, 8), 3.0, Pal.ink(0.3 * dim))
-		var lid := PackedVector2Array([box.position + Vector2(0, -2), box.position + Vector2(24, -12)])
-		draw_line(lid[0], lid[1], Pal.ink(0.45 * dim), 2.0)
-	for cp: Vector2 in [Vector2(712, 378), Vector2(1272, 378), Vector2(1170, 918)]:
-		draw_circle(cp, 6.0, Color(0.08, 0.08, 0.085))
-		draw_arc(cp, 6.0, 0.0, TAU, 14, Pal.ink(0.5 * dim), 1.5)
-		draw_arc(cp + Vector2(7, 0), 3.0, -PI / 2.0, PI / 2.0, 6, Pal.ink(0.4 * dim), 1.2)
+		draw_rect(box, Pal.ink(0.65 * dim, 1.2), false, 2.0)
+		draw_line(box.position + Vector2(20, 0), box.position + Vector2(20, 24), Pal.ink(0.4 * dim), 1.5)
+		# half of it left: rice in one side, a few grains of the other
+		draw_circle(box.position + Vector2(10, 12), 6.0, Pal.ink(0.45 * dim))
+		draw_circle(box.position + Vector2(30, 15), 2.0, Pal.ink(0.35 * dim))
+		draw_line(box.position + Vector2(3, 3), box.position + Vector2(14, 3), Pal.ink(0.9 * dim, 1.4), 1.5)
+		draw_line(box.position + Vector2(0, -3), box.position + Vector2(36, -18), Pal.ink(0.6 * dim), 3.0)
+		# chopsticks laid across, still where they were put down
+		draw_line(box.position + Vector2(-6, 30), box.position + Vector2(44, 22), Pal.ink(0.5 * dim), 1.5)
+		draw_line(box.position + Vector2(-6, 34), box.position + Vector2(44, 26), Pal.ink(0.5 * dim), 1.5)
+	for cp: Vector2 in [Vector2(716, 380), Vector2(1276, 380), Vector2(1172, 920)]:
+		draw_circle(cp, 9.0, Color(0.08, 0.08, 0.085))
+		draw_arc(cp, 9.0, 0.0, TAU, 18, Pal.ink(0.65 * dim, 1.2), 2.0)
+		draw_arc(cp + Vector2(10, 0), 4.5, -PI / 2.0, PI / 2.0, 8, Pal.ink(0.5 * dim), 1.5)
+		draw_arc(cp, 5.0, PI * 1.1, PI * 1.5, 6, Pal.ink(0.8 * dim, 1.4), 1.5)
+		# a wisp of steam: still warm, nobody here to drink it
+		var wisp := PackedVector2Array()
+		for q in 6:
+			wisp.append(cp + Vector2(sin(t * 2.0 + q * 0.9) * 3.0, -12.0 - q * 5.0))
+		draw_polyline(wisp, Pal.ink(0.25 * dim), 1.2)
 	var badge := Rect2(Vector2(612, 318), Vector2(18, 24))
 	draw_rect(badge, Color(0.09, 0.09, 0.095))
 	draw_rect(badge, Pal.ink(0.55 * dim), false, 1.2)
 	draw_circle(badge.position + Vector2(9, 9), 4.0, Pal.ink(0.3 * dim))
 	draw_line(badge.position + Vector2(4, 18), badge.position + Vector2(14, 18), Pal.ink(0.35 * dim), 1.5)
 	draw_line(badge.position + Vector2(9, 0), badge.position + Vector2(9, -6), Pal.ink(0.4 * dim), 1.0)
+
+
+# By the crate, the quota window: a painted queue line, footprints that wait,
+# badges dropped by people who gave up, and the window's board.
+func _draw_quota(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	var w := Rect2(424, 832, 178, 40)
+	draw_rect(w, Color(0.06, 0.06, 0.065))
+	draw_rect(w, Pal.ink(0.5 * dim), false, 1.5)
+	draw_string(sf, w.position + Vector2(8, 17), Txt.t("quota_window"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.7 * dim))
+	draw_string(sf, w.position + Vector2(8, 34), Txt.t("quota_today"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.5 * dim))
+	# the shutter, down
+	var sh := PackedVector2Array()
+	for q in 4:
+		sh.append(Vector2(w.end.x - 34.0, w.position.y + 6.0 + q * 8.0))
+		sh.append(Vector2(w.end.x - 6.0, w.position.y + 6.0 + q * 8.0))
+	draw_multiline(sh, Pal.ink(0.4 * dim), 1.5)
+	# the queue: a dashed line out across the floor, footprints along it
+	var q2 := PackedVector2Array()
+	var x := 616.0
+	while x < 830.0:
+		q2.append(Vector2(x, 866.0))
+		q2.append(Vector2(x + 12.0, 866.0))
+		x += 22.0
+	draw_multiline(q2, Color(1, 1, 1, 0.1 * dim), 2.0)
+	for fx: float in [610.0, 670.0, 730.0, 790.0]:
+		for fs: float in [-1.0, 1.0]:
+			var fp := Vector2(fx + fs * 5.0, 852.0)
+			draw_colored_polygon(PackedVector2Array([fp + Vector2(-3, -6), fp + Vector2(3, -6), fp + Vector2(4, 6), fp + Vector2(-4, 6)]), Color(1, 1, 1, 0.06 * dim))
+	for bd in [[Vector2(650, 892), 0.4], [Vector2(735, 830), -0.6], [Vector2(812, 888), 1.1]]:
+		draw_set_transform(bd[0], bd[1], Vector2.ONE)
+		draw_rect(Rect2(-8, -11, 16, 22), Color(0.09, 0.09, 0.095))
+		draw_rect(Rect2(-8, -11, 16, 22), Pal.ink(0.5 * dim), false, 1.2)
+		draw_circle(Vector2(0, -3), 3.5, Pal.ink(0.3 * dim))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 # Oil under the presses, scuffed lanes where the carts run, stacked ration
@@ -877,13 +924,14 @@ func _draw_presses(dim: float) -> void:
 			# the ram comes down and springs back, every press together
 			var ph := fmod(t * 2.5, 1.0)
 			var ram := 1.0 - Pal.ease_out(ph) if ph < 0.5 else (ph - 0.5) * 2.0
-			var rr := ins.grow(-6.0 - 10.0 * (1.0 - ram))
+			var rr := ins.grow(-ins.size.x * 0.2 - 8.0 * (1.0 - ram))
 			draw_rect(rr, Color(0.07, 0.07, 0.08))
 			var strike := ph < 0.1
 			draw_rect(rr, Pal.ink((0.9 if strike else 0.3) * dim, 1.5 if strike else 1.0), false, 2.0)
 			if ph < 0.18:
 				# the strike rings out round the base
 				draw_rect(r.grow(4.0 + ph * 60.0), Pal.ink(0.5 * (1.0 - ph / 0.18) * dim, 1.2), false, 1.5)
+			draw_string(sf, ins.position + Vector2(4, 16), "PR-%02d" % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.6 * dim))
 		for b: Vector2 in [ins.position, Vector2(ins.end.x, ins.position.y)]:
 			draw_circle(b + Vector2(0, 26), 2.5, Pal.ink(0.35 * dim))
 
