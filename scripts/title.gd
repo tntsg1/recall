@@ -19,7 +19,7 @@ const LETTERS := {
 	" ": [],
 }
 const UNIT := 22.0
-const MENU := ["start", "trial", "tutorial", "gun", "stake", "achievements", "settings", "quit"]
+const MENU := ["start", "trial", "tutorial", "gun", "stake", "achievements", "archive", "settings", "quit"]
 const SETTINGS := ["master", "music", "sfx", "shake", "soft", "fullscreen", "lang", "keys", "assist", "back"]
 const ROW_H := 58.0
 const ROW_W := 520.0
@@ -197,8 +197,11 @@ func _menu_top() -> float:
 
 func _row_rect(i: int, pg: String = "") -> Rect2:
 	var vp := _vp()
-	var top := vp.y * (_menu_top() if (pg if pg != "" else page) == "menu" else 0.40)
-	return Rect2(vp.x / 2.0 - ROW_W / 2.0, top + i * ROW_H, ROW_W, 48.0)
+	var on := pg if pg != "" else page
+	var top := vp.y * (_menu_top() if on == "menu" else 0.40)
+	# a long menu (Continue on top) packs its rows a little closer
+	var step := 52.0 if on == "menu" and _menu().size() >= 10 else ROW_H
+	return Rect2(vp.x / 2.0 - ROW_W / 2.0, top + i * step, ROW_W, step - 10.0)
 
 
 func _bar_rect(i: int) -> Rect2:
@@ -365,7 +368,7 @@ func _input(ev: InputEvent) -> void:
 				dragging = ""
 				Settings.save()
 			return
-		if page == "achievements":
+		if page == "achievements" or page == "archive":
 			_go("menu")
 			return
 		if hover >= 0:
@@ -458,6 +461,8 @@ func _accept(d: int) -> void:
 					_change_value(_menu()[sel.menu], 1)
 				"achievements":
 					_go("achievements")
+				"archive":
+					_go("archive")
 				"settings":
 					_go("settings")
 				"quit":
@@ -558,7 +563,7 @@ func _draw() -> void:
 	bm.set_shader_parameter("size", vp)
 	_draw_word(vp)
 	var dim_word := 0.0
-	for pg in ["achievements", "settings", "keys"]:
+	for pg in ["achievements", "archive", "settings", "keys"]:
 		dim_word = maxf(dim_word, _page_k(pg, 0).x)
 	if dim_word > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, vp), Color(0.02, 0.02, 0.022, 0.93 * dim_word))
@@ -570,6 +575,8 @@ func _draw() -> void:
 				_draw_menu(vp)
 			"achievements":
 				_draw_ach(vp)
+			"archive":
+				_draw_archive(vp)
 			"settings":
 				_draw_settings(vp)
 			"keys":
@@ -734,6 +741,58 @@ func _unlock_text(key: String) -> String:
 	if Ach.LIST.has(key):
 		return Ach.desc_of(key)
 	return key
+
+
+# The archive: every fragment of the world found so far, chapter by chapter;
+# the ones still out there keep their places as gaps.
+func _draw_archive(vp: Vector2) -> void:
+	var pk := _page_k("archive", 0)
+	if pk.x <= 0.01:
+		return
+	var total := 0
+	var have := 0
+	var chapters: Array = []
+	for i in Chapters.count():
+		var st := Chapters.story(i)
+		var items := Lore.all_of(st)
+		if items.is_empty():
+			continue
+		chapters.append([i, items])
+		for it in items:
+			total += 1
+			if Lore.found(it[0]):
+				have += 1
+	_text_c(font_xl, Txt.t("t_archive") + "  %d / %d" % [have, total], Vector2(vp.x / 2.0, 120 + pk.y * 0.5), 34, Pal.ink(pk.x))
+	_text_c(font_s, Txt.t("archive_hint"), Vector2(vp.x / 2.0, 156 + pk.y * 0.5), 14, Pal.ink(0.45 * pk.x))
+	var x0 := vp.x / 2.0 - 420.0
+	var y := 210.0
+	var row := 0
+	# a dark sheet under the list, so the word behind does not read through
+	var rows_n := 0
+	for ch in chapters:
+		rows_n += 1 + (ch[1] as Array).size()
+	draw_rect(Rect2(0.0, y - 34.0, vp.x, rows_n * 30.0 + chapters.size() * 28.0 + 40.0), Color(0.02, 0.02, 0.022, 0.96 * pk.x))
+	for ch in chapters:
+		var ki := _page_k("archive", row)
+		row += 1
+		view_label(Chapters.label(ch[0]) + "  ·  " + Chapters.title(ch[0]), Vector2(x0 + ki.y, y), 18, Pal.ink(0.9 * ki.x), font_b)
+		draw_line(Vector2(x0 + ki.y, y + 10.0), Vector2(x0 + 840.0 * ki.x, y + 10.0), Pal.ink(0.2 * ki.x), 1.0)
+		y += 40.0
+		for it in ch[1]:
+			var kj := _page_k("archive", row)
+			row += 1
+			var got := Lore.found(it[0])
+			var kind_mark: String = {"s": "▸", "w": "▪", "r": "◦"}.get(String(it[0]).substr(0, 1), "·")
+			view_label(kind_mark, Vector2(x0 + 8.0 + kj.y, y), 15, Pal.ink((0.6 if got else 0.2) * kj.x), font_s)
+			var line: String = it[1] if got else "？？？？？？"
+			view_label(line, Vector2(x0 + 34.0 + kj.y, y), 16, Pal.ink((0.85 if got else 0.22) * kj.x), font_s)
+			y += 30.0
+		y += 18.0
+	_text_c(font_s, Txt.t("t_back"), Vector2(vp.x / 2.0, vp.y - 40), 15, Pal.ink(0.5 * pk.x))
+
+
+func view_label(txt: String, at: Vector2, size: int, c: Color, f: Font) -> void:
+	draw_string(f, at, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size, c)
 
 
 func _draw_ach(vp: Vector2) -> void:

@@ -242,6 +242,8 @@ func _begin_host() -> void:
 		return
 	state = HOST
 	shell.state = Enemies.HOST
+	if game.lore != null and not endless:
+		game.lore.on_seize(shell)
 	shell.knock = Vector2.ZERO
 	shell.vel = Vector2.ZERO
 	shell.burn = 0.0

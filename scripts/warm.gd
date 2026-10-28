@@ -213,6 +213,10 @@ func _queue_pages() -> void:
 	_collect(Ach.LIST, page_strings)
 	_collect(Loadout.GUNS, page_strings)
 	_collect(Loadout.STAKES, page_strings)
+	_collect(Lore.SEIZE, page_strings)
+	_collect(Lore.WALL, page_strings)
+	_collect(Lore.RADIO, page_strings)
+	_collect(Lore.DEATH, page_strings)
 
 
 func _scan_pages() -> void:

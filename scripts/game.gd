@@ -18,6 +18,8 @@ var enemies: Enemies
 var boss                      # the current chapter's boss (train, warden, ...)
 var bosses: Array = []
 var bosses_by := {}           # boss name (Chapters) -> node
+var lore: LoreProps          # the world's fragments in this room (design/LORE.md)
+var radio_n := 0
 var wave_ctl: Waves
 var fx: Fx
 var cam: Cam
@@ -185,6 +187,10 @@ func _ready() -> void:
 		bosses_by[pair[0]] = bn
 		bosses.append(bn)
 	boss = bosses_by[Chapters.boss(0)]
+	lore = LoreProps.new()
+	lore.game = self
+	add_child(lore)
+	lore.start_chapter(0)
 	wave_ctl = Waves.new()
 	wave_ctl.game = self
 	add_child(wave_ctl)
@@ -970,6 +976,7 @@ func _run_frame(dt: float) -> void:
 	elif not possess.busy():
 		player.step(sdt, dt, move, aim_world())
 	possess.step(sdt, dt)
+	lore.step(dt)
 	if prof_on:
 		_lap("player+possess")
 	trail.append([sim_time, player.pos])
@@ -1730,6 +1737,7 @@ func next_chapter() -> void:
 	boss = bosses_by[Chapters.boss(chapter)]
 	boss.reset()
 	arena.setup(Chapters.room(chapter))
+	lore.start_chapter(chapter)
 	sfx.start_chapter(Chapters.music(chapter))
 	sfx.play("chapter", 1.0, -2.0)
 	hud.chapter_intro()
@@ -1781,6 +1789,14 @@ func on_wave_clear(index: int, time: float, grade: String) -> void:
 		sfx.play("mend", 1.1, -4.0)
 	hud.stamp(index, time, grade)
 	sfx.play("stamp", 1.0 if grade == "S" else 0.9, 0.0)
+	# the city's broadcast re-tells what just happened (after waves 2 and 4, and the boss)
+	if tutorial == null and (index == 1 or index == 3 or index == Waves.BOSS):
+		var r := Lore.radio_line(Chapters.story(chapter), "boss" if index == Waves.BOSS else "wave", radio_n)
+		radio_n += 1
+		if not r.is_empty():
+			hud.radio(r.text)
+			if Lore.find(r.id):
+				hud.lore_found()
 	cam.add_trauma(0.25)
 	cam.punch(0.03)
 	_wave(player.pos, 0.9)

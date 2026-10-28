@@ -54,7 +54,7 @@ static func load_data() -> Dictionary:
 	if not data.is_empty():
 		return data
 	data = {"runs": 0, "wins": 0, "best_chapter": 0, "best_wave": 0, "best_time": 0.0, "kills": 0,
-		"ach": {}, "unlocks": {}, "stake_won": -1, "gun_wins": {}, "beat": 0, "crit": 0, "cross": 0}
+		"ach": {}, "unlocks": {}, "lore": {}, "stake_won": -1, "gun_wins": {}, "beat": 0, "crit": 0, "cross": 0}
 	if FileAccess.file_exists(path()):
 		var f := FileAccess.open(path(), FileAccess.READ)
 		var parsed = JSON.parse_string(f.get_as_text())
@@ -134,8 +134,10 @@ static func merge(o: Dictionary) -> bool:
 	var bt := float(o.get("best_time", 0.0))
 	if bt > 0.0 and (float(d.best_time) <= 0.0 or bt < float(d.best_time)):
 		d.best_time = bt
-	for k in ["ach", "unlocks"]:
+	for k in ["ach", "unlocks", "lore"]:
 		if o.get(k) is Dictionary:
+			if not d.get(k) is Dictionary:
+				d[k] = {}
 			for id in o[k]:
 				if not d[k].has(id):
 					d[k][id] = o[k][id]

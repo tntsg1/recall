@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Regenerate every still the visual review uses into proofs/review/.
 cd "$(dirname "$0")/.."
-for t in title_shots hud_shots review_shots host_hud_shots possess_shots band_shots resume_shots; do
+for t in title_shots hud_shots review_shots host_hud_shots possess_shots band_shots resume_shots lockdown_shots lore_shots archive_shot; do
 	timeout 260 bash tools/run_test.sh tests/$t.gd --fixed-fps 60 > /dev/null 2>&1 || echo "FAILED $t"
 done
 R=proofs/review
@@ -10,4 +10,7 @@ for f in ui/1_assemble ui/2_menu ui/4_page_in ui/8_opening ui/9_cards_rising ui/
 done
 cp proofs/ui/resume_100.png $R/ui_resume_chapter.png
 cp proofs/ui/resume_230.png $R/ui_resume_wave.png
+for f in proofs/boss/lockdown_1_drop proofs/boss/lockdown_2_lock proofs/boss/lockdown_3_legs proofs/boss/lockdown_4_overload proofs/lore/1_worker proofs/lore/2_remnants proofs/lore/3_memory proofs/lore/4_radio proofs/lore/5_death proofs/lore/6_archive; do
+	cp $f.png $R/ch1_$(basename $f).png
+done
 echo "review stills: $(ls $R/*.png | wc -l)"
