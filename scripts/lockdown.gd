@@ -14,7 +14,7 @@ extends Node2D
 
 enum { OFF, ENTER, RUN, DYING, DEAD }
 
-const HOME := Vector2(960, 200)
+const HOME := Vector2(960, 250)   # low enough that nothing of it crosses the HUD
 const LAMP_HP := 220.0
 const LEG_HP := 160.0
 const CORE_HP := 450.0
@@ -640,13 +640,12 @@ func _draw() -> void:
 	var dim := 1.0 - 0.45 * f
 	if state == OFF:
 		if enter_t > 0.0:
-			_draw_stripes(Pal.ease_out(enter_t), dim)
+			pass
 		return
 	if state == DEAD:
 		return
 	if state == ENTER:
 		dim *= clampf(t / 0.9, 0.0, 1.0)
-	_draw_stripes(1.0, dim)
 	if phase == 2:
 		_draw_sockets(dim)
 	var col := Pal.foe(dim, 1.0 + 0.8 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
@@ -729,9 +728,15 @@ func _draw() -> void:
 		var arm0 := _local(Vector2(signf((LAMPS[k] as Vector2).x) * 120.0, 10.0))
 		if lamp_hp[k] > 0.0:
 			draw_line(arm0, lp, col, 3.0)
-			draw_circle(lp, LAMP_R, Color(0.05, 0.05, 0.055, 1.0))
-			draw_arc(lp, LAMP_R, 0.0, TAU, 24, Pal.foe(dim, 1.4 + 1.4 * lamp_flash[k]), 2.5, false)
-			draw_circle(lp + Vector2.from_angle(lamp_a[k]) * 8.0, 7.0, Pal.ink(dim, 2.4 if lamp_aim[k] < 0.0 else 3.2))
+			# a square housing, its lens turned along the beam: nothing like you
+			var face := Vector2.from_angle(lamp_a[k])
+			var side := face.orthogonal()
+			var box := PackedVector2Array([lp - face * LAMP_R - side * LAMP_R, lp + face * LAMP_R * 0.6 - side * LAMP_R, lp + face * LAMP_R * 0.6 + side * LAMP_R, lp - face * LAMP_R + side * LAMP_R])
+			draw_colored_polygon(box, Color(0.05, 0.05, 0.055, 1.0))
+			box.append(box[0])
+			var hc := Pal.red(dim, 2.4) if lamp_aim[k] >= 0.0 else Pal.foe(dim, 1.4 + 1.4 * lamp_flash[k])
+			draw_polyline(box, hc, 2.5, false)
+			draw_line(lp + face * LAMP_R * 0.6 - side * LAMP_R * 0.75, lp + face * LAMP_R * 0.6 + side * LAMP_R * 0.75, Pal.ink(dim, 2.6 if lamp_aim[k] < 0.0 else 3.4), 6.0)
 			# glass left: a broken ring that closes as it fills
 			var g: float = lamp_hp[k] / LAMP_HP
 			draw_arc(lp, LAMP_R + 6.0, -PI / 2.0, -PI / 2.0 + TAU * g, 24, Pal.foe(0.6 * dim), 1.5, false)
@@ -744,7 +749,7 @@ func _draw() -> void:
 			draw_arc(pos, 70.0 + 30.0 * wk, 0.0, TAU, 48, Pal.red(0.5 * wk * dim, 2.0), 2.0, false)
 		else:
 			var ra: float = 1.0 - clampf(w[1] / 1.2, 0.0, 1.0)
-			draw_arc(pos, w[0], 0.0, TAU, 96, Pal.red(ra * dim, 2.4), 4.0, false)
+			draw_arc(pos, w[0], 0.0, TAU, 96, Pal.red(ra * dim, 2.4), 8.0, false)
 			draw_arc(pos, maxf(0.0, w[0] - 12.0), 0.0, TAU, 96, Pal.red(0.3 * ra * dim, 1.4), 1.0, false)
 	# charged rounds crackle where they sit
 	for b in charged:

@@ -643,7 +643,7 @@ func _draw_word(vp: Vector2) -> void:
 	# where and when: the world in one line, lit a beat after the word
 	var era := clampf((t - 3.0) / 0.8, 0.0, 1.0)
 	if era > 0.0:
-		_text_c(font_s, Txt.t("t_era"), Vector2(vp.x / 2.0, 428), 14, Pal.ink(0.35 * era * whole))
+		_text_c(font_s, Txt.t("t_era"), Vector2(vp.x / 2.0, 432), 17, Pal.ink(0.5 * era * whole))
 
 
 # The highlight: a soft band that springs between rows, a red underline that
@@ -801,6 +801,18 @@ func _draw_archive(vp: Vector2) -> void:
 		var kc := _page_k("archive", row)
 		row += 1
 		view_label(Chapters.label(ch[0]) + "  ·  " + Chapters.title(ch[0]), Vector2(x0 + kc.y, y), 20, Pal.ink(0.95 * kc.x), font_b)
+		# the file's own header: its number, its grade, the bureau's stamp
+		var fh := Txt.t("arch_file") % [Chapters.story(ch[0]), Chapters.story(ch[0]) * 100 + 13]
+		var fw := font_s.get_string_size(fh, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+		var fx := x0 + colw * 3.0 + gap * 2.0
+		view_label(fh, Vector2(fx - fw - 96.0, y), 14, Pal.ink(0.5 * kc.x), font_s)
+		var sc := Vector2(fx - 44.0, y - 8.0)
+		draw_arc(sc, 30.0, 0.0, TAU, 32, Pal.red(0.75 * kc.x, 1.4), 2.0, false)
+		draw_arc(sc, 25.0, 0.0, TAU, 32, Pal.red(0.4 * kc.x, 1.2), 1.0, false)
+		draw_set_transform(sc, -0.25, Vector2.ONE)
+		var st := Txt.t("arch_stamp")
+		draw_string(font_b, Vector2(-font_b.get_string_size(st, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x / 2.0, 5.0), st, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.red(0.85 * kc.x, 1.5))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		draw_line(Vector2(x0, y + 12.0), Vector2(x0 + (colw * 3.0 + gap * 2.0) * kc.x, y + 12.0), Pal.ink(0.25 * kc.x), 1.0)
 		y += 52.0
 		var tallest := 0.0
@@ -821,16 +833,18 @@ func _draw_archive(vp: Vector2) -> void:
 			for it in items:
 				var kj := _page_k("archive", row + c + 1)
 				var got := Lore.found(it[0])
-				var lines := _arch_lines(String(it[1]), colw - 20.0, 16)
+				var lines := _arch_lines(String(it[1]), colw - 20.0, 16) if got else [String(it[1]).substr(0, mini(String(it[1]).length(), 22))]
 				var top_y := yy - 15.0
 				for ln in lines:
 					if got:
 						var col := Possess.cyan(0.9 * kj.x, 1.3) if src == "s" else Pal.ink(0.85 * kj.x)
 						view_label(ln, Vector2(cx + 12.0 + kj.y, yy), 16, col, font_s)
 					else:
-						# blacked out: a bar as long as the words it hides
+						# blacked out: solid black, as long as the words it hides
 						var lw := font_s.get_string_size(ln, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-						draw_rect(Rect2(cx + 12.0 + kj.y, yy - 13.0, lw, 15.0), Pal.ink(0.13 * kj.x))
+						var bar := Rect2(cx + 12.0 + kj.y, yy - 14.0, lw, 17.0)
+						draw_rect(bar, Color(0, 0, 0, kj.x))
+						draw_rect(bar, Pal.ink(0.22 * kj.x), false, 1.0)
 					yy += 24.0
 				draw_line(Vector2(cx + 4.0, top_y), Vector2(cx + 4.0, yy - 20.0), Possess.cyan(0.6 * kj.x) if (got and src == "s") else Pal.ink((0.5 if got else 0.15) * kj.x), 2.0)
 				yy += 12.0

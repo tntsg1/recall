@@ -7,7 +7,7 @@ extends Node2D
 
 const REVEAL_R := 110.0      # a returning round this close wakes a remnant
 const HOLD := 2.6
-const REMNANT_OFF := {"plate": 92.0, "screen": 60.0, "scrawl": 130.0, "notice": 90.0}
+const REMNANT_OFF := {"plate": 80.0, "screen": 120.0, "scrawl": 130.0, "notice": 110.0}
 
 var game
 var story := 1
@@ -110,7 +110,11 @@ func _draw() -> void:
 	var f: float = game.focus
 	var dim := 1.0 - 0.45 * f
 	if story == 1:
-		_draw_door(Vector2(960, 1010), dim)
+		_draw_floor(dim)
+		# the door stands in the left wall, read as if the wall were its floor
+		draw_set_transform(Vector2(80, 790), PI / 2.0, Vector2.ONE)
+		_draw_door(Vector2.ZERO, dim)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		_draw_screen(Vector2(80, 300), dim)
 		_draw_scrawl(Vector2(1840, 780), dim)
 		_draw_notice(Vector2(1500, 70), dim)
@@ -122,6 +126,19 @@ func _draw() -> void:
 		if k <= 0.01:
 			continue
 		_draw_remnant(w, Pal.ease_out(k), dim)
+
+
+# Paint on the yard's floor, worn almost away: the street's number and a lane.
+func _draw_floor(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	var c := Color(1, 1, 1, 0.022 * dim)
+	draw_string(sf, Vector2(960.0 - sf.get_string_size("13", HORIZONTAL_ALIGNMENT_LEFT, -1, 260).x / 2.0, 640.0), "13", HORIZONTAL_ALIGNMENT_LEFT, -1, 260, c)
+	var x := 260.0
+	while x < 1660.0:
+		if x < 860.0 or x > 1060.0:
+			draw_line(Vector2(x, 690.0), Vector2(x + 40.0, 690.0), c, 6.0)
+		x += 80.0
+	draw_string(sf, Vector2(1480.0, 724.0), "B3 →", HORIZONTAL_ALIGNMENT_LEFT, -1, 30, c)
 
 
 func _draw_remnant(w: Array, k: float, dim: float) -> void:
@@ -176,7 +193,7 @@ func _draw_door(c: Vector2, dim: float) -> void:
 
 # A propaganda screen on the left wall, cracked, still trying to say its line.
 func _draw_screen(c: Vector2, dim: float) -> void:
-	var r := Rect2(c.x + 4.0, c.y - 110.0, 34.0, 220.0)
+	var r := Rect2(c.x + 4.0, c.y - 130.0, 92.0, 260.0)
 	draw_rect(r, Color(0.04, 0.04, 0.045, 1.0))
 	draw_rect(r, Pal.ink(0.6 * dim), false, 2.0)
 	draw_rect(r.grow(-4.0), Pal.ink(0.2 * dim), false, 1.0)
@@ -188,11 +205,15 @@ func _draw_screen(c: Vector2, dim: float) -> void:
 	# what is left of its slogan, running down the glass, stuttering
 	var on2 := int(t * 3.0) % 5 != 0
 	if on2:
-		draw_set_transform(Vector2(r.position.x + 24.0, r.position.y + 18.0), PI / 2.0, Vector2.ONE)
-		draw_string(Fonts.get_font("SemiBold"), Vector2.ZERO, Txt.t("prop_screen"), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.45 * dim, 1.3))
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		var sf := Fonts.get_font("SemiBold")
+		var l1 := Txt.t("prop_screen_1")
+		var l2 := Txt.t("prop_screen_2")
+		var cx := r.get_center().x
+		draw_string(sf, Vector2(cx - sf.get_string_size(l1, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x / 2.0, r.position.y + 96.0), l1, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Pal.ink(0.55 * dim, 1.4))
+		draw_string(sf, Vector2(cx - sf.get_string_size(l2, HORIZONTAL_ALIGNMENT_LEFT, -1, 28).x / 2.0, r.position.y + 134.0), l2, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Pal.ink(0.6 * dim, 1.5))
 	# the crack
-	draw_polyline(PackedVector2Array([r.position + Vector2(4, 70), r.position + Vector2(18, 92), r.position + Vector2(10, 118), r.position + Vector2(28, 150), r.position + Vector2(22, 172)]), Pal.ink(0.7 * dim, 1.2), 1.5)
+	draw_polyline(PackedVector2Array([r.position + Vector2(6, 40), r.position + Vector2(40, 88), r.position + Vector2(26, 130), r.position + Vector2(70, 176), r.position + Vector2(58, 220)]), Pal.ink(0.7 * dim, 1.2), 1.5)
+	draw_line(r.position + Vector2(40, 88), r.position + Vector2(86, 102), Pal.ink(0.5 * dim, 1.2), 1.0)
 
 
 # Graffiti on the right wall: the Union's mark, crossed out, the paint running.
@@ -214,7 +235,7 @@ func _draw_scrawl(c: Vector2, dim: float) -> void:
 
 # A notice on the top wall, half torn, with the bureau's red stamp.
 func _draw_notice(c: Vector2, dim: float) -> void:
-	var r := Rect2(c.x - 48.0, c.y + 6.0, 96.0, 58.0)
+	var r := Rect2(c.x - 60.0, c.y + 22.0, 120.0, 72.0)
 	draw_rect(r, Color(0.07, 0.07, 0.075, 1.0))
 	draw_rect(r, Pal.ink(0.55 * dim), false, 1.5)
 	draw_line(r.position + Vector2(10, 12), r.position + Vector2(60, 12), Pal.ink(0.5 * dim), 2.0)
@@ -232,11 +253,13 @@ func _draw_worker(dim: float) -> void:
 	var a := clampf(k / 0.6, 0.0, 1.0) * (1.0 - clampf((k - 4.6) / 0.6, 0.0, 1.0))
 	if a <= 0.01:
 		return
-	var x := 1150.0
+	var y := 700.0
 	if k > 3.2:
-		x = lerpf(1150.0, 1010.0, Pal.ease_io(clampf((k - 3.2) / 1.4, 0.0, 1.0)))
-	var foot := Vector2(x, 1000.0)
-	var c := Pal.ink(0.55 * a * dim)
+		y = lerpf(700.0, 790.0, Pal.ease_io(clampf((k - 3.2) / 1.4, 0.0, 1.0)))
+	var foot := Vector2(150.0 - 40.0 * clampf((k - 3.2) / 1.4, 0.0, 1.0), y)
+	var c := Pal.ink(0.7 * a * dim)
+	draw_set_transform(foot, 0.0, Vector2(1.7, 1.7))
+	foot = Vector2.ZERO
 	# a plain figure in work clothes: head, shoulders, a lamp in hand
 	draw_circle(foot + Vector2(0, -38), 6.0, c)
 	draw_line(foot + Vector2(0, -32), foot + Vector2(0, -12), c, 3.0)
@@ -247,9 +270,15 @@ func _draw_worker(dim: float) -> void:
 	# the hand lamp, pointed at you as the yard wakes
 	var lamp := foot + Vector2(12, -20)
 	draw_circle(lamp, 2.5, Pal.ink(a * dim, 2.2))
-	var aim: Vector2 = (game.player.pos - lamp).normalized()
-	var pts := PackedVector2Array([lamp, lamp + aim.rotated(0.22) * 120.0, lamp + aim.rotated(-0.22) * 120.0])
-	draw_polygon(pts, PackedColorArray([Color(1, 1, 1, 0.12 * a * dim), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var lamp_w := Vector2(150.0, y) + Vector2(12, -20) * 1.7
+	var aim_w: Vector2 = (game.player.pos - lamp_w).normalized()
+	draw_polygon(PackedVector2Array([lamp_w, lamp_w + aim_w.rotated(0.22) * 220.0, lamp_w + aim_w.rotated(-0.22) * 220.0]), PackedColorArray([Color(1, 1, 1, 0.14 * a * dim), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
+	# what he says, once, as you wake
+	var say := Txt.t("worker_line")
+	var sa := a * clampf((k - 0.8) / 0.3, 0.0, 1.0) * (1.0 - clampf((k - 3.0) / 0.4, 0.0, 1.0))
+	if sa > 0.01:
+		draw_string(font, Vector2(150.0 + 30.0, y - 92.0), say, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.95 * sa * dim, 1.2))
 
 
 func _draw_memory() -> void:

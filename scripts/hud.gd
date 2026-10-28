@@ -247,6 +247,9 @@ func step(dt: float) -> void:
 		reticle = game.get_viewport().get_canvas_transform() * game.aim_world()
 	ammo_pop = maxf(0.0, ammo_pop - dt / 0.25)
 	_step_host(dt)
+	# the run's end: you fade with the room, so nothing sits on the words
+	if over_t >= 0.0:
+		game.player.modulate.a = 1.0 - clampf((over_t - 1.2) / 0.6, 0.0, 1.0)
 	if radio_t >= 0.0:
 		radio_t += dt
 		if radio_t > 7.0:
@@ -1547,10 +1550,10 @@ func _draw_intro(vp: Vector2) -> void:
 	var cy := vp.y * 0.4
 	var w := 520.0 * Pal.ease_out(t / 0.7)
 	view.draw_line(Vector2(vp.x / 2.0 - w / 2.0, cy + 34.0), Vector2(vp.x / 2.0 + w / 2.0, cy + 34.0), Pal.ink(0.5 * a), 1.0)
-	_text_c(font_s, Chapters.label(game.chapter), Vector2(vp.x / 2.0, cy + 10.0 - 60.0 * 0.86 - 18.0), 16, Pal.ink(0.55 * a))
+	_text_c(font_s, Chapters.label(game.chapter), Vector2(vp.x / 2.0, cy + 10.0 - 60.0 * 0.86 - 18.0), 18, Pal.ink(0.65 * a))
 	var rise := (1.0 - Pal.ease_out(clampf((t - 0.15) / 0.6, 0.0, 1.0))) * 20.0
 	_text_stagger(font_xl, Chapters.title(game.chapter), Vector2(vp.x / 2.0, cy + 10.0), 60, Pal.ink(1.0, 1.15), t - 0.15, t - 2.15, 0.05)
-	_text_c(font_s, Chapters.sub(game.chapter), Vector2(vp.x / 2.0, cy + 70.0), 16, Pal.ink(0.6 * a * clampf((t - 0.5) / 0.4, 0.0, 1.0)))
+	_text_c(font_s, Chapters.sub(game.chapter), Vector2(vp.x / 2.0, cy + 74.0), 20, Pal.ink(0.8 * a * clampf((t - 0.5) / 0.4, 0.0, 1.0)))
 
 
 func _draw_over(vp: Vector2) -> void:
