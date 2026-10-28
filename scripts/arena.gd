@@ -60,6 +60,8 @@ func setup(ch: int) -> void:
 			for k in 6:
 				var c := Vector2(960, 540) + Vector2.from_angle(PI / 6.0 + TAU * k / 6.0) * Vector2(520, 330)
 				inner.append(Rect2(c - Vector2(34, 34), Vector2(68, 68)))
+			# the strategic reserve crate, where the arms put what they take
+			inner.append(Arms.CRATE)
 		_:
 			# the Hall of Mirrors: two pillars, four panels, the middle kept open
 			inner.append(Rect2(390, 500, 80, 80))

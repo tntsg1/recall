@@ -157,6 +157,14 @@ func _draw() -> void:
 		_draw_target(Vector2(600, 70), Vector2(0, 1), dim, 1)
 		if shows.get("w3_safety", 0.0) <= 0.01:
 			_draw_floor_notice(Vector2(1490, 1010), dim)
+	elif story == 4:
+		_draw_stations(dim)
+		_draw_presses(dim)
+		_draw_reserve(dim)
+		_draw_terminal(Vector2(80, 260), dim, "w4_board")
+		if shows.get("w4_notice", 0.0) <= 0.01:
+			_draw_wall_notice(Vector2(1840, 300), dim)
+		_draw_scrawl(Vector2(1840, 820), dim)
 	for w in Lore.walls(story):
 		var id := "w%d_%s" % [story, w[0]]
 		var k: float = shows.get(id, 0.0)
@@ -440,7 +448,7 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 			yy += step
 	elif id != "" or int(t * 2.0) % 3 != 0:
 		var dots := ".".repeat(int(t * 2.0) % 4)
-		draw_string(font, scr.position + Vector2(8, 30), Txt.t("term_idle" if story != 3 else "term_log") + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
+		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
 
 
 # The queue: posts with a rope slung between them, and the waiting line.
@@ -554,14 +562,24 @@ func _rows(txt: String, width: float, size: int) -> Array:
 	for ch in txt:
 		# closing punctuation stays on the row it ends, even a little past the edge
 		if font.get_string_size(cur + ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width and cur != "" and not "，。：；、！？）」".contains(ch):
-			out.append(cur)
-			cur = ch
+			# a number or a latin word moves down whole rather than splitting
+			var cut := cur.length()
+			while cut > 0 and _word_char(cur[cut - 1]) and _word_char(ch):
+				cut -= 1
+			if cut == 0:
+				cut = cur.length()
+			out.append(cur.substr(0, cut))
+			cur = cur.substr(cut) + ch
 		else:
 			cur += ch
 	if cur != "":
 		out.append(cur)
 	row_cache[key] = out
 	return out
+
+
+func _word_char(c: String) -> bool:
+	return (c >= "0" and c <= "9") or (c >= "A" and c <= "Z") or (c >= "a" and c <= "z") or c == "-"
 
 
 # Graffiti on the right wall: the Union's mark, crossed out, the paint running.
@@ -769,6 +787,67 @@ func _draw_floor_notice(c: Vector2, dim: float) -> void:
 	draw_line(tc + Vector2(0, -5), tc + Vector2(0, 2), Pal.ink(0.6 * dim), 2.0)
 	for j in 3:
 		draw_line(r.position + Vector2(44, 16 + j * 11), r.position + Vector2(108 - (j % 2) * 20, 16 + j * 11), Pal.ink(0.25 * dim), 1.0)
+
+
+# ---------------------------------------------------------------- the production union
+
+# Work stations painted along the belts: a numbered box each, two worn
+# footprints where someone stood all day.
+func _draw_stations(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	var lines := PackedVector2Array()
+	var n := 0
+	for st: Vector2 in [Vector2(360, 360), Vector2(680, 360), Vector2(1240, 360), Vector2(1560, 360), Vector2(700, 900), Vector2(1100, 900)]:
+		n += 1
+		var r := Rect2(st - Vector2(34, 22), Vector2(68, 44))
+		lines.append_array(PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.position.y), r.end,
+			r.end, Vector2(r.position.x, r.end.y), Vector2(r.position.x, r.end.y), r.position]))
+		for fs: float in [-1.0, 1.0]:
+			var fp := st + Vector2(fs * 9.0, 4.0)
+			draw_colored_polygon(PackedVector2Array([fp + Vector2(-4, -9), fp + Vector2(4, -9), fp + Vector2(5, 8), fp + Vector2(-5, 8)]), Color(1, 1, 1, 0.05 * dim))
+		draw_string(sf, r.position + Vector2(4, -4), Txt.t("station") % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 1, 1, 0.12 * dim))
+	draw_multiline(lines, Color(1, 1, 1, 0.07 * dim), 2.0)
+
+
+# The six blocks are stamping-press bases: a hazard band, a number, bolts.
+func _draw_presses(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	var n := 0
+	for r: Rect2 in game.arena.inner:
+		if r.size.x > 100.0:
+			continue
+		n += 1
+		var ins := r.grow(-7.0)
+		var hz := PackedVector2Array()
+		var x := ins.position.x
+		while x < ins.end.x - 6.0:
+			hz.append(Vector2(x, ins.end.y))
+			hz.append(Vector2(x + 8.0, ins.end.y - 12.0))
+			x += 10.0
+		draw_multiline(hz, Pal.ink(0.3 * dim), 2.0)
+		draw_string(sf, ins.position + Vector2(4, 16), "PR-%02d" % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+		for b: Vector2 in [ins.position, Vector2(ins.end.x, ins.position.y)]:
+			draw_circle(b + Vector2(0, 26), 2.5, Pal.ink(0.35 * dim))
+
+
+# The strategic reserve crate: banded, padlocked, sealed, its stencil big.
+func _draw_reserve(dim: float) -> void:
+	var r := Arms.CRATE
+	var sf := Fonts.get_font("SemiBold")
+	var ins := r.grow(-8.0)
+	draw_rect(ins, Pal.ink(0.2 * dim), false, 1.0)
+	for bx: float in [r.position.x + 46.0, r.end.x - 46.0]:
+		draw_line(Vector2(bx, r.position.y + 2.0), Vector2(bx, r.end.y - 2.0), Pal.ink(0.35 * dim), 4.0)
+	if shows.get("w4_crate", 0.0) <= 0.01:
+		var tx := Txt.t("crate_reserve")
+		var tw := sf.get_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
+		draw_string(sf, Vector2(r.get_center().x - tw / 2.0, r.get_center().y + 4.0), tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.6 * dim))
+	# the padlock on its front edge, and a seal strip across the lid
+	var lk := Vector2(r.get_center().x, r.end.y - 14.0)
+	draw_rect(Rect2(lk - Vector2(9, 6), Vector2(18, 14)), Pal.WALL)
+	draw_rect(Rect2(lk - Vector2(9, 6), Vector2(18, 14)), Pal.ink(0.6 * dim), false, 1.5)
+	draw_arc(lk - Vector2(0, 6), 6.0, PI, TAU, 10, Pal.ink(0.6 * dim), 1.5)
+	draw_line(Vector2(r.position.x + 10.0, r.position.y + 18.0), Vector2(r.end.x - 10.0, r.position.y + 30.0), Pal.red(0.45 * dim, 1.1), 3.0)
 
 
 # The maintenance worker: by the door as the chapter opens, then back inside.

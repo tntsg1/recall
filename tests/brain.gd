@@ -143,6 +143,16 @@ func think(game) -> void:
 			move += dir.orthogonal() * (1.6 if int(frame / 90) % 2 == 0 else -1.6)
 			if bs.rail_mode == 2 and bs.rail_t > Testbed.RAIL_HOLD - 0.12:
 				bot.dash = true
+	# robot arms: get out of a sector that is rising or sweeping, dash if caught
+	if game.arms.active():
+		for arm in game.arms.arms:
+			if arm.mode == Arms.RISE or arm.mode == Arms.SWEEP:
+				var v: Vector2 = p - arm.base
+				var off: float = absf(wrapf(v.angle() - (arm.face as Vector2).angle(), -PI, PI))
+				if v.length() < Arms.L + 40.0 and off < Arms.HALF + 0.2:
+					move += v.normalized() * 2.2
+					if arm.mode == Arms.SWEEP and absf(wrapf(v.angle() - arm.a, -PI, PI)) < 0.35:
+						bot.dash = true
 	# laser fences: stand clear of a beam that is lit or about to be
 	if game.lasers.active():
 		for fe in game.lasers.fences:

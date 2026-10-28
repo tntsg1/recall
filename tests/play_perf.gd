@@ -56,6 +56,7 @@ func _initialize() -> void:
 	root.add_child(scene)
 	game = scene
 	game.prof_on = true
+	brain = preload("res://tests/brain.gd").new(bot)
 	# story=N: start in that story chapter; boss: straight to its boss
 	for a in args:
 		if a.begins_with("story="):
@@ -65,7 +66,6 @@ func _initialize() -> void:
 	if "boss" in args:
 		await process_frame
 		game.dev_jump(Waves.BOSS)
-	brain = preload("res://tests/brain.gd").new(bot)
 	_watch.call_deferred(game)
 
 

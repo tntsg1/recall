@@ -29,6 +29,13 @@ const SEIZE := {
 		Enemies.GUARD: [["防暴盾第九版：更轻，更结实，更朝向人群。", "RIOT SHIELD V9: LIGHTER, STRONGER, MORE FACING THE CROWD."]],
 		Enemies.CHARGER: [["靶纸上画的不是敌军。是排队的人。", "THE TARGETS DON'T SHOW ENEMY SOLDIERS. THEY SHOW PEOPLE IN A QUEUE."]],
 	},
+	4: {
+		Enemies.CHASER: [["工人编号 2207。本月产出 1400 件。个人配额：0。", "WORKER 2207. OUTPUT THIS MONTH: 1,400 UNITS. PERSONAL QUOTA: 0."],
+			["他们说储备是为了将来。我没见过将来。", "THEY SAY THE RESERVE IS FOR THE FUTURE. I HAVE NEVER SEEN THE FUTURE."]],
+		Enemies.GUARD: [["守卫储备仓第三年。仓门一次也没开过。", "THIRD YEAR GUARDING THE RESERVE. THE DOOR HAS NEVER OPENED."]],
+		Enemies.CHARGER: [["装配线每年提速一成。工人的工资不变。", "THE LINE RUNS TEN PER CENT FASTER EVERY YEAR. THE WAGES DO NOT."]],
+		Enemies.LEECH: [["我把一切吸进来，再交上去。自己什么也不留。", "I TAKE EVERYTHING IN AND HAND IT UP. I KEEP NOTHING."]],
+	},
 }
 
 # remnants: [id, wall point, inward normal, kind of mark, zh, en]
@@ -51,6 +58,12 @@ const WALL := {
 		["crate", Vector2(285, 860), Vector2(0, -1), "crate", "人民卫士 Ⅳ 型 · 仅限国内使用", "PEOPLE'S GUARDIAN MK IV · DOMESTIC USE ONLY"],
 		["safety", Vector2(1490, 1010), Vector2(0, -1), "notice", "试射期间请勿抗议。抗议者将被视为测试目标。", "DO NOT PROTEST DURING LIVE FIRE. PROTESTERS WILL BE TREATED AS TARGETS."],
 	],
+	4: [
+		["board", Vector2(80, 260), Vector2(1, 0), "screen", "今日产出口粮 98400 份 · 入库 98105 · 发放 295", "RATIONS MADE TODAY 98,400 · TO RESERVE 98,105 · ISSUED 295"],
+		["crate", Vector2(315, 845), Vector2(0, -1), "crate", "战略储备 · 开启须经全民董事会批准", "STRATEGIC RESERVE · OPENING REQUIRES THE BOARD'S APPROVAL"],
+		["notice", Vector2(1840, 300), Vector2(-1, 0), "notice", "为庆祝产量再创新高，午餐时间缩短为 4 分钟。", "TO CELEBRATE RECORD OUTPUT, LUNCH IS NOW FOUR MINUTES."],
+		["scrawl", Vector2(1840, 820), Vector2(-1, 0), "scrawl", "我们造的面包，我们买不起。", "WE BAKE THE BREAD. WE CAN'T AFFORD IT."],
+	],
 }
 
 const RADIO := {
@@ -68,6 +81,11 @@ const RADIO := {
 		"wave": [["仿生军械研究院今日完成例行测试。一切武器均用于守护和平。", "THE BIONIC ORDNANCE INSTITUTE FINISHED ROUTINE TESTS. ALL WEAPONS SERVE PEACE."],
 			["请勿靠近研究院围墙。围墙后面就是和平。", "KEEP AWAY FROM THE INSTITUTE WALLS. BEHIND THEM IS PEACE."]],
 		"boss": [["军械试验平台已完成全部测试项目，即将投入民用。", "THE ORDNANCE TESTBED HAS PASSED EVERY TEST. CIVILIAN SERVICE BEGINS SOON."]],
+	},
+	4: {
+		"wave": [["中央生产联合体本季度超额完成任务，战略储备再创新高。", "THE CENTRAL PRODUCTION UNION BEAT ITS QUOTA. THE STRATEGIC RESERVE HITS A NEW HIGH."],
+			["口粮配给调整为每日一份，以支援战略储备建设。", "RATIONS ARE NOW ONE A DAY, IN SUPPORT OF THE STRATEGIC RESERVE."]],
+		"boss": [["储备回收机进入例行检修。储备物资安全，无需关注。", "THE RESERVE INTAKE IS UNDER ROUTINE MAINTENANCE. RESERVES ARE SAFE. NO NEED TO LOOK."]],
 	},
 }
 

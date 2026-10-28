@@ -10,7 +10,7 @@ const LIST := {
 	"pierce60": ["织网", "THE NET", "一次回收贯穿 60 次", "Pierce 60 times in one recall"],
 	"boss_1": ["终点站", "LAST STOP", "击毁逆行列车", "Destroy the Retrograde"],
 	"boss_2": ["碎镜", "BROKEN GLASS", "击碎镜面守卫", "Shatter the Mirror Warden"],
-	"boss_3": ["反刍", "SPAT OUT", "击败弹道吞噬者", "Defeat the Devourer"],
+	"boss_3": ["反刍", "SPAT OUT", "击败战略储备回收机", "Defeat the Reserve Intake"],
 	"boss_4": ["停摆", "STOPPED CLOCK", "击败节拍器", "Stop the Metronome"],
 	"boss_5": ["归零", "ZEROED", "击败归零", "Defeat Zero"],
 	"win": ["一局", "A FULL RUN", "通关一局", "Finish a run"],
