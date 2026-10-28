@@ -8,7 +8,7 @@ var game
 var sp_list: Array = []   # [pos, vel, t, dur, color, width, len, drag]
 var rings: Array = []    # [pos, r0, r1, t, dur, color, width]
 var shards: Array = []   # [pos, a, b, rot, vel, spin, t, dur, color, width]
-var numbers: Array = []  # [text, pos, vel, t, dur, size, color, pop]
+var numbers: Array = []  # [text, pos, vel, t, dur, size, color, pop, value]
 var flashes: Array = []  # [pos, r, t, dur, color]
 var motes: Array = []    # [pos, vel, phase, size]
 var add_layer: Node2D
@@ -119,9 +119,17 @@ func number(pos: Vector2, value: float, ret: bool) -> void:
 	if numbers.size() >= 48:
 		numbers.remove_at(0)
 	var size := 30 if ret else 20
+	# hits landing together on one spot add up into one number that pops again,
+	# instead of a pile of "10"s on top of each other
+	for n in numbers:
+		if n[5] == size and n[3] < 0.18 and (n[1] as Vector2).distance_to(pos) < 48.0:
+			n[8] += value
+			n[0] = str(int(round(n[8])))
+			n[3] = 0.0
+			return
 	var c := Pal.ink(1.0, 1.6 if ret else 1.0)
 	var v := Vector2(randf_range(-40, 40), -110.0 if ret else -70.0)
-	numbers.append([str(int(round(value))), pos + Vector2(randf_range(-8, 8), -10), v, 0.0, 0.75 if ret else 0.6, size, c, 1.0])
+	numbers.append([str(int(round(value))), pos + Vector2(randf_range(-8, 8), -10), v, 0.0, 0.75 if ret else 0.6, size, c, 1.0, value])
 
 
 func flash(pos: Vector2, r: float, dur: float, c: Color) -> void:

@@ -160,6 +160,8 @@ const S := {
 	"build_empty": ["还没有流派和遗物", "NO SCHOOLS OR RELICS YET"],
 	"t_continue": ["继续", "CONTINUE"],
 	"t_new_run": ["新的一局", "NEW RUN"],
+	"cap_wave": ["波次", "WAVE"],
+	"cap_grade": ["评级", "GRADE"],
 	"resumed": ["从这一波的开头继续", "BACK AT THE START OF THIS WAVE"],
 	"devp_title": ["开发者模式 · 输入口令", "DEVELOPER MODE · ENTER THE CODE"],
 	"devp_hint": ["点击数字或直接键入 · Esc 取消", "CLICK THE KEYS OR TYPE · ESC TO CANCEL"],

@@ -656,7 +656,8 @@ func _row(i: int, pg: String, label: String, value: String, a: float, dx: float,
 	var pr: float = press[i].x if pg == page else 0.0
 	var sc := 1.0 + 0.025 * lift + pr * 0.01
 	var c := Pal.ink((0.55 + 0.4 * lift) * a * (0.5 if locked else 1.0))
-	draw_set_transform(r.get_center() + Vector2(dx + lift * 10.0, 0), 0.0, Vector2(sc, sc))
+	# the chosen row swells in place: it stays on the menu's centre line
+	draw_set_transform(r.get_center() + Vector2(dx, 0), 0.0, Vector2(sc, sc))
 	var lr := Rect2(-r.size / 2.0, r.size)
 	if value == "":
 		_text_c(font_xl, label, Vector2(0, 9), 24, c)
@@ -723,7 +724,7 @@ func _draw_menu(vp: Vector2) -> void:
 		_text_c(font_s, info, Vector2(vp.x / 2.0, _row_rect(_menu().size(), "menu").position.y + 24), 16, Pal.ink(0.6 * pa))
 	var d := Meta.load_data()
 	var rec := Txt.t("t_records") % [int(d.runs), int(d.wins), int(round(count_roll.shown)), Ach.LIST.size()]
-	_text_c(font_s, rec, Vector2(vp.x / 2.0, vp.y - 40.0), 14, Pal.ink(0.4 * pa))
+	_text_c(font_s, rec, Vector2(vp.x / 2.0, vp.y - 40.0), 15, Pal.ink(0.45 * pa))
 
 
 func _unlock_text(key: String) -> String:

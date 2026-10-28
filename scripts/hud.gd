@@ -364,7 +364,7 @@ func _draw_view() -> void:
 		var qs := "Q  " + str(emb)
 		view.draw_string(font_b, base + Vector2(60.0, 0), qs, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, qc)
 	if game.tutorial == null:
-		_draw_seize_key(base + Vector2(150.0, -14.0), mine)
+		_draw_seize_key(base + Vector2(124.0, -14.0), mine)
 	if hk > 0.01:
 		_draw_host(vp, base, hk)
 	# pierce counter
@@ -463,6 +463,10 @@ func _draw_timer(vp: Vector2) -> void:
 	timer_odo.draw(view, font_l, 0.0, 10.0, 34, Pal.ink(0.92 * appear), 0)
 	view.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	view.draw_string(font_s, Vector2(cx - 150.0, y + 4.0), "%02d" % (w.index + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.4 * appear))
+	# what the two small marks are, on the same line, outboard of them
+	var wc := Txt.t("cap_wave")
+	view.draw_string(font_s, Vector2(cx - 158.0 - font_s.get_string_size(wc, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x, y + 3.0), wc, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.28 * appear))
+	view.draw_string(font_s, Vector2(cx + 160.0, y + 3.0), Txt.t("cap_grade"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.28 * appear))
 	view.draw_line(Vector2(cx - 120.0, y - 2.0), Vector2(cx - 70.0, y - 2.0), Pal.ink(0.18 * appear), 1.0)
 	view.draw_line(Vector2(cx + 70.0, y - 2.0), Vector2(cx + 120.0, y - 2.0), Pal.ink(0.18 * appear), 1.0)
 	# the grade still within reach, flipping over as each threshold passes
@@ -968,8 +972,8 @@ func _frame(r: Rect2, rarity: int, a: float, hov: float) -> void:
 		for p: Vector2 in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
 			var sx := 1.0 if p.x < r.get_center().x else -1.0
 			var sy := 1.0 if p.y < r.get_center().y else -1.0
-			view.draw_line(p + Vector2(-4 * sx, -4 * sy), p + Vector2(l * sx, -4 * sy), Pal.ink(0.9 * a, 1.3), 2.0)
-			view.draw_line(p + Vector2(-4 * sx, -4 * sy), p + Vector2(-4 * sx, l * sy), Pal.ink(0.9 * a, 1.3), 2.0)
+			view.draw_line(p + Vector2(-4 * sx, -4 * sy), p + Vector2(l * sx, -4 * sy), Pal.red(0.95 * a, 1.8), 2.0)
+			view.draw_line(p + Vector2(-4 * sx, -4 * sy), p + Vector2(-4 * sx, l * sy), Pal.red(0.95 * a, 1.8), 2.0)
 		# a slow glint runs round the frame
 		var g := fmod(game.real_time * 0.35, 1.0)
 		var per := 2.0 * (r.size.x + r.size.y)
@@ -983,7 +987,7 @@ func _frame(r: Rect2, rarity: int, a: float, hov: float) -> void:
 			gp = Vector2(r.end.x - (d - r.size.x - r.size.y), r.end.y)
 		else:
 			gp = Vector2(r.position.x, r.end.y - (d - 2.0 * r.size.x - r.size.y))
-		view.draw_circle(gp, 3.0, Pal.ink(a, 2.4))
+		view.draw_circle(gp, 3.0, Pal.red(a, 2.6))
 
 
 func _card_face(c: Dictionary, r: Rect2, a: float, hov: float, idx: int) -> void:
@@ -1006,7 +1010,7 @@ func _card_face(c: Dictionary, r: Rect2, a: float, hov: float, idx: int) -> void
 			title = Cards.item_name(c.id)
 			desc = Cards.item_desc(c.id)
 	_frame(r, rarity, a, hov)
-	_text_c(font_s, kind, Vector2(0, r.position.y + 34.0), 14, Pal.ink(0.55 * a))
+	_text_c(font_s, kind, Vector2(0, r.position.y + 34.0), 14, Pal.red(0.9 * a, 1.4) if rarity == 2 else Pal.ink(0.55 * a))
 	var ic := Pal.ink(a, 1.0 + 0.4 * hov)
 	match c.type:
 		"school":
@@ -1180,7 +1184,7 @@ func _draw_slots(vp: Vector2) -> void:
 			var pop: float = _pop(school_pop.get(k, 0.0))
 			_icon(k, sp, 12.0 * (1.0 + 0.4 * pop), game.real_time, Pal.ink(0.85, 1.0 + 0.8 * pop), 1.6)
 			for j in 3:
-				view.draw_rect(Rect2(sp + Vector2(-13 + j * 10, 22), Vector2(6, 3)), Pal.ink(0.8 if j < game.lv[k] else 0.15))
+				view.draw_rect(Rect2(sp + Vector2(-13 + j * 10, 17), Vector2(6, 2)), Pal.ink(0.8 if j < game.lv[k] else 0.15))
 		else:
 			view.draw_arc(sp, 4.0, 0.0, TAU, 12, Pal.ink(0.12), 1.0, false)
 	for i in Cards.RELIC_SLOTS:
@@ -1193,7 +1197,7 @@ func _draw_slots(vp: Vector2) -> void:
 			view.draw_rect(rr.grow(pop2 * 4.0), Pal.ink(0.5 + 0.3 * rar * 0.5, 1.0 + pop2), false, 1.0 + rar * 0.6)
 			_glyph(id, rp, 11.0 * (1.0 + 0.3 * pop2), Pal.ink(0.85, 1.0 + 0.8 * pop2), 1.3)
 		else:
-			view.draw_rect(rr, Pal.ink(0.1), false, 1.0)
+			view.draw_rect(rr, Pal.ink(0.07), false, 1.0)
 	# armed items wait beside the ammo
 	var ax := vp.x / 2.0 - 230.0 - 40.0
 	for k in ["overload", "firststrike", "stasis", "ward", "longhold", "slowfield", "tempo", "haste", "calm_mind"]:

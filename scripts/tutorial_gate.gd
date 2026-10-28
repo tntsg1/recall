@@ -145,7 +145,7 @@ func _dummy(kind: int, at: Vector2, hp: float):
 
 func skip_rect(vp: Vector2) -> Rect2:
 	# in the top band, right-aligned to the arena's edge, clear of its frame
-	return Rect2(vp.x - Hud.BAND_EDGE - 290, 14, 290, 40)
+	return Rect2(vp.x - Hud.BAND_EDGE - 20 - 290, 14, 290, 40)
 
 func done_rect(vp: Vector2) -> Rect2:
 	return Rect2(vp.x / 2.0 - 280, 340, 560, 64)
@@ -207,7 +207,7 @@ func draw_hud(hud, vp: Vector2) -> void:
 	var ph := 74.0 + paragraph.get_size().y + 32.0
 	v.draw_rect(Rect2(x, 104, width, ph), Color(0.035, 0.035, 0.04, 1.0))
 	v.draw_line(Vector2(x, 104), Vector2(x + width * (stage + 1.0) / STEPS, 104), Pal.red(0.9, 1.5), 3.0)
-	v.draw_string(hud.font_s, Vector2(Hud.BAND_EDGE, 41), Txt.t("t_tutorial") + "  %d / %d" % [stage + 1, STEPS], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.7))
+	v.draw_string(hud.font_s, Vector2(Hud.BAND_EDGE + 20, 41), Txt.t("t_tutorial") + "  %d / %d" % [stage + 1, STEPS], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.7))
 	hud._text_c(hud.font_s, Txt.t("teach_skip"), skip_rect(vp).get_center() + Vector2(0, 7), 18, Pal.ink(0.7))
 	v.draw_string(hud.font_xl, Vector2(x + 30, 153), Txt.t("teach_%d_title" % stage), HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Pal.ink(1.0))
 	paragraph.draw(v.get_canvas_item(), Vector2(x + 30, 178), Pal.ink(0.8))
