@@ -658,10 +658,16 @@ func _draw_lanes(dim: float) -> void:
 		if absf(bx2 - 785.0) < 70.0 or absf(bx2 - 1135.0) < 70.0:
 			continue
 		draw_string(sf, Vector2(bx2 - 30.0, 456.0), "A-%d" % (tb + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 1, 0.22 * dim))
-		# the figure that stood here, queueing, and the tick that cleared it
-		draw_circle(Vector2(bx2 - 6.0, 478.0), 7.0, Color(1, 1, 1, 0.16 * dim))
-		draw_polyline(PackedVector2Array([Vector2(bx2 - 22, 510), Vector2(bx2 - 19, 491), Vector2(bx2 + 7, 491), Vector2(bx2 + 10, 510)]), Color(1, 1, 1, 0.18 * dim), 2.0)
-		draw_polyline(PackedVector2Array([Vector2(bx2 + 14, 482), Vector2(bx2 + 20, 489), Vector2(bx2 + 30, 472)]), Pal.ink(0.45 * dim), 2.5)
+		# the figures that stood here, in a queue behind its arrow, and the
+		# tick that cleared them
+		for qn in 3:
+			var qx := bx2 - 22.0 + qn * 13.0
+			draw_circle(Vector2(qx, 484.0), 3.5, Color(1, 1, 1, 0.18 * dim))
+			draw_line(Vector2(qx, 489.0), Vector2(qx, 506.0), Color(1, 1, 1, 0.18 * dim), 3.0)
+		draw_line(Vector2(bx2 - 28, 474), Vector2(bx2 + 8, 474), Color(1, 1, 1, 0.14 * dim), 1.5)
+		draw_line(Vector2(bx2 + 8, 474), Vector2(bx2 + 3, 470), Color(1, 1, 1, 0.14 * dim), 1.5)
+		draw_line(Vector2(bx2 + 8, 474), Vector2(bx2 + 3, 478), Color(1, 1, 1, 0.14 * dim), 1.5)
+		draw_polyline(PackedVector2Array([Vector2(bx2 + 14, 490), Vector2(bx2 + 20, 497), Vector2(bx2 + 30, 480)]), Pal.ink(0.45 * dim), 2.5)
 	# the test zone: a hatched band across the floor under the platform
 	var y0 := 330.0
 	var x := 700.0

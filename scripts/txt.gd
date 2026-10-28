@@ -122,6 +122,7 @@ const S := {
 	"radio_testbed_4": ["全项联测开始。采购方代表请就座观摩。", "FULL DEMONSTRATION BEGINS. BUYERS' DELEGATES, PLEASE BE SEATED."],
 	"tb_pass": ["结果：合格", "RESULT: PASSED"],
 	"tb_ok": ["合格", "PASSED"],
+	"tb_filed": ["已归档", "FILED"],
 	"tb_vent": ["散热中", "COOLING"],
 	"tb_fail": ["测试中止", "TEST ABORTED"],
 	"chapter_2": ["国民资产管理中心", "NATIONAL ASSET CENTRE"],

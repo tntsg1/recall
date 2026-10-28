@@ -710,7 +710,8 @@ func _draw_screen(o: Vector2, dim: float) -> void:
 			sub_col = Pal.red(0.8 * dim, 1.8)
 		PASS:
 			head = Txt.t("tb_test_%d" % (test + 1))
-			sub = Txt.t("tb_pass")
+			# the stamp says it; the screen only files it away
+			sub = Txt.t("tb_pass") if stamp > 0.97 else Txt.t("tb_filed")
 		VENT:
 			head = Txt.t("tb_vent")
 			sub = ""
@@ -887,7 +888,7 @@ func _draw_dangers(dim: float) -> void:
 		var k: float = m[2] / MIS_FALL
 		# the fill is the timer: it reaches the rim as the round lands
 		# (linear-light blending: a little alpha already reads as a fair grey)
-		draw_circle(at, MIS_R * maxf(k, 0.0), Pal.ink(0.004 + 0.01 * k))
+		draw_circle(at, MIS_R * maxf(k, 0.0), Pal.ink(0.003 + 0.007 * k))
 		var dash := PackedVector2Array()
 		for j in 16:
 			var a0 := TAU * j / 16.0 + t * 0.9

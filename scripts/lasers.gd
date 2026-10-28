@@ -14,6 +14,7 @@ const HURT_R := 6.0
 
 var fences: Array = []    # [a, b, group]
 var live := [false, false]
+var fade := [0.0, 0.0]    # a beam that just went dark dies away over a moment
 var warn := [0.0, 0.0]    # 0..1: how near a dark group is to lighting
 var forced := -1          # -1 take turns; 0 every beam off; 1 every beam on
 var force_t := 0.0
@@ -95,6 +96,7 @@ func step(dt: float) -> void:
 					game.fx.flash(f[1], 22.0, 0.12, Pal.red(0.8, 2.6))
 		live[g] = on
 		warn[g] = w
+		fade[g] = 1.0 if on else maxf(0.0, fade[g] - dt / 0.25)
 	if game:
 		_hurt()
 	queue_redraw()
@@ -187,6 +189,12 @@ func _draw() -> void:
 				s += 90.0
 			if runs.size() > 0:
 				draw_multiline(runs, Pal.red(0.8 * soft, 3.0 * soft), 3.0 if forced != 1 else 2.0)
+		elif fade[g] > 0.0:
+			# powering down: the glow dies back toward the near emitter
+			var fk: float = fade[g]
+			var e2 := a.lerp(b, fk)
+			draw_line(a, e2, Pal.red(0.1 * fk, 1.3), 10.0)
+			draw_line(a, e2, Pal.red(fk, 1.2 + 1.6 * fk), 2.0)
 		elif warn[g] > 0.0:
 			# about to light: a thick pulsing band and hatching on the floor either
 			# side, both growing as it nears
