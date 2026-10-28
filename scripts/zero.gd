@@ -142,14 +142,14 @@ func damage(dmg: float, ret: bool, at_p: Vector2, d: Vector2, _frame_k: int = -1
 	if ret:
 		red = 1.0
 	game.fx.number(at_p, dmg, ret)
-	var c := Pal.red(1.0, 3.2) if ret else Pal.ink(1.0, 1.8)
+	var c := Pal.red(1.0, 3.2) if ret else Pal.foe(1.0, 1.8)
 	game.fx.sparks(at_p, d, 6 if ret else 3, c, 500.0, 0.25, 0.8)
 	game.on_target_hit(ret)
 	var want := clampi(int((1.0 - hp / HP) * 3.0), 0, 2)
 	while phase < want:
 		phase += 1
 		guard_t = 1.4
-		game.fx.ring(pos, R, 360.0, 0.6, Pal.ink(0.9, 1.5), 3.0)
+		game.fx.ring(pos, R, 360.0, 0.6, Pal.foe(0.9, 1.5), 3.0)
 		game.sfx.play("armor", 1.4, 0.0)
 		game.add_hitstop(0.09)
 		game.cam.add_trauma(0.6)
@@ -226,7 +226,7 @@ func _run(dt: float, pl: Vector2) -> void:
 			var a := to.angle() + lerpf(-0.9, 0.9, (k + 0.5) / n)
 			game.bullets.fire_foe(pos + Vector2.from_angle(a) * (R + 8.0), Vector2.from_angle(a))
 		game.sfx.play("shot", 0.7, -2.0)
-		game.fx.ring(pos, R, R + 26.0, 0.2, Pal.ink(0.7, 1.4), 1.5)
+		game.fx.ring(pos, R, R + 26.0, 0.2, Pal.foe(0.7, 1.4), 1.5)
 	# it calls them home — the lines light up first
 	recall_cd -= dt
 	if recall_cd <= 0.8 and not warned:
@@ -257,7 +257,7 @@ func _dying(dt: float) -> void:
 			var a := TAU * k / 12.0
 			var p0 := Vector2.from_angle(a) * R
 			var p1 := Vector2.from_angle(a + TAU / 12.0) * R
-			game.fx.shard(pos + (p0 + p1) * 0.5, (p0 - p1) * 0.5, (p1 - p0) * 0.5, p0.normalized() * randf_range(200, 420), randf_range(-8, 8), 2.0, Pal.ink(1.0, 1.8), 3.0)
+			game.fx.shard(pos + (p0 + p1) * 0.5, (p0 - p1) * 0.5, (p1 - p0) * 0.5, p0.normalized() * randf_range(200, 420), randf_range(-8, 8), 2.0, Pal.foe(1.0, 1.8), 3.0)
 		game.on_boss_dead(pos)
 
 
@@ -273,18 +273,18 @@ func _draw() -> void:
 			for k in 24:
 				var d := Vector2.from_angle(TAU * k / 24.0 + enter_t * 2.0)
 				var r := lerpf(260.0, R + 6.0, e)
-				draw_line(HOME + d * r, HOME + d * (r + 8.0), Pal.ink(0.6 * e * dim), 1.5)
+				draw_line(HOME + d * r, HOME + d * (r + 8.0), Pal.foe(0.6 * e * dim), 1.5)
 		return
 	if state == DEAD:
 		return
 	for g in ghosts:
 		var k2: float = 1.0 - g[1] / 0.3
-		draw_arc(g[0], R * 0.9, 0.0, TAU, 32, Pal.ink(0.3 * k2 * dim), 1.5, false)
+		draw_arc(g[0], R * 0.9, 0.0, TAU, 32, Pal.foe(0.3 * k2 * dim), 1.5, false)
 	var appear := Pal.back(clampf(t / 0.8, 0.0, 1.0)) if state == ENTER else 1.0
 	# it looks like you, inverted: a hollow disc with a solid notch
-	var col := Pal.ink(dim, 1.0 + 0.8 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
+	var col := Pal.foe(dim, 1.0 + 0.8 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
 	draw_arc(pos, R * appear, 0.0, TAU, 48, col, 3.0, false)
-	draw_arc(pos, R * 0.62 * appear, 0.0, TAU, 40, Pal.ink(0.35 * dim), 1.0, false)
+	draw_arc(pos, R * 0.62 * appear, 0.0, TAU, 40, Pal.foe(0.35 * dim), 1.0, false)
 	var a := aim.angle()
 	var notch := PackedVector2Array([pos + Vector2.from_angle(a - 0.32) * R * appear, pos + Vector2.from_angle(a) * R * 0.3 * appear, pos + Vector2.from_angle(a + 0.32) * R * appear])
 	draw_colored_polygon(notch, col)
@@ -294,4 +294,4 @@ func _draw() -> void:
 	for k in n:
 		var d2 := Vector2.from_angle(-PI / 2.0 + TAU * k / n)
 		var on := float(k) / n < 1.0 - left
-		draw_line(pos + d2 * (R + 6.0), pos + d2 * (R + 11.0), Pal.ink(0.7 if on else 0.15, 1.0), 1.5)
+		draw_line(pos + d2 * (R + 6.0), pos + d2 * (R + 11.0), Pal.foe(0.7 if on else 0.15, 1.0), 1.5)

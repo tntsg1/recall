@@ -293,8 +293,8 @@ static func _seg_rect(a: Vector2, b: Vector2, r: Rect2) -> Dictionary:
 
 func on_armor(k: int, at_p: Vector2, normal: Vector2) -> void:
 	car_flash[k] = 1.0
-	game.fx.sparks(at_p, normal, 5, Pal.ink(1.0, 1.9), 420.0, 0.2, 0.9)
-	game.fx.flash(at_p, 16.0, 0.08, Pal.ink(0.4, 1.4))
+	game.fx.sparks(at_p, normal, 5, Pal.foe(1.0, 1.9), 420.0, 0.2, 0.9)
+	game.fx.flash(at_p, 16.0, 0.08, Pal.foe(0.4, 1.4))
 	game.sfx.play("shield", randf_range(0.7, 0.85), -8.0)
 
 
@@ -313,7 +313,7 @@ func damage(dmg: float, ret: bool, at_p: Vector2, d: Vector2, frame_k: int = -1)
 	if ret:
 		core_red = 1.0
 	game.fx.number(at_p, dmg, ret)
-	var c := Pal.red(1.0, 3.2) if ret else Pal.ink(1.0, 1.8)
+	var c := Pal.red(1.0, 3.2) if ret else Pal.foe(1.0, 1.8)
 	game.fx.sparks(at_p, d, 8 if ret else 5, c, 560.0, 0.28, 0.8)
 	game.fx.flash(at_p, 34.0, 0.14, Color(c.r, c.g, c.b, 0.4))
 	game.on_target_hit(ret)
@@ -339,9 +339,9 @@ func _break(p: int) -> void:
 			var b: Vector2 = corners[(j + 1) % 4]
 			var mid := (a + b) * 0.5
 			var out := tr.basis_xform(mid).normalized()
-			game.fx.shard(tr * mid, tr.basis_xform(a - mid), tr.basis_xform(b - mid), out * randf_range(260, 420) + tangent(car_s(k)) * speed * dir * 0.5, randf_range(-8, 8), 1.1, Pal.ink(1.0, 1.5), 3.0)
-		game.fx.sparks(tr.origin, Vector2.UP, 18, Pal.ink(1.0, 1.9), 700.0, 0.45, PI)
-		game.fx.ring(tr.origin, 20.0, 160.0, 0.5, Pal.ink(0.9, 1.4), 2.5)
+			game.fx.shard(tr * mid, tr.basis_xform(a - mid), tr.basis_xform(b - mid), out * randf_range(260, 420) + tangent(car_s(k)) * speed * dir * 0.5, randf_range(-8, 8), 1.1, Pal.foe(1.0, 1.5), 3.0)
+		game.fx.sparks(tr.origin, Vector2.UP, 18, Pal.foe(1.0, 1.9), 700.0, 0.45, PI)
+		game.fx.ring(tr.origin, 20.0, 160.0, 0.5, Pal.foe(0.9, 1.4), 2.5)
 	# the shutters slam shut for a moment
 	core = CLOSED
 	core_t = -1.2
@@ -409,7 +409,7 @@ func _run(dt: float) -> void:
 				var k := randi() % CARS
 				if car_visible(k):
 					var p := at(car_s(k)) + tangent(car_s(k)).orthogonal() * randf_range(-18, 18)
-					game.fx.spark(p, -tangent(car_s(k)) * dir * randf_range(200, 400), 0.25, Pal.ink(1.0, 1.8), 1.2, 8.0)
+					game.fx.spark(p, -tangent(car_s(k)) * dir * randf_range(200, 400), 0.25, Pal.foe(1.0, 1.8), 1.2, 8.0)
 		elif reverse_t > 0.9:
 			speed = Pal.damp(speed, 0.0, 12.0, dt)
 		else:
@@ -482,10 +482,10 @@ func _burst(k: int, big: float) -> void:
 		var b: Vector2 = corners[(j + 1) % 4]
 		var mid := (a + b) * 0.5
 		var out := tr.basis_xform(mid).normalized()
-		game.fx.shard(tr * mid, tr.basis_xform(a - mid), tr.basis_xform(b - mid), out * randf_range(300, 520) * big, randf_range(-10, 10), 1.2, Pal.ink(1.0, 1.6), 2.5)
-	game.fx.sparks(tr.origin, Vector2.UP, int(16 * big), Pal.ink(1.0, 1.9), 800.0 * big, 0.5, PI)
-	game.fx.ring(tr.origin, 20.0, 180.0 * big, 0.55, Pal.ink(0.9, 1.5), 2.5)
-	game.fx.flash(tr.origin, 90.0 * big, 0.3, Pal.ink(0.5, 1.4))
+		game.fx.shard(tr * mid, tr.basis_xform(a - mid), tr.basis_xform(b - mid), out * randf_range(300, 520) * big, randf_range(-10, 10), 1.2, Pal.foe(1.0, 1.6), 2.5)
+	game.fx.sparks(tr.origin, Vector2.UP, int(16 * big), Pal.foe(1.0, 1.9), 800.0 * big, 0.5, PI)
+	game.fx.ring(tr.origin, 20.0, 180.0 * big, 0.55, Pal.foe(0.9, 1.5), 2.5)
+	game.fx.flash(tr.origin, 90.0 * big, 0.3, Pal.foe(0.5, 1.4))
 	game.sfx.play("die", randf_range(0.7, 0.8), 0.0)
 	game.cam.add_trauma(0.3 * big)
 	game.add_hitstop(0.05)
@@ -529,16 +529,16 @@ func _draw_rails() -> void:
 			ties.append(p - n * 19.0)
 		s += step_len
 	if inner.size() > 1:
-		rails.draw_polyline(inner, Pal.ink(0.28), 1.5, false)
-		rails.draw_polyline(outer, Pal.ink(0.28), 1.5, false)
+		rails.draw_polyline(inner, Pal.foe(0.28), 1.5, false)
+		rails.draw_polyline(outer, Pal.foe(0.28), 1.5, false)
 	if ties.size() > 0:
-		rails.draw_multiline(ties, Pal.ink(0.09), 3.0)
+		rails.draw_multiline(ties, Pal.foe(0.09), 3.0)
 	# the gate the train comes through
 	if track_draw >= 1.0:
 		var g := at(0.0)
 		var gn := tangent(0.0).orthogonal()
-		rails.draw_line(g + gn * 30.0, g + gn * 22.0, Pal.ink(0.7), 3.0)
-		rails.draw_line(g - gn * 30.0, g - gn * 22.0, Pal.ink(0.7), 3.0)
+		rails.draw_line(g + gn * 30.0, g + gn * 22.0, Pal.foe(0.7), 3.0)
+		rails.draw_line(g - gn * 30.0, g - gn * 22.0, Pal.foe(0.7), 3.0)
 
 
 func _draw() -> void:
@@ -557,35 +557,35 @@ func _draw() -> void:
 		if state == ENTER:
 			appear = Pal.ease_out(clampf(car_s(k) / 60.0, 0.0, 1.0))
 		draw_set_transform_matrix(tr)
-		var edge := Pal.ink(dim * appear, 1.0 + 0.8 * car_flash[k])
+		var edge := Pal.foe(dim * appear, 1.0 + 0.8 * car_flash[k])
 		if stripped[k]:
 			# a bare frame after the armour is gone
 			var st: float = strip_t[k]
 			var glow_k := maxf(0.0, 1.0 - st / 0.4)
-			draw_rect(r.grow(-4), Pal.ink(0.35 * dim * appear, 1.0 + 2.0 * glow_k), false, 1.0)
-			draw_line(r.position + Vector2(4, 4), r.end - Vector2(4, 4), Pal.ink(0.18 * dim), 1.0)
-			draw_line(Vector2(r.position.x + 4, r.end.y - 4), Vector2(r.end.x - 4, r.position.y + 4), Pal.ink(0.18 * dim), 1.0)
+			draw_rect(r.grow(-4), Pal.foe(0.35 * dim * appear, 1.0 + 2.0 * glow_k), false, 1.0)
+			draw_line(r.position + Vector2(4, 4), r.end - Vector2(4, 4), Pal.foe(0.18 * dim), 1.0)
+			draw_line(Vector2(r.position.x + 4, r.end.y - 4), Vector2(r.end.x - 4, r.position.y + 4), Pal.foe(0.18 * dim), 1.0)
 		else:
 			draw_rect(r, Color(0.06, 0.06, 0.065, appear))
 			draw_rect(r, edge, false, 2.0)
-			draw_rect(r.grow(-5), Pal.ink(0.16 * dim * appear), false, 1.0)
+			draw_rect(r.grow(-5), Pal.foe(0.16 * dim * appear), false, 1.0)
 			# armour seams and windows
 			var n := 3 if k > 0 else 2
 			for j in n:
 				var x := lerpf(r.position.x + 12.0, r.end.x - 12.0, (j + 0.5) / n)
-				draw_rect(Rect2(x - 5.0, -4.0, 10.0, 8.0), Pal.ink(0.22 * dim * appear), false, 1.0)
+				draw_rect(Rect2(x - 5.0, -4.0, 10.0, 8.0), Pal.foe(0.22 * dim * appear), false, 1.0)
 		if k == 0:
 			# the engine's nose and headlight, pointing the way it runs
 			var front := r.end.x if dir > 0.0 else r.position.x
 			var sgn := 1.0 if dir > 0.0 else -1.0
-			draw_colored_polygon(PackedVector2Array([Vector2(r.end.x, -sz.y / 2.0), Vector2(r.end.x + 14.0, 0), Vector2(r.end.x, sz.y / 2.0)]), Pal.ink(0.9 * dim * appear))
+			draw_colored_polygon(PackedVector2Array([Vector2(r.end.x, -sz.y / 2.0), Vector2(r.end.x + 14.0, 0), Vector2(r.end.x, sz.y / 2.0)]), Pal.foe(0.9 * dim * appear))
 			if horn_t >= 0.0 and int(horn_t * 8.0) % 2 == 0:
-				draw_circle(Vector2(front + sgn * 4.0, 0), 5.0, Pal.ink(1.0, 2.6))
+				draw_circle(Vector2(front + sgn * 4.0, 0), 5.0, Pal.foe(1.0, 2.6))
 		if k == CARS - 1:
 			_draw_core(r, dim * appear)
 		# couplings
 		if k > 0 and car_visible(k - 1):
-			draw_line(Vector2(r.end.x, 0), Vector2(r.end.x + (SPACING - (car_size(k).x + car_size(k - 1).x) / 2.0), 0), Pal.ink(0.5 * dim), 2.0)
+			draw_line(Vector2(r.end.x, 0), Vector2(r.end.x + (SPACING - (car_size(k).x + car_size(k - 1).x) / 2.0), 0), Pal.foe(0.5 * dim), 2.0)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# the lane ahead lights up while it brakes to reverse
 	if state == RUN and reverse_t > 0.0:
@@ -596,7 +596,7 @@ func _draw() -> void:
 			var s0 := lead_s - dir * (i * 26.0)
 			segs.append(at(s0))
 			segs.append(at(s0 - dir * 13.0))
-		draw_multiline(segs, Pal.ink(0.35 + 0.3 * sin(t * 20.0)), 2.0)
+		draw_multiline(segs, Pal.foe(0.35 + 0.3 * sin(t * 20.0)), 2.0)
 
 
 func _draw_core(r: Rect2, a: float) -> void:
@@ -605,17 +605,17 @@ func _draw_core(r: Rect2, a: float) -> void:
 	if core == WARN:
 		warn = 0.5 + 0.5 * sin(core_t * 50.0)
 	# the core: a white hexagon that glows hot when open, red after a recall hit
-	var cc := Pal.ink(a, 1.1 + 0.7 * o + 0.6 * core_flash).lerp(Pal.red(a, 2.2), core_red * 0.9)
+	var cc := Pal.foe(a, 1.1 + 0.7 * o + 0.6 * core_flash).lerp(Pal.red(a, 2.2), core_red * 0.9)
 	var hex := PackedVector2Array()
 	for j in 6:
 		hex.append(Vector2.from_angle(TAU * j / 6.0 + game.real_time * (0.6 + 2.0 * o)) * CORE_R * (0.55 + 0.45 * o))
 	draw_colored_polygon(hex, cc)
 	if o > 0.05:
-		draw_arc(Vector2.ZERO, CORE_R + 4.0 + 3.0 * sin(game.real_time * 9.0), 0.0, TAU, 28, Pal.ink(0.6 * o * a, 1.5), 1.5, false)
+		draw_arc(Vector2.ZERO, CORE_R + 4.0 + 3.0 * sin(game.real_time * 9.0), 0.0, TAU, 28, Pal.foe(0.6 * o * a, 1.5), 1.5, false)
 	# shutters: two plates that slide apart along the car
 	var gap := o * (r.size.x / 2.0 - 4.0)
 	var plate_w := r.size.x / 2.0 - 2.0
-	var pc := Pal.ink(a, 1.0 + warn * 0.8)
+	var pc := Pal.foe(a, 1.0 + warn * 0.8)
 	var left := Rect2(Vector2(-plate_w - gap, -r.size.y / 2.0 + 3.0), Vector2(plate_w, r.size.y - 6.0))
 	var right := Rect2(Vector2(gap, -r.size.y / 2.0 + 3.0), Vector2(plate_w, r.size.y - 6.0))
 	for pr: Rect2 in [left, right]:

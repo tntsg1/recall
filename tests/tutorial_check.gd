@@ -2,7 +2,7 @@ extends SceneTree
 
 var fails := 0
 var game
-var bot := {"move": Vector2.ZERO, "aim": Vector2(1840, 800), "fire": false, "focus": false, "dash": false}
+var bot := {"move": Vector2.ZERO, "aim": Vector2(1840, 800), "fire": false, "focus": false, "dash": false, "possess": false}
 var visual := false
 var captured := {}
 
@@ -77,7 +77,9 @@ func run() -> void:
 	var early_done := false
 	var short_hold := 0
 	var last_stage := -1
-	for frame in 1800:
+	var pstep := 0
+	var pt := 0
+	for frame in 3600:
 		var t = game.tutorial
 		if t.stage != last_stage:
 			print("STAGE ", t.stage)
@@ -87,6 +89,7 @@ func run() -> void:
 		bot.fire = false
 		bot.focus = false
 		bot.dash = false
+		bot.possess = false
 		match t.stage:
 			TutorialGate.MOVE:
 				bot.move = (TutorialGate.GOAL - game.player.pos).normalized()
@@ -102,13 +105,48 @@ func run() -> void:
 					bot.focus = true
 			TutorialGate.DASH:
 				bot.dash = not t.dashed
+			TutorialGate.POSSESS:
+				# shoot through the target into the wall, recall, seize it, break the others
+				pt += 1
+				var hd = t.host_dummy
+				match pstep:
+					0:
+						bot.aim = hd.pos + (hd.pos - game.player.pos).normalized() * 400.0
+						if pt > 20:
+							bot.fire = true
+						if game.bullets.count_state(Bullets.EMBED) > 0:
+							pstep = 1
+							pt = 0
+					1:
+						bot.focus = pt < 30
+						if game.possess.marks.has(hd.id):
+							pstep = 2
+							pt = 0
+						elif pt > 200:
+							pstep = 0
+							pt = 0
+					2:
+						bot.possess = pt < 3
+						if game.possess.hosting():
+							pstep = 3
+							pt = 0
+					3:
+						var near = null
+						for td in t.targets:
+							if td.state == Enemies.ALIVE:
+								near = td
+								break
+						if near != null:
+							bot.aim = near.pos
+							bot.move = (near.pos - game.player.pos).normalized() if near.pos.distance_to(game.player.pos) > 120.0 else Vector2.ZERO
+						bot.fire = pt % 12 < 2
 			TutorialGate.COMPLETE:
 				break
 		await process_frame
 	var t = game.tutorial
 	print("TRAINING END stage=", t.stage, " hit=", t.return_hit, " arrived=", t.returned, " focus=", game.focusing, " ammo=", game.ammo, " embed=", game.bullets.count_state(Bullets.EMBED), " active=", game.bullets.recall_active(), " dummy=", t.dummy.hp if t.dummy != null else -1)
 	check(early_done and t.retry_note, "releasing too early offers a recoverable retry")
-	check(t.stage == TutorialGate.COMPLETE, "real move/fire/embed/preview/return/dash sequence completes")
+	check(t.stage == TutorialGate.COMPLETE, "real move/fire/embed/preview/return/dash/seize sequence completes")
 	check(t.return_hit and t.returned, "real return round hits target and reaches magazine")
 	check(t.dashed, "actual successful dash required")
 	check(game.wave_ctl.index == 0 and not game.picking, "random waves and card rewards stay out of training")

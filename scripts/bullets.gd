@@ -253,7 +253,7 @@ func drop(b: B) -> void:
 	b.path = PackedVector2Array([b.pos - b.dir * 2.0, b.pos])
 	b.cum = PackedFloat32Array([0.0, 2.0])
 	b.bounces = 0
-	game.fx.flash(b.pos, 16.0, 0.12, Pal.ink(0.6, 1.5))
+	game.fx.flash(b.pos, 16.0, 0.12, Pal.you(0.6, 1.5))
 
 
 # Straight home (Recall Order, Leech Ward).
@@ -413,9 +413,9 @@ func split(b: B, at: Vector2, dir: Vector2, s_at: float) -> void:
 		list.append(c)
 	# a crowded screen keeps the split mark small
 	if list.size() < 250:
-		game.fx.sparks(at, dir, 4, Pal.ink(1.0, 1.8), 300.0, 0.15, 0.6)
+		game.fx.sparks(at, dir, 4, Pal.you(1.0, 1.8), 300.0, 0.15, 0.6)
 	else:
-		game.fx.flash(at, 12.0, 0.08, Pal.ink(0.5, 1.4))
+		game.fx.flash(at, 12.0, 0.08, Pal.you(0.5, 1.4))
 	game.sfx.play("split", randf_range(0.95, 1.15), -10.0)
 
 
@@ -486,7 +486,7 @@ func recall(from: Vector2) -> int:
 		b.crit = game.has("critical") and life_max - b.life <= 3.0
 		if b.crit:
 			b.dmg *= 2.0
-			game.fx.flash(b.pos, 30.0, 0.25, Pal.ink(0.8, 2.2))
+			game.fx.flash(b.pos, 30.0, 0.25, Pal.you(0.8, 2.2))
 			game.sfx.play("crit", randf_range(0.95, 1.1), -6.0)
 	_shadows(c, gap)
 	return n
@@ -551,7 +551,7 @@ func step(dt: float, real_dt: float) -> void:
 					b.settled = false
 					b.state = FADE
 					b.t = 0.0
-					game.fx.ring(b.pos, 4.0, 18.0, 0.4, Pal.ink(0.35), 1.0)
+					game.fx.ring(b.pos, 4.0, 18.0, 0.4, Pal.you(0.35), 1.0)
 					if not b.child:
 						game.sfx.play("expire", 1.0, -12.0)
 						game.queue_regen()
@@ -647,7 +647,7 @@ func _fly(b: B, dt: float) -> void:
 			b.t = 0.0
 			b.life = 0.0
 			b.zlight = 0.0
-			game.fx.sparks(hw.point, hw.normal, 3, Pal.ink(0.6, 1.2), 240.0, 0.15, 0.8)
+			game.fx.sparks(hw.point, hw.normal, 3, Pal.you(0.6, 1.2), 240.0, 0.15, 0.8)
 		else:
 			b.pos = to
 			b.set_head(to)
@@ -698,8 +698,8 @@ func _fly(b: B, dt: float) -> void:
 	if h and h.mirror and b.path.size() < 12:
 		# mirror panels turn rounds away without using up a ricochet
 		_bend(b, h.point, b.dir.bounce(h.normal), h.normal)
-		game.fx.sparks(h.point, h.normal, 3, Pal.ink(1.0, 2.0), 320.0, 0.14, 0.7)
-		game.fx.flash(h.point, 18.0, 0.1, Pal.ink(0.6, 1.8))
+		game.fx.sparks(h.point, h.normal, 3, Pal.you(1.0, 2.0), 320.0, 0.14, 0.7)
+		game.fx.flash(h.point, 18.0, 0.1, Pal.you(0.6, 1.8))
 		game.sfx.play("shield", randf_range(1.4, 1.6), -12.0)
 		return
 	if h:
@@ -714,8 +714,8 @@ func _fly(b: B, dt: float) -> void:
 			b.path.append(b.pos)
 			b.cum.append(b.cum[b.cum.size() - 1])
 			b.set_head(b.pos)
-			game.fx.sparks(h.point, h.normal, 4, Pal.ink(1.0, 1.7), 300.0, 0.16, 0.8)
-			game.fx.flash(h.point, 16.0, 0.08, Pal.ink(0.5, 1.4))
+			game.fx.sparks(h.point, h.normal, 4, Pal.you(1.0, 1.7), 300.0, 0.16, 0.8)
+			game.fx.flash(h.point, 16.0, 0.08, Pal.you(0.5, 1.4))
 			game.sfx.play("embed", randf_range(1.3, 1.5), -14.0)
 			if game.lv.bounce >= 3 and game.lv.split >= 1:
 				split(b, b.pos, b.dir, b.total())
@@ -877,18 +877,18 @@ func _head(b: B) -> Array:
 	var t: float = game.real_time
 	match b.state:
 		FLY:
-			return [b.pos - b.dir * 8.0, b.dir, 22.0, 3.6, Pal.ink(1.0, 1.9)]
+			return [b.pos - b.dir * 8.0, b.dir, 22.0, 3.6, Pal.you(1.0, 1.9)]
 		EMBED when b.foe:
 			var zl := 0.5 + 0.5 * sin(game.real_time * 20.0) if b.zlight > 0.0 else 0.0
-			return [b.pos - b.dir * 6.0, b.dir, 16.0, 3.0, Pal.ink(0.45 + 0.55 * zl, 1.0 + 1.2 * zl).lerp(Pal.red(1.0, 2.8), b.light)]
+			return [b.pos - b.dir * 6.0, b.dir, 16.0, 3.0, Pal.foe(0.45 + 0.55 * zl, 1.0 + 1.2 * zl).lerp(Pal.red(1.0, 2.8), b.light)]
 		RETURN when b.zero_pass:
-			return [b.pos - b.dir * 10.0, b.dir, 30.0, 4.4, Pal.ink(1.0, 3.0)]
+			return [b.pos - b.dir * 10.0, b.dir, 30.0, 4.4, Pal.you(1.0, 3.0)]
 		EMBED:
 			var settle := Pal.back(b.t / 0.22, 2.6)
 			var sink := lerpf(-8.0, 3.0, settle)
 			var wob := sin(b.t * 70.0) * exp(-b.t * 14.0) * 2.4
 			var breath := 0.5 + 0.5 * sin(t * 2.4 + b.seed)
-			var c := Pal.ink(1.0, 1.0 + 0.3 * breath)
+			var c := Pal.you(1.0, 1.0 + 0.3 * breath)
 			if b.light > 0.0:
 				c = c.lerp(Pal.red(1.0, 2.8 + 0.6 * breath), Pal.ease_out(b.light))
 			var rem := life_max - b.life
@@ -903,16 +903,16 @@ func _head(b: B) -> Array:
 		RETURN:
 			return [b.pos - b.dir * 10.0, b.dir, 36.0 if b.crit else 30.0, 5.4 if b.crit else 4.4, Pal.red(1.0, 6.0 if b.crit else 4.5)]
 		CAPTURED:
-			return [b.pos, b.dir, 12.0, 2.6, Pal.ink(0.75, 1.2)]
+			return [b.pos, b.dir, 12.0, 2.6, Pal.you(0.75, 1.2)]
 		ORBIT:
 			var fade := clampf(b.orbit_left / 0.3, 0.0, 1.0)
 			return [b.pos - b.dir * 6.0, b.dir, 16.0, 3.0, Pal.red(0.6 + 0.4 * fade, 2.6)]
 		HOME:
 			var f := clampf(b.t / b.home_dur, 0.0, 1.0)
-			return [b.pos, b.dir, lerpf(16.0, 8.0, f), lerpf(3.0, 2.2, f), Pal.red(1.0, 3.0).lerp(Pal.ink(1.0, 2.0), f)]
+			return [b.pos, b.dir, lerpf(16.0, 8.0, f), lerpf(3.0, 2.2, f), Pal.red(1.0, 3.0).lerp(Pal.you(1.0, 2.0), f)]
 		_:
 			var f2 := clampf(b.t / 0.35, 0.0, 1.0)
-			return [b.pos - b.dir * 8.0, b.dir, 18.0 * (1.0 - f2 * 0.6), 3.0 * (1.0 - f2), Pal.ink(1.0 - f2)]
+			return [b.pos - b.dir * 8.0, b.dir, 18.0 * (1.0 - f2 * 0.6), 3.0 * (1.0 - f2), Pal.you(1.0 - f2)]
 
 
 var _buf := PackedFloat32Array()
@@ -963,13 +963,13 @@ func _draw() -> void:
 				var n := b.path.size()
 				# straight leg (the usual case): no path walk needed
 				if b.pos.distance_to(b.path[n - 2]) >= tl:
-					_trail(0, PackedVector2Array([b.pos, b.pos - b.dir * tl]), Pal.ink(0.55, 1.4))
+					_trail(0, PackedVector2Array([b.pos, b.pos - b.dir * tl]), Pal.you(0.55, 1.4))
 				else:
 					var s := b.total()
-					_trail(0, b.sub(s, maxf(0.0, s - tl)), Pal.ink(0.55, 1.4))
+					_trail(0, b.sub(s, maxf(0.0, s - tl)), Pal.you(0.55, 1.4))
 			RETURN:
 				var s2 := b.s
-				var tc := Pal.ink(0.9, 2.4) if b.zero_pass else (Pal.ink(0.35, 1.2) if b.shadow else Pal.red(0.85, 3.2))
+				var tc := Pal.you(0.9, 2.4) if b.zero_pass else (Pal.you(0.35, 1.2) if b.shadow else Pal.red(0.85, 3.2))
 				_trail(1, b.sub(s2, minf(b.total(), s2 + 240.0)), tc)
 			HOME, ORBIT:
 				if b.hist.size() > 1:
@@ -1030,7 +1030,7 @@ func _draw_faint() -> void:
 			seen[key] = true
 			segs.append_array(_circle_segs(b.path[0], 3.0, 10))
 	if segs.size() > 0:
-		faint.draw_multiline(segs, Pal.ink(0.085), -1.0)
+		faint.draw_multiline(segs, Pal.you(0.085), -1.0)
 
 
 func _circle_segs(o: Vector2, r: float, n: int, a0: float = 0.0, a1: float = TAU) -> PackedVector2Array:
@@ -1080,11 +1080,11 @@ func _draw_paths() -> void:
 		var tg: Vector2 = sc[1].orthogonal()
 		_sw.append(p - tg * 4.0)
 		_sw.append(p + tg * 4.0)
-		_cw.append(Pal.ink(0.2 * a))
+		_cw.append(Pal.you(0.2 * a))
 	for b in list:
 		if b.state == EMBED and b.foe and b.zlight > 0.0:
 			# Zero is about to call it: its whole way back flickers
-			_poly_w(b.path, Pal.ink(0.5 + 0.4 * sin(game.real_time * 24.0), 1.6))
+			_poly_w(b.path, Pal.you(0.5 + 0.4 * sin(game.real_time * 24.0), 1.6))
 		if b.state == EMBED:
 			var rem := life_max - b.life
 			if b.light > 0.0:
@@ -1106,11 +1106,11 @@ func _draw_paths() -> void:
 			elif not b.settled:
 				var appear := Pal.ease_out(b.t / 0.5)
 				var fade := clampf(rem, 0.0, 1.0)
-				_poly_w(b.path, Pal.ink(0.085 * appear * fade))
-				_circle_w(b.path[0], 3.0, 10, Pal.ink(0.16 * appear * fade))
+				_poly_w(b.path, Pal.you(0.085 * appear * fade))
+				_circle_w(b.path[0], 3.0, 10, Pal.you(0.16 * appear * fade))
 			if b.light <= 0.0 and rem < WARN:
 				var k := 1.0 - rem / WARN
-				_circle_w(b.pos - b.dir * 8.0, 11.0, 14, Pal.ink(0.45), -PI / 2.0, -PI / 2.0 + TAU * (1.0 - k))
+				_circle_w(b.pos - b.dir * 8.0, 11.0, 14, Pal.you(0.45), -PI / 2.0, -PI / 2.0 + TAU * (1.0 - k))
 		elif b.state == PULL or b.state == RETURN:
 			var upto := b.s if b.state == RETURN else b.total()
 			if upto > 0.0:
@@ -1154,6 +1154,6 @@ func _draw_glow() -> void:
 		elif b.state == EMBED:
 			var p2 := b.pos - b.dir * 9.0
 			var k2 := Pal.ease_out(b.t / 0.3) * clampf((life_max - b.life) / 1.0, 0.0, 1.0)
-			glow.draw_texture_rect(glow_tex, Rect2(p2 - Vector2(13, 13), Vector2(26, 26)), false, Pal.ink(0.16 * k2))
+			glow.draw_texture_rect(glow_tex, Rect2(p2 - Vector2(13, 13), Vector2(26, 26)), false, Pal.you(0.16 * k2))
 		elif b.state == FLY:
-			glow.draw_texture_rect(glow_tex, Rect2(b.pos - Vector2(14, 14), Vector2(28, 28)), false, Pal.ink(0.18))
+			glow.draw_texture_rect(glow_tex, Rect2(b.pos - Vector2(14, 14), Vector2(28, 28)), false, Pal.you(0.18))

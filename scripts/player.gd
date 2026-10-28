@@ -116,9 +116,9 @@ func shatter() -> void:
 		var p0 := Vector2.from_angle(a) * R
 		var p1 := Vector2.from_angle(a + TAU / 8.0) * R
 		var mid := (p0 + p1) * 0.5
-		game.fx.shard(pos + mid, p0 - mid, p1 - mid, mid.normalized() * randf_range(160, 320), randf_range(-8, 8), 1.6, Pal.ink(1.0, 1.6), 2.5)
-	game.fx.ring(pos, 6.0, 260.0, 0.9, Pal.ink(1.0, 1.6), 3.0)
-	game.fx.flash(pos, 160.0, 0.5, Pal.ink(0.6, 1.4))
+		game.fx.shard(pos + mid, p0 - mid, p1 - mid, mid.normalized() * randf_range(160, 320), randf_range(-8, 8), 1.6, Pal.you(1.0, 1.6), 2.5)
+	game.fx.ring(pos, 6.0, 260.0, 0.9, Pal.you(1.0, 1.6), 3.0)
+	game.fx.flash(pos, 160.0, 0.5, Pal.you(0.6, 1.4))
 
 
 func kick() -> void:
@@ -143,7 +143,7 @@ func _draw() -> void:
 	var f: float = game.focus
 	for g in ghosts:
 		var k: float = 1.0 - g[1] / 0.28
-		draw_arc(g[0] - pos, R * (0.8 + 0.2 * k), 0.0, TAU, 28, Pal.ink(0.32 * k * k), 1.5, false)
+		draw_arc(g[0] - pos, R * (0.8 + 0.2 * k), 0.0, TAU, 28, Pal.you(0.32 * k * k), 1.5, false)
 	var speed := vel.length()
 	var stretch := clampf(speed / DASH_SPEED, 0.0, 1.0) * 0.45 + clampf(speed / SPEED, 0.0, 1.0) * 0.06
 	var vdir := vel.normalized() if speed > 1.0 else aim
@@ -153,7 +153,7 @@ func _draw() -> void:
 	if invuln > 0.0:
 		vis = 0.45 + 0.55 * (0.5 + 0.5 * cos(invuln * 34.0))
 	draw_set_transform(body_off, vdir.angle(), Vector2(1.0 + stretch, 1.0 - stretch * 0.6))
-	draw_circle(Vector2.ZERO, R, Pal.ink(vis, 1.15 + 0.8 * hurt_t))
+	draw_circle(Vector2.ZERO, R, Pal.you(vis, 1.15 + 0.8 * hurt_t))
 	if hurt_t > 0.0:
 		for c in cracks:
 			draw_polyline(PackedVector2Array([c[0], c[1], c[2]]), Color(Pal.BG, hurt_t), 1.6, false)
@@ -161,7 +161,7 @@ func _draw() -> void:
 	# the notch: a dark bite out of the rim facing the aim
 	var notch := PackedVector2Array([Vector2(R + 1.0, -5.0), Vector2(R * 0.38, 0.0), Vector2(R + 1.0, 5.0)])
 	draw_colored_polygon(notch, Pal.BG)
-	draw_line(Vector2(R + 5.0, 0), Vector2(R + 11.0 - recoil * 3.0, 0), Pal.ink(0.55), 1.5)
+	draw_line(Vector2(R + 5.0, 0), Vector2(R + 11.0 - recoil * 3.0, 0), Pal.you(0.55), 1.5)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# magazine ring
 	var full := int(round(shown))
@@ -172,11 +172,11 @@ func _draw() -> void:
 		var r0 := 22.0 + pop * 3.0
 		var tl := 4.0 + pop * 3.0
 		var on := k < full
-		var c := Pal.ink(0.62 if on else 0.1)
+		var c := Pal.you(0.62 if on else 0.1)
 		if tick_red[k] > 0.0:
 			c = c.lerp(Pal.red(1.0, 3.0), tick_red[k])
 		if empty_pulse > 0.0 and not on:
-			c = c.lerp(Pal.ink(0.6), empty_pulse)
+			c = c.lerp(Pal.you(0.6), empty_pulse)
 		var d := Vector2.from_angle(a)
 		draw_line(d * r0, d * (r0 + tl), c, 1.6 + pop)
 	if game.focusing or f > 0.02:

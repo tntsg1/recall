@@ -154,15 +154,15 @@ func prism_hit(a: Vector2, b: Vector2, bullet) -> Dictionary:
 
 func on_prism(e: E, at: Vector2) -> void:
 	e.shield_flash = 1.0
-	game.fx.sparks(at, Vector2.from_angle(e.rot), 5, Pal.ink(1.0, 2.0), 360.0, 0.2, PI)
+	game.fx.sparks(at, Vector2.from_angle(e.rot), 5, Pal.foe(1.0, 2.0), 360.0, 0.2, PI)
 	game.sfx.play("cross", randf_range(1.2, 1.4), -10.0)
 
 
 func on_shield(e: E, at: Vector2, dir: Vector2, ret: bool) -> void:
 	e.shield_flash = 1.0
 	e.knock += -e.face * (70.0 if ret else 40.0)
-	game.fx.sparks(at, e.face, 6, Pal.ink(1.0, 1.9), 420.0, 0.22, 0.9)
-	game.fx.flash(at, 18.0, 0.1, Pal.ink(0.35, 1.3))
+	game.fx.sparks(at, e.face, 6, Pal.foe(1.0, 1.9), 420.0, 0.22, 0.9)
+	game.fx.flash(at, 18.0, 0.1, Pal.foe(0.35, 1.3))
 	game.sfx.play("shield", randf_range(0.92, 1.1), -6.0)
 	game.cam.add_trauma(0.03)
 
@@ -252,11 +252,11 @@ func _hit(e: E, dmg: float, dir: Vector2, at: Vector2, ret: bool) -> void:
 			var mid := (pts[k] + pts[k + 1]) * 0.5
 			var wm := tr * mid
 			var out := (wm - e.pos).normalized()
-			game.fx.shard(wm, (pts[k] - mid) * 0.45, (pts[k + 1] - mid) * 0.45, out * randf_range(140, 220) + dir * 160.0, randf_range(-10, 10), 0.55, Pal.ink(0.9, 1.3), 2.0)
+			game.fx.shard(wm, (pts[k] - mid) * 0.45, (pts[k + 1] - mid) * 0.45, out * randf_range(140, 220) + dir * 160.0, randf_range(-10, 10), 0.55, Pal.foe(0.9, 1.3), 2.0)
 	game.fx.number(at, dmg, ret)
-	var c := Pal.red(1.0, 3.2) if ret else Pal.ink(1.0, 1.8)
+	var c := Pal.red(1.0, 3.2) if ret else Pal.foe(1.0, 1.8)
 	game.fx.sparks(at, dir, 7 if ret else 4, c, 520.0 if ret else 380.0, 0.26, 0.7)
-	game.fx.sparks(at, -dir, 2, Pal.ink(0.8, 1.4), 200.0, 0.2, 1.2)
+	game.fx.sparks(at, -dir, 2, Pal.foe(0.8, 1.4), 200.0, 0.2, 1.2)
 	game.fx.flash(at, 30.0 if ret else 22.0, 0.14, Color(c.r, c.g, c.b, 0.35))
 	game.on_target_hit(ret)
 	if e.hp <= 0.0:
@@ -336,7 +336,7 @@ func _die(e: E, dir: Vector2) -> void:
 			game.bullets.drop(b)
 		game.sfx.play("mend", 1.3, -6.0)
 	var tr := Transform2D(e.rot, e.pos)
-	var col := Pal.ink(1.0, 1.6).lerp(Pal.red(1.0, 2.6), e.red)
+	var col := Pal.foe(1.0, 1.6).lerp(Pal.red(1.0, 2.6), e.red)
 	var pts := _poly(e)
 	for k in e.sides:
 		var a := pts[k]
@@ -350,9 +350,9 @@ func _die(e: E, dir: Vector2) -> void:
 			var a2 := Vector2.from_angle(lerpf(-SHIELD_HALF, SHIELD_HALF, k / 3.0) + e.face.angle()) * SHIELD_R
 			var b2 := Vector2.from_angle(lerpf(-SHIELD_HALF, SHIELD_HALF, (k + 1) / 3.0) + e.face.angle()) * SHIELD_R
 			var m2 := (a2 + b2) * 0.5
-			game.fx.shard(e.pos + m2, a2 - m2, b2 - m2, m2.normalized() * randf_range(200, 300) + dir * 200.0, randf_range(-8, 8), 0.8, Pal.ink(1.0, 1.4), 4.0)
+			game.fx.shard(e.pos + m2, a2 - m2, b2 - m2, m2.normalized() * randf_range(200, 300) + dir * 200.0, randf_range(-8, 8), 0.8, Pal.foe(1.0, 1.4), 4.0)
 	game.fx.ring(e.pos, e.r * 0.6, e.r * 4.0, 0.45, col, 2.0)
-	game.fx.ring(e.pos, e.r * 0.3, e.r * 2.2, 0.3, Pal.ink(0.6), 1.0)
+	game.fx.ring(e.pos, e.r * 0.3, e.r * 2.2, 0.3, Pal.foe(0.6), 1.0)
 	game.fx.flash(e.pos, e.r * 3.0, 0.26, Color(col.r, col.g, col.b, 0.4))
 	game.fx.sparks(e.pos, dir, 10 + e.sides * 2, col, 700.0, 0.4, 1.3)
 	game.on_target_die(e.pos, e.kind)
@@ -398,8 +398,8 @@ func step(dt: float) -> void:
 				if e.t >= SPAWN_TIME:
 					e.state = ALIVE
 					e.t = 0.0
-					game.fx.ring(e.pos, e.r, e.r * 2.0, 0.35, Pal.ink(0.7, 1.3), 1.5)
-					game.fx.flash(e.pos, e.r * 2.5, 0.2, Pal.ink(0.5, 1.2))
+					game.fx.ring(e.pos, e.r, e.r * 2.0, 0.35, Pal.foe(0.7, 1.3), 1.5)
+					game.fx.flash(e.pos, e.r * 2.5, 0.2, Pal.foe(0.5, 1.2))
 			ALIVE:
 				match e.kind:
 					PRISM:
@@ -523,7 +523,7 @@ func _leech(e: E, pl: Vector2, dt: float) -> void:
 		want = (target.pos - e.pos).normalized()
 		if td < e.r + 10.0:
 			game.bullets.capture(target, e.grip)
-			game.fx.flash(target.pos, 20.0, 0.12, Pal.ink(0.5, 1.4))
+			game.fx.flash(target.pos, 20.0, 0.12, Pal.foe(0.5, 1.4))
 			game.sfx.play("lit", 0.7, -10.0)
 	else:
 		# full, or nothing to take: keep away from you
@@ -640,7 +640,7 @@ func _charger(e: E, pl: Vector2, dt: float) -> void:
 				e.mode_t = 0.0
 				e.vel = e.dash_dir * DASH_SPEED
 				game.sfx.play("dash_e", randf_range(0.95, 1.05), -4.0)
-				game.fx.ring(e.pos, e.r, e.r * 2.5, 0.25, Pal.ink(0.6), 1.5)
+				game.fx.ring(e.pos, e.r, e.r * 2.5, 0.25, Pal.foe(0.6), 1.5)
 		DASH:
 			e.vel = e.dash_dir * DASH_SPEED * lerpf(1.0, 0.7, clampf(e.mode_t / 0.6, 0.0, 1.0))
 			if int(e.mode_t * 60.0) % 2 == 0:
@@ -669,8 +669,8 @@ func _slam(e: E) -> void:
 	e.squash = 1.0
 	e.squash_dir = e.dash_dir
 	var at := e.pos + e.dash_dir * e.r
-	game.fx.sparks(at, -e.dash_dir, 12, Pal.ink(1.0, 1.8), 520.0, 0.3, 1.2)
-	game.fx.ring(at, 6.0, 46.0, 0.35, Pal.ink(0.8), 1.5)
+	game.fx.sparks(at, -e.dash_dir, 12, Pal.foe(1.0, 1.8), 520.0, 0.3, 1.2)
+	game.fx.ring(at, 6.0, 46.0, 0.35, Pal.foe(0.8), 1.5)
 	game.sfx.play("slam", randf_range(0.95, 1.05), -4.0)
 	game.cam.add_trauma(0.16)
 
@@ -749,12 +749,12 @@ func _draw() -> void:
 		var basis := Transform2D(sd.angle(), Vector2.ZERO)
 		var sc := Transform2D(Vector2(1.0 - sq, 0), Vector2(0, 1.0 + sq * 0.7), Vector2.ZERO)
 		var tr := Transform2D(0.0, e.pos + shake) * basis * sc * basis.affine_inverse() * Transform2D(e.rot, Vector2.ZERO) * Transform2D(Vector2(extra, 0), Vector2(0, 1.0 / maxf(extra, 0.5)), Vector2.ZERO)
-		var col := Pal.ink(dim).lerp(Pal.red(dim, 2.4), e.red * 0.85)
+		var col := Pal.foe(dim).lerp(Pal.red(dim, 2.4), e.red * 0.85)
 		for g in e.ghosts:
 			var gk: float = 1.0 - g[1] / 0.25
 			var gt := Transform2D(g[2], g[0])
 			for k in pts.size() - 1:
-				draw_line(gt * pts[k], gt * pts[k + 1], Pal.ink(0.3 * gk * gk), 1.5)
+				draw_line(gt * pts[k], gt * pts[k + 1], Pal.foe(0.3 * gk * gk), 1.5)
 		if e.state == SPAWN:
 			for k in e.sides:
 				var kk := Pal.back(clampf((e.t - k * 0.06) / 0.42, 0.0, 1.0), 2.0)
@@ -762,7 +762,7 @@ func _draw() -> void:
 				var off: Vector2 = o[0] * (1.0 - kk)
 				var lt := Transform2D(float(o[1]) * (1.0 - kk), Vector2.ZERO)
 				var mid := (pts[k] + pts[k + 1]) * 0.5
-				draw_line(tr * (mid + off + lt * (pts[k] - mid)), tr * (mid + off + lt * (pts[k + 1] - mid)), Pal.ink(clampf(kk * 1.4, 0.0, 1.0) * dim), 2.0)
+				draw_line(tr * (mid + off + lt * (pts[k] - mid)), tr * (mid + off + lt * (pts[k + 1] - mid)), Pal.foe(clampf(kk * 1.4, 0.0, 1.0) * dim), 2.0)
 			var core := Pal.ease_out(clampf((e.t - 0.4) / 0.35, 0.0, 1.0))
 			if core > 0.0:
 				_core(e, tr, core, col)
@@ -778,8 +778,8 @@ func _draw() -> void:
 			else:
 				var m := (a + b) * 0.5
 				var out := (m - e.pos).normalized() * 2.5
-				draw_line(a, a.lerp(m, 0.62) + out, Pal.ink(0.42 * dim), 1.5)
-				draw_line(b, b.lerp(m, 0.55) + out * 0.6, Pal.ink(0.42 * dim), 1.5)
+				draw_line(a, a.lerp(m, 0.62) + out, Pal.foe(0.42 * dim), 1.5)
+				draw_line(b, b.lerp(m, 0.55) + out * 0.6, Pal.foe(0.42 * dim), 1.5)
 		_core(e, tr, 1.0, col)
 		if e.kind == GUARD:
 			_draw_shield(e, dim, 1.0)
@@ -788,21 +788,21 @@ func _draw() -> void:
 			for k in 3:
 				var ta := e.rot + PI + (k - 1) * 0.5
 				var tl := e.r + 10.0 + 6.0 * sin(e.t * 8.0 + k)
-				draw_line(e.pos + Vector2.from_angle(ta) * e.r, e.pos + Vector2.from_angle(ta + 0.2 * sin(e.t * 5.0 + k)) * tl, Pal.ink(0.55 * dim), 1.2)
+				draw_line(e.pos + Vector2.from_angle(ta) * e.r, e.pos + Vector2.from_angle(ta + 0.2 * sin(e.t * 5.0 + k)) * tl, Pal.foe(0.55 * dim), 1.2)
 		if e.kind == PRISM:
 			# the bend it gives, drawn as a fan of fine lines through the body
 			for k in 3:
 				var a3 := e.rot + TAU * k / 3.0 + PI / 3.0
-				draw_line(e.pos, e.pos + Vector2.from_angle(a3) * e.r * 0.8, Pal.ink((0.35 + 0.6 * e.shield_flash) * dim, 1.0 + e.shield_flash), 1.0)
+				draw_line(e.pos, e.pos + Vector2.from_angle(a3) * e.r * 0.8, Pal.foe((0.35 + 0.6 * e.shield_flash) * dim, 1.0 + e.shield_flash), 1.0)
 		if e.kind == CHARGER and e.mode == STUN:
 			for k in 3:
 				var a3 := e.t * 5.0 + TAU * k / 3.0
-				draw_circle(e.pos + Vector2.from_angle(a3) * (e.r + 8.0), 1.6, Pal.ink(0.7 * dim))
+				draw_circle(e.pos + Vector2.from_angle(a3) * (e.r + 8.0), 1.6, Pal.foe(0.7 * dim))
 		if e.flash > 0.0:
 			var poly := PackedVector2Array()
 			for k in e.sides:
 				poly.append(tr * pts[k])
-			draw_colored_polygon(poly, Pal.ink(0.7 * e.flash, 1.15))
+			draw_colored_polygon(poly, Pal.foe(0.7 * e.flash, 1.15))
 
 
 func _core(e: E, tr: Transform2D, k: float, col: Color) -> void:
@@ -822,7 +822,7 @@ func _draw_shield(e: E, dim: float, k: float) -> void:
 	var a0 := e.face.angle() - SHIELD_HALF * k
 	var a1 := e.face.angle() + SHIELD_HALF * k
 	var frac := e.hp / e.maxhp
-	var c := Pal.ink(dim, 1.0 + 1.2 * e.shield_flash)
+	var c := Pal.foe(dim, 1.0 + 1.2 * e.shield_flash)
 	var w := 5.0 + 2.0 * e.shield_flash
 	if frac > 0.5:
 		draw_arc(e.pos, SHIELD_R, a0, a1, 20, c, w, false)
@@ -833,7 +833,7 @@ func _draw_shield(e: E, dim: float, k: float) -> void:
 			var s0 := lerpf(a0, a1, j / 3.0) + gap
 			var s1 := lerpf(a0, a1, (j + 1) / 3.0) - gap
 			draw_arc(e.pos, SHIELD_R + (j - 1) * 1.2, s0, s1, 8, c, w - 1.0, false)
-	draw_arc(e.pos, SHIELD_R + 6.0, a0 + 0.1, a1 - 0.1, 16, Pal.ink(0.18 * dim), 1.0, false)
+	draw_arc(e.pos, SHIELD_R + 6.0, a0 + 0.1, a1 - 0.1, 16, Pal.foe(0.18 * dim), 1.0, false)
 
 
 func _draw_telegraph(e: E, k: float, dim: float) -> void:
@@ -854,11 +854,11 @@ func _draw_telegraph(e: E, k: float, dim: float) -> void:
 		segs.append(e.pos + e.dash_dir * minf(at + seg, reach))
 		at += period
 	if segs.size() > 0:
-		draw_multiline(segs, Pal.ink(a, 1.4 if locked else 1.0), 2.0 if locked else 1.2)
+		draw_multiline(segs, Pal.foe(a, 1.4 if locked else 1.0), 2.0 if locked else 1.2)
 	if locked:
 		var side := e.dash_dir.orthogonal() * (e.r + 4.0)
-		draw_line(e.pos + side, end + side * 0.4, Pal.ink(0.12 * dim), 1.0)
-		draw_line(e.pos - side, end - side * 0.4, Pal.ink(0.12 * dim), 1.0)
+		draw_line(e.pos + side, end + side * 0.4, Pal.foe(0.12 * dim), 1.0)
+		draw_line(e.pos - side, end - side * 0.4, Pal.foe(0.12 * dim), 1.0)
 
 
 func _draw_warn(e: E) -> void:
@@ -867,7 +867,7 @@ func _draw_warn(e: E) -> void:
 	if e.t < 0.0:
 		return
 	var r := e.r * 2.2 * (1.0 - 0.5 * Pal.ease_out(k))
-	draw_arc(e.pos, r, 0.0, TAU, 32, Pal.ink(0.5 * k), 1.2, false)
+	draw_arc(e.pos, r, 0.0, TAU, 32, Pal.foe(0.5 * k), 1.2, false)
 	for j in 4:
 		var d := Vector2.from_angle(TAU * j / 4.0 + k * 1.2)
-		draw_line(e.pos + d * (r + 3.0), e.pos + d * (r + 9.0), Pal.ink(0.7 * k), 1.5)
+		draw_line(e.pos + d * (r + 3.0), e.pos + d * (r + 9.0), Pal.foe(0.7 * k), 1.5)

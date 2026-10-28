@@ -1,7 +1,8 @@
 class_name TutorialGate
 extends Node2D
 # Uses the real player, recorded bullet paths, return damage and dash.
-enum { MOVE, SHOOT, HOLD, RETURN, DASH, COMPLETE }
+enum { MOVE, SHOOT, HOLD, RETURN, DASH, POSSESS, COMPLETE }
+const STEPS := 7
 const GOAL := Vector2(1260, 800)
 var game
 var entry := 1
@@ -17,6 +18,8 @@ var dummy
 var marked_round
 var retry_note := false
 var hold_started := false
+var host_dummy                  # the possession step: the one to mark and seize
+var targets: Array = []          # ...and the ones to break with it
 
 func configure(owner_game, mode: int) -> void:
 	game = owner_game
@@ -66,7 +69,17 @@ func advance(next: int) -> void:
 		dashed = false
 	if stage == HOLD:
 		hold_started = false
+	if stage == POSSESS:
+		game.bullets.clear_for_chapter()
+		game.ammo = game.mag
+		game.possess.cooldown = 0.0
+		host_dummy = _dummy(Enemies.CHASER, GOAL + Vector2(260, -330), 400.0)
+		targets.clear()
+		for k in 4:
+			targets.append(_dummy(Enemies.CHASER, GOAL + Vector2(-220, -300) + Vector2.from_angle(TAU * k / 4.0) * 80.0, 60.0))
 	if stage == COMPLETE:
+		if game.possess.hosting():
+			game.possess.end(false, true)
 		Meta.finish_tutorial(true)
 	queue_redraw()
 
@@ -109,8 +122,26 @@ func step(dt: float) -> void:
 				advance(SHOOT)
 		DASH:
 			if dashed and game.player.dash_t <= 0.0:
+				advance(POSSESS)
+		POSSESS:
+			var broken := 0
+			for d in targets:
+				if d.state == Enemies.DEAD or d.hp < d.maxhp:
+					broken += 1
+			if game.possess.hosting() and broken >= 2:
 				advance(COMPLETE)
+			elif host_dummy != null and host_dummy.state == Enemies.DEAD and not game.possess.busy():
+				host_dummy = _dummy(Enemies.CHASER, GOAL + Vector2(260, -330), 400.0)
 	queue_redraw()
+
+func _dummy(kind: int, at: Vector2, hp: float):
+	var d = game.enemies.spawn(kind, at, 0.0)
+	d.state = Enemies.ALIVE
+	d.hp = hp
+	d.maxhp = hp
+	d.speed = 0.0
+	return d
+
 
 func skip_rect(vp: Vector2) -> Rect2:
 	return Rect2(vp.x - 330, 28, 290, 48)
@@ -152,7 +183,7 @@ func finish(completed: bool) -> void:
 func instructions() -> String:
 	var binds := {
 		"move": "%s / %s / %s / %s" % [Settings.key_name("up"), Settings.key_name("left"), Settings.key_name("down"), Settings.key_name("right")],
-		"recall": Settings.key_name("recall"), "dash": Settings.key_name("dash")}
+		"recall": Settings.key_name("recall"), "dash": Settings.key_name("dash"), "possess": "E"}
 	return Txt.t("teach_%d_body" % stage).format(binds)
 
 func draw_hud(hud, vp: Vector2) -> void:
@@ -160,8 +191,8 @@ func draw_hud(hud, vp: Vector2) -> void:
 	var width := minf(1100, vp.x - 100)
 	var x := (vp.x - width) / 2.0
 	v.draw_rect(Rect2(x, 104, width, 210), Color(0.035, 0.035, 0.04, 1.0))
-	v.draw_line(Vector2(x, 104), Vector2(x + width * (stage + 1.0) / 6.0, 104), Pal.red(0.9, 1.5), 3.0)
-	v.draw_string(hud.font_s, Vector2(40, 60), Txt.t("t_tutorial") + "  %d / 6" % (stage + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.7))
+	v.draw_line(Vector2(x, 104), Vector2(x + width * (stage + 1.0) / STEPS, 104), Pal.red(0.9, 1.5), 3.0)
+	v.draw_string(hud.font_s, Vector2(40, 60), Txt.t("t_tutorial") + "  %d / %d" % [stage + 1, STEPS], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.7))
 	hud._text_c(hud.font_s, Txt.t("teach_skip"), skip_rect(vp).get_center() + Vector2(0, 7), 18, Pal.ink(0.7))
 	v.draw_string(hud.font_xl, Vector2(x + 30, 153), Txt.t("teach_%d_title" % stage), HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Pal.ink(1.0))
 	var paragraph := TextParagraph.new()
@@ -188,6 +219,12 @@ func _draw() -> void:
 		var p := Vector2(Arena.ROOM.end.x - 5.0, clampf(game.player.pos.y, 390, 910))
 		draw_line(p - Vector2(0, 55), p + Vector2(0, 55), Pal.red(0.9, 2.0), 5.0)
 		draw_line(game.player.pos + Vector2(45, 0), p - Vector2(20, 0), Pal.ink(0.18), 1.0)
+	elif stage == POSSESS:
+		if host_dummy != null and host_dummy.state == Enemies.ALIVE and not game.possess.busy():
+			draw_arc(host_dummy.pos, 34.0 + sin(age * 4.0) * 3.0, 0, TAU, 40, Pal.you(0.8, 1.6), 1.5, true)
+		for d in targets:
+			if d.state == Enemies.ALIVE:
+				draw_arc(d.pos, 26.0, 0, TAU, 32, Pal.foe(0.5), 1.0, true)
 	elif stage in [HOLD, RETURN] and marked_round != null:
 		draw_circle(marked_round.path[0], 9.0, Pal.ink(0.35))
 		if dummy != null and dummy.state == Enemies.ALIVE:

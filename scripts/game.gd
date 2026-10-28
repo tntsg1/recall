@@ -195,6 +195,9 @@ func _ready() -> void:
 	possess = Possess.new()
 	possess.game = self
 	add_child(possess)
+	var signs := Signs.new()
+	signs.game = self
+	add_child(signs)
 	for cls in [Boss, Warden, Devourer, Metronome, Zero]:
 		var bn = cls.new()
 		bn.game = self
@@ -648,7 +651,7 @@ func _in_move() -> Vector2:
 
 
 func _in_fire() -> bool:
-	if tutorial != null and tutorial.stage != TutorialGate.SHOOT:
+	if tutorial != null and tutorial.stage != TutorialGate.SHOOT and tutorial.stage != TutorialGate.POSSESS:
 		return false
 	if tutorial != null and not bullets.list.is_empty():
 		return false
@@ -658,7 +661,7 @@ func _in_fire() -> bool:
 
 
 func _in_focus() -> bool:
-	if tutorial != null and tutorial.stage not in [TutorialGate.HOLD, TutorialGate.RETURN]:
+	if tutorial != null and tutorial.stage not in [TutorialGate.HOLD, TutorialGate.RETURN, TutorialGate.POSSESS]:
 		return false
 	if bot != null:
 		return bot.focus
@@ -769,7 +772,7 @@ func yard_key(k: int) -> void:
 
 
 func _in_possess() -> bool:
-	if tutorial != null:
+	if tutorial != null and tutorial.stage != TutorialGate.POSSESS:
 		return false
 	if bot != null:
 		return bot.get("possess", false)

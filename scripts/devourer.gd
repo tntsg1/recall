@@ -144,7 +144,7 @@ func hit_test(a: Vector2, b: Vector2) -> Dictionary:
 
 func on_armor(_k: int, at_p: Vector2, normal: Vector2) -> void:
 	flash = maxf(flash, 0.4)
-	game.fx.sparks(at_p, normal, 5, Pal.ink(1.0, 1.8), 400.0, 0.2, 0.9)
+	game.fx.sparks(at_p, normal, 5, Pal.foe(1.0, 1.8), 400.0, 0.2, 0.9)
 	game.sfx.play("shield", randf_range(0.6, 0.75), -8.0)
 
 
@@ -160,7 +160,7 @@ func damage(dmg: float, ret: bool, at_p: Vector2, d: Vector2, _frame_k: int = -1
 	if ret:
 		red = 1.0
 	game.fx.number(at_p, dmg, ret)
-	var c := Pal.red(1.0, 3.2) if ret else Pal.ink(1.0, 1.8)
+	var c := Pal.red(1.0, 3.2) if ret else Pal.foe(1.0, 1.8)
 	game.fx.sparks(at_p, d, 8 if ret else 5, c, 560.0, 0.28, 0.8)
 	game.on_target_hit(ret)
 	# a hit in the core makes it cough a round back up
@@ -168,7 +168,7 @@ func damage(dmg: float, ret: bool, at_p: Vector2, d: Vector2, _frame_k: int = -1
 	if inside.size() > 0:
 		var b = inside[0]
 		game.bullets.fling(b, (b.pos - pos).normalized())
-		game.fx.flash(b.pos, 20.0, 0.12, Pal.ink(0.6, 1.6))
+		game.fx.flash(b.pos, 20.0, 0.12, Pal.foe(0.6, 1.6))
 	var want := clampi(int((1.0 - hp / HP) * 3.0), 0, 2)
 	while phase < want:
 		phase += 1
@@ -184,7 +184,7 @@ func _phase_break() -> void:
 	# it spits everything out at once
 	for b in game.bullets.held_by(self):
 		game.bullets.fling(b, (b.pos - pos).normalized().rotated(randf_range(-0.3, 0.3)))
-	game.fx.ring(pos, R, 360.0, 0.6, Pal.ink(0.9, 1.5), 3.0)
+	game.fx.ring(pos, R, 360.0, 0.6, Pal.foe(0.9, 1.5), 3.0)
 	game.sfx.play("armor", 0.8, 0.0)
 	game.add_hitstop(0.09)
 	game.cam.add_trauma(0.6)
@@ -283,7 +283,7 @@ func _dying(dt: float) -> void:
 			var a := TAU * k / 28.0
 			var p0 := Vector2.from_angle(a) * R
 			var p1 := Vector2.from_angle(a + 0.3) * R * 0.7
-			game.fx.shard(pos + (p0 + p1) * 0.5, (p0 - p1) * 0.5, (p1 - p0) * 0.5, p0.normalized() * randf_range(260, 620), randf_range(-10, 10), 1.4, Pal.ink(1.0, 1.6), 2.5)
+			game.fx.shard(pos + (p0 + p1) * 0.5, (p0 - p1) * 0.5, (p1 - p0) * 0.5, p0.normalized() * randf_range(260, 620), randf_range(-10, 10), 1.4, Pal.foe(1.0, 1.6), 2.5)
 		game.on_boss_dead(pos)
 
 
@@ -302,12 +302,12 @@ func _draw() -> void:
 					var u := j / 39.0
 					var a := u * TAU * 1.5 + enter_t * 5.0 + TAU * k / 3.0
 					pts.append(HOME + Vector2.from_angle(a) * lerpf(R * 3.0, R * 0.4, u) * (1.6 - e))
-				draw_polyline(pts, Pal.ink(0.4 * e * dim), 1.0, false)
+				draw_polyline(pts, Pal.foe(0.4 * e * dim), 1.0, false)
 		return
 	if state == DEAD:
 		return
 	var appear := Pal.back(clampf(t / 0.8, 0.0, 1.0)) if state == ENTER else 1.0
-	var col := Pal.ink(dim, 1.0 + 0.6 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
+	var col := Pal.foe(dim, 1.0 + 0.6 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
 	# the jaw: a ring of teeth that breathe in and out
 	var teeth := 14
 	var pts2 := PackedVector2Array()
@@ -317,20 +317,20 @@ func _draw() -> void:
 		pts2.append(pos + Vector2.from_angle(a) * rr)
 	draw_colored_polygon(pts2.slice(0, teeth * 2), Color(0.05, 0.05, 0.055, appear))
 	draw_polyline(pts2, col, 2.0, false)
-	draw_arc(pos, R * 0.72 * appear, 0.0, TAU, 48, Pal.ink(0.2 * dim), 1.0, false)
+	draw_arc(pos, R * 0.72 * appear, 0.0, TAU, 48, Pal.foe(0.2 * dim), 1.0, false)
 	# the core: opens with what it holds
 	var cr := core_r() * appear
-	draw_circle(pos, cr, Pal.ink(dim, 1.2 + 1.2 * flash).lerp(Pal.red(dim, 2.2), red * 0.8))
-	draw_arc(pos, cr + 5.0, 0.0, TAU, 32, Pal.ink(0.5 * dim), 1.0, false)
+	draw_circle(pos, cr, Pal.foe(dim, 1.2 + 1.2 * flash).lerp(Pal.red(dim, 2.2), red * 0.8))
+	draw_arc(pos, cr + 5.0, 0.0, TAU, 32, Pal.foe(0.5 * dim), 1.0, false)
 	# inhale: lines of pull toward the mouth
 	if state == RUN and mode == INHALE:
 		var k2 := mode_t / 0.7
-		draw_arc(pos, REACH[phase] * (1.0 - Pal.ease_in(k2)), 0.0, TAU, 96, Pal.ink(0.5 * (1.0 - k2) * dim), 2.0, false)
+		draw_arc(pos, REACH[phase] * (1.0 - Pal.ease_in(k2)), 0.0, TAU, 96, Pal.foe(0.5 * (1.0 - k2) * dim), 2.0, false)
 		for pr in pulled:
 			var b = pr[0]
 			if b.state == Bullets.EMBED:
-				draw_line(b.pos, pos, Pal.ink(0.18 * dim), 1.0)
+				draw_line(b.pos, pos, Pal.foe(0.18 * dim), 1.0)
 	elif state == RUN and cd < 1.2:
 		# the warning before a breath: the reach is drawn and tightens
 		var w := 1.0 - cd / 1.2
-		draw_arc(pos, REACH[phase], 0.0, TAU, 96, Pal.ink((0.15 + 0.35 * w) * dim), 1.0 + w, false)
+		draw_arc(pos, REACH[phase], 0.0, TAU, 96, Pal.foe((0.15 + 0.35 * w) * dim), 1.0 + w, false)

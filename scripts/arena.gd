@@ -144,8 +144,8 @@ func is_free(p: Vector2, rad: float) -> bool:
 
 func _draw() -> void:
 	var f: float = game.focus if game else 0.0
-	var edge := Pal.ink(0.9 - 0.35 * f)
-	var faint := Pal.ink(0.13 - 0.06 * f)
+	var edge := Pal.line(0.9 - 0.35 * f, 1.35)
+	var faint := Pal.line(0.16 - 0.06 * f)
 	# boundary: dark mass outside the room, a single crisp inner edge and a hairline inset
 	var big := ROOM.grow(OUTER)
 	draw_rect(Rect2(big.position, Vector2(big.size.x, ROOM.position.y - big.position.y)), Pal.WALL)
@@ -154,7 +154,7 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2(ROOM.end.x, ROOM.position.y), Vector2(big.end.x - ROOM.end.x, ROOM.size.y)), Pal.WALL)
 	draw_rect(ROOM, edge, false, 2.0)
 	draw_rect(ROOM.grow(10), faint, false, 1.0)
-	_corner_marks(ROOM.grow(22), Pal.ink(0.35 - 0.2 * f))
+	_corner_marks(ROOM.grow(22), Pal.line(0.45 - 0.2 * f, 1.2))
 	for r in inner:
 		draw_rect(r, Pal.WALL)
 		draw_rect(r, edge, false, 2.0)

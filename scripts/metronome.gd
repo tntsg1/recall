@@ -141,7 +141,7 @@ func _arms() -> Array:
 
 
 func on_armor(_k: int, at_p: Vector2, normal: Vector2) -> void:
-	game.fx.sparks(at_p, normal, 5, Pal.ink(1.0, 1.9), 420.0, 0.2, 0.9)
+	game.fx.sparks(at_p, normal, 5, Pal.foe(1.0, 1.9), 420.0, 0.2, 0.9)
 	game.sfx.play("shield", randf_range(0.85, 1.0), -8.0)
 
 
@@ -157,16 +157,16 @@ func damage(dmg: float, ret: bool, at_p: Vector2, d: Vector2, _frame_k: int = -1
 	if ret:
 		red = 1.0
 	game.fx.number(at_p, dmg, ret)
-	var c := Pal.red(1.0, 3.2) if ret else Pal.ink(1.0, 1.8)
+	var c := Pal.red(1.0, 3.2) if ret else Pal.foe(1.0, 1.8)
 	game.fx.sparks(at_p, d, 8 if ret else 5, c, 560.0, 0.28, 0.8)
 	if on_beat_window():
-		game.fx.ring(bob, BOB_R, BOB_R + 30.0, 0.25, Pal.ink(0.9, 1.8), 2.0)
+		game.fx.ring(bob, BOB_R, BOB_R + 30.0, 0.25, Pal.foe(0.9, 1.8), 2.0)
 	game.on_target_hit(ret)
 	var want := clampi(int((1.0 - hp / HP) * 3.0), 0, 2)
 	while phase < want:
 		phase += 1
 		guard_t = 1.4
-		game.fx.ring(bob, BOB_R, 360.0, 0.6, Pal.ink(0.9, 1.5), 3.0)
+		game.fx.ring(bob, BOB_R, 360.0, 0.6, Pal.foe(0.9, 1.5), 3.0)
 		game.sfx.play("armor", 1.1, 0.0)
 		game.add_hitstop(0.09)
 		game.cam.add_trauma(0.6)
@@ -218,7 +218,7 @@ func step(dt: float) -> void:
 	if bi != last_beat:
 		last_beat = bi
 		if state == RUN:
-			game.fx.ring(bob, BOB_R * 0.6, BOB_R * 1.4, 0.3, Pal.ink(0.5, 1.4), 1.5)
+			game.fx.ring(bob, BOB_R * 0.6, BOB_R * 1.4, 0.3, Pal.foe(0.5, 1.4), 1.5)
 			if phase >= 1 and bi % 4 == 0:
 				rings.append([bob, 0.0])
 				game.sfx.play("slam", 1.2, -6.0)
@@ -265,7 +265,7 @@ func _dying(dt: float) -> void:
 			var a := TAU * k / 24.0
 			var p0 := Vector2.from_angle(a) * BOB_R
 			var p1 := Vector2.from_angle(a + 0.3) * BOB_R * 0.7
-			game.fx.shard(bob + (p0 + p1) * 0.5, (p0 - p1) * 0.5, (p1 - p0) * 0.5, p0.normalized() * randf_range(300, 640), randf_range(-10, 10), 1.4, Pal.ink(1.0, 1.6), 2.5)
+			game.fx.shard(bob + (p0 + p1) * 0.5, (p0 - p1) * 0.5, (p1 - p0) * 0.5, p0.normalized() * randf_range(300, 640), randf_range(-10, 10), 1.4, Pal.foe(1.0, 1.6), 2.5)
 		game.on_boss_dead(bob)
 
 
@@ -280,35 +280,35 @@ func _draw() -> void:
 	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.35, 0.0, 1.0)
 	# the pivot and its gear
 	draw_circle(PIVOT, 18.0, Pal.WALL)
-	draw_arc(PIVOT, 18.0, 0.0, TAU, 24, Pal.ink(0.9 * dim), 2.0, false)
+	draw_arc(PIVOT, 18.0, 0.0, TAU, 24, Pal.foe(0.9 * dim), 2.0, false)
 	for k in 6:
 		var a := theta * 2.0 + TAU * k / 6.0
-		draw_line(PIVOT + Vector2.from_angle(a) * 10.0, PIVOT + Vector2.from_angle(a) * 22.0, Pal.ink(0.5 * dim), 2.0)
+		draw_line(PIVOT + Vector2.from_angle(a) * 10.0, PIVOT + Vector2.from_angle(a) * 22.0, Pal.foe(0.5 * dim), 2.0)
 	if state != DYING:
 		for arm in _arms():
 			var along: Vector2 = (arm[1] - arm[0]).normalized()
 			var n := along.orthogonal() * ARM_W * 0.5
 			var poly := PackedVector2Array([arm[0] + n, arm[1] + n, arm[1] - n, arm[0] - n])
 			draw_colored_polygon(poly, Color(0.07, 0.07, 0.075))
-			draw_polyline(PackedVector2Array([arm[0] + n, arm[1] + n, arm[1] - n, arm[0] - n, arm[0] + n]), Pal.ink(0.85 * dim), 1.5, false)
+			draw_polyline(PackedVector2Array([arm[0] + n, arm[1] + n, arm[1] - n, arm[0] - n, arm[0] + n]), Pal.foe(0.85 * dim), 1.5, false)
 			# tick marks run down the arm like a scale
 			for j in 12:
 				var p: Vector2 = arm[0].lerp(arm[1], (j + 1) / 13.0)
-				draw_line(p - n * 1.6, p + n * 1.6, Pal.ink(0.25 * dim), 1.0)
+				draw_line(p - n * 1.6, p + n * 1.6, Pal.foe(0.25 * dim), 1.0)
 	if arm2_k > 0.05:
 		var b2 := _bob_of(PIVOT2, LEN2 * arm2_k, theta2, -1.0)
 		draw_circle(b2, 22.0, Pal.WALL)
-		draw_arc(b2, 22.0, 0.0, TAU, 24, Pal.ink(0.8 * dim), 2.0, false)
+		draw_arc(b2, 22.0, 0.0, TAU, 24, Pal.foe(0.8 * dim), 2.0, false)
 	# the bob: shell plates part on the beat to show the core
-	var col := Pal.ink(dim, 1.0 + 0.8 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
+	var col := Pal.foe(dim, 1.0 + 0.8 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
 	draw_circle(bob, BOB_R, Color(0.05, 0.05, 0.055))
 	draw_arc(bob, BOB_R, 0.0, TAU, 40, col, 2.5, false)
 	var core := 0.45 + 0.35 * beat_k if open else 0.3
-	draw_circle(bob, BOB_R * core, Pal.ink(dim, 1.2 + 1.6 * beat_k * (1.0 if open else 0.0)).lerp(Pal.red(dim, 2.2), red * 0.8))
+	draw_circle(bob, BOB_R * core, Pal.foe(dim, 1.2 + 1.6 * beat_k * (1.0 if open else 0.0)).lerp(Pal.red(dim, 2.2), red * 0.8))
 	for k in 4:
 		var a := theta + TAU * k / 4.0 + PI / 4.0
 		var gap := BOB_R * (0.35 + 0.25 * beat_k * (1.0 if open else 0.0))
-		draw_arc(bob + Vector2.from_angle(a) * (gap - BOB_R * 0.35), BOB_R * 0.8, a - 0.55, a + 0.55, 10, Pal.ink(0.75 * dim), 3.0, false)
+		draw_arc(bob + Vector2.from_angle(a) * (gap - BOB_R * 0.35), BOB_R * 0.8, a - 0.55, a + 0.55, 10, Pal.foe(0.75 * dim), 3.0, false)
 	for r in rings:
 		var e := Pal.ease_out(r[1] / 0.9)
-		draw_arc(r[0], e * 300.0, 0.0, TAU, 96, Pal.ink(0.9 * (1.0 - e) * dim, 1.4), 3.0, false)
+		draw_arc(r[0], e * 300.0, 0.0, TAU, 96, Pal.foe(0.9 * (1.0 - e) * dim, 1.4), 3.0, false)
