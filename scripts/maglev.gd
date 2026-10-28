@@ -182,7 +182,7 @@ func _draw() -> void:
 					chev.append(q + fw * 2.0)
 					chev.append(q + fw * 2.0)
 					chev.append(q - fw * 6.0 - n * 8.0)
-				ps += 46.0
+				ps += 92.0
 			if chev.size() > 0:
 				draw_multiline(chev, Pal.ink(0.7 * dim, 1.8), 2.0)
 		elif w > 0.0:

@@ -1171,6 +1171,21 @@ func _draw_memory() -> void:
 	var tw := font.get_string_size(memory, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var p: Vector2 = (sh.pos as Vector2) + Vector2(-tw / 2.0, 92.0)
 	p.x = clampf(p.x, Arena.ROOM.position.x + 10.0, Arena.ROOM.end.x - tw - 10.0)
+	# keep the plate off cover and floor rails: step it away, one way only
+	var away := 40.0 if p.y < Arena.ROOM.get_center().y else -40.0
+	for k in 8:
+		var plate := Rect2(p + Vector2(-12, -24), Vector2(tw + 24, 34))
+		var hit := false
+		for rr: Rect2 in game.arena.inner:
+			if plate.intersects(rr.grow(4.0)):
+				hit = true
+		if game.maglev.active():
+			for rl in game.maglev.rails:
+				if plate.grow(4.0).has_point(rl[0]) or plate.grow(4.0).has_point(rl[1]) or Geometry2D.segment_intersects_segment(rl[0], rl[1], plate.position, plate.end) != null:
+					hit = true
+		if not hit:
+			break
+		p.y += away
 	mem_layer.draw_rect(Rect2(p + Vector2(-12, -24), Vector2(tw + 24, 34)), Color(0.01, 0.015, 0.02, 0.94 * a))
 	mem_layer.draw_rect(Rect2(p + Vector2(-12, -24), Vector2(tw + 24, 34)), Possess.cyan(0.25 * a, 1.0), false, 1.0)
 	mem_layer.draw_line(p + Vector2(-12, -24), p + Vector2(-12, 10), Possess.cyan(a, 1.8), 2.0)
