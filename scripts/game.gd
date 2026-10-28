@@ -1620,7 +1620,7 @@ func run_snapshot() -> Dictionary:
 
 
 func _resume(snap: Dictionary) -> void:
-	for i in int(snap.chapter):
+	for i in int(snap.get("chapter", 0)):
 		next_chapter()
 	assist_retries_used = int(snap.get("assist_retries_used", 0))
 	assist_damage = float(snap.get("assist_damage", 0.0))
@@ -1632,29 +1632,30 @@ func _resume(snap: Dictionary) -> void:
 		wave_ctl.plan = snap.plan.duplicate(true)
 	relics.clear()
 	mag = Loadout.mag()
-	for id in snap.relics:
+	for id in snap.get("relics", []):
 		if Cards.RELICS.has(id):
 			_gain_relic(id)
-	for k in snap.lv:
-		lv[k] = int(snap.lv[k])
-	for k in snap.armed:
+	var slv: Dictionary = snap.get("lv", {})
+	for k in slv:
+		lv[k] = int(slv[k])
+	for k in snap.get("armed", {}):
 		armed[k] = bool(snap.armed[k])
-	max_cracks = int(snap.max_cracks)
-	cracks = int(snap.cracks)
-	rerolls = int(snap.rerolls)
-	run_time = float(snap.run_time)
-	kills = int(snap.kills)
-	hits_taken = int(snap.hits_taken)
-	chapter_hits = int(snap.chapter_hits)
-	max_combo = int(snap.max_combo)
-	crosses = int(snap.crosses)
-	crit_recalls = int(snap.crit_recalls)
-	steals = int(snap.steals)
-	run_ach = snap.run_ach.duplicate()
+	max_cracks = int(snap.get("max_cracks", max_cracks))
+	cracks = int(snap.get("cracks", cracks))
+	rerolls = int(snap.get("rerolls", rerolls))
+	run_time = float(snap.get("run_time", 0.0))
+	kills = int(snap.get("kills", 0))
+	hits_taken = int(snap.get("hits_taken", 0))
+	chapter_hits = int(snap.get("chapter_hits", 0))
+	max_combo = int(snap.get("max_combo", 0))
+	crosses = int(snap.get("crosses", 0))
+	crit_recalls = int(snap.get("crit_recalls", 0))
+	steals = int(snap.get("steals", 0))
+	run_ach = snap.get("run_ach", []).duplicate()
 	ammo = mag
-	wave_ctl.results = snap.results.duplicate(true)
-	wave_ctl.chapter_log = snap.chapter_log.duplicate(true)
-	var w := int(snap.wave)
+	wave_ctl.results = snap.get("results", []).duplicate(true)
+	wave_ctl.chapter_log = snap.get("chapter_log", []).duplicate(true)
+	var w := int(snap.get("wave", 0))
 	if w > 0:
 		# pick up as if the cards before this wave had just been chosen
 		wave_ctl.index = w - 1

@@ -14,6 +14,31 @@ static var training_requested := 0 # 1: before new run; 2: replay from title
 static var training_active := false
 static var possess_trial := false  # the title's "seize trial": an endless practice room
 
+
+# Started by a test script (-s / --script)? Then the game reads and writes a
+# sandbox file instead of the player's, so no test can ever touch a real save,
+# whatever it sets or whichever scene resets test_mode on the way. The sandbox
+# starts empty each time a test process first touches it.
+static var _sandbox_fresh := false
+
+
+static func under_test() -> bool:
+	for a in OS.get_cmdline_args():
+		if a == "-s" or a == "--script" or a.begins_with("res://tests/") or a.begins_with("tests/"):
+			return true
+	return false
+
+
+static func path() -> String:
+	if not under_test():
+		return PATH
+	var p := "user://recall_meta.test.json"
+	if not _sandbox_fresh:
+		_sandbox_fresh = true
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
+	return p
+
 static func needs_tutorial() -> bool:
 	var d := load_data()
 	return not bool(d.get("tutorial_seen", false)) and int(d.runs) == 0 and run_saved() == null
@@ -30,8 +55,8 @@ static func load_data() -> Dictionary:
 		return data
 	data = {"runs": 0, "wins": 0, "best_chapter": 0, "best_wave": 0, "best_time": 0.0, "kills": 0,
 		"ach": {}, "unlocks": {}, "stake_won": -1, "gun_wins": {}, "beat": 0, "crit": 0, "cross": 0}
-	if FileAccess.file_exists(PATH):
-		var f := FileAccess.open(PATH, FileAccess.READ)
+	if FileAccess.file_exists(path()):
+		var f := FileAccess.open(path(), FileAccess.READ)
 		var parsed = JSON.parse_string(f.get_as_text())
 		if parsed is Dictionary:
 			for k in parsed:
@@ -45,7 +70,10 @@ static func save() -> void:
 	var d := load_data()
 	d.saved_at = int(Time.get_unix_time_from_system())
 	var text := JSON.stringify(d, "\t")
-	var f := FileAccess.open(PATH, FileAccess.WRITE)
+	# keep the previous file as a rolling backup before writing the new one
+	if FileAccess.file_exists(path()):
+		DirAccess.copy_absolute(ProjectSettings.globalize_path(path()), ProjectSettings.globalize_path(path() + ".bak"))
+	var f := FileAccess.open(path(), FileAccess.WRITE)
 	if f:
 		f.store_string(text)
 		f.close()

@@ -3,6 +3,11 @@ class_name Settings
 # flashes, fullscreen, language, and key bindings. Tests never save them.
 
 const PATH := "user://recall_settings.cfg"
+
+
+# Under a test script the settings live in a sandbox file (see Meta.path).
+static func _path() -> String:
+	return "user://recall_settings.test.cfg" if Meta.under_test() else PATH
 const ACTIONS := ["up", "down", "left", "right", "recall", "dash", "pause"]
 
 static var master := 1.0
@@ -24,7 +29,7 @@ static func load_all() -> void:
 		return
 	loaded = true
 	var cf := ConfigFile.new()
-	if cf.load(PATH) != OK:
+	if cf.load(_path()) != OK:
 		return
 	master = cf.get_value("audio", "master", master)
 	music = cf.get_value("audio", "music", music)
@@ -52,7 +57,7 @@ static func save() -> void:
 	cf.set_value("assist", "enabled", assist)
 	cf.set_value("assist", "damage_reduction", damage_reduction)
 	cf.set_value("assist", "retries", retry_limit)
-	cf.save(PATH)
+	cf.save(_path())
 
 
 # Volumes, window mode, language and rebinds take effect here.
