@@ -35,7 +35,7 @@ const VENT_TIME := [3.4, 3.1, 2.8]
 const MIS_R := 92.0
 const MIS_FALL := 1.25
 const FLAME_TIME := 3.0
-const FLAME_HALF := 0.17
+const FLAME_HALF := 0.22
 const FLAME_REACH := 980.0
 const RAIL_LOCK := 1.3
 const RAIL_HOLD := 0.4
@@ -73,6 +73,8 @@ var rail_shot := 0.0         # fades the last beam
 var rail_end := Vector2.ZERO
 var stamp := 0.0             # the "passed" stamp on the screen
 var steam_cd := 0.0
+var puff_cd := 0.0
+var pod_open := 0.0          # the missile pod's lid, slid back for a missile test
 
 
 func _ready() -> void:
@@ -302,6 +304,13 @@ func step(dt: float) -> void:
 				stage_t = 0.0
 		RUN:
 			_run(dt)
+			# the deck shudders while a test spins up
+			var sh := 0.0
+			if stage == ANNOUNCE:
+				sh = 3.0 * (1.0 - stage_t / ANNOUNCE_TIME)
+			pos = HOME + Vector2(sin(t * 83.0), cos(t * 71.0)) * sh
+			var pods := (stage == ANNOUNCE or stage == TEST) and (test == 0 or test == 3)
+			pod_open = move_toward(pod_open, 1.0 if pods else 0.0, dt / 0.5)
 		DYING:
 			_dying(dt)
 	_step_missiles(dt)
@@ -352,7 +361,12 @@ func _run(dt: float) -> void:
 				stage_t = 0.0
 				stamp = 1.0
 				tests_run += 1
-				game.sfx.play("stamp", 1.0, -4.0)
+				# the stamp comes down hard
+				game.sfx.play("stamp", 0.8, 0.0)
+				game.sfx.play("slam", 0.7, -6.0)
+				game.cam.add_trauma(0.25)
+				game.cam.punch(0.02)
+				game.fx.flash(SCREEN.get_center() + _off(), 90.0, 0.12, Pal.red(0.4, 2.0))
 		PASS:
 			_park_rail(dt)
 			if stage_t >= PASS_TIME:
@@ -368,7 +382,13 @@ func _run(dt: float) -> void:
 				steam_cd = 0.09
 				for side: float in [-1.0, 1.0]:
 					var at := Vector2(SLOT.get_center().x + side * SLOT.size.x * 0.5, SLOT.end.y - 10.0) + _off()
-					game.fx.sparks(at, Vector2(side * 0.4, 1.0).normalized(), 1, Pal.ink(0.35, 1.0), 160.0, 0.5, 0.6)
+					game.fx.sparks(at, Vector2(side * 0.4, 1.0).normalized(), 2, Pal.ink(0.4, 1.1), 220.0, 0.6, 0.7)
+			puff_cd -= dt
+			if puff_cd <= 0.0:
+				# steam off the deck, either side of the turret
+				puff_cd = 0.28
+				for side2: float in [-1.0, 1.0]:
+					game.fx.ring(TURRET + _off() + Vector2(side2 * 90.0, 10.0), 6.0, 46.0, 0.6, Pal.ink(0.22, 1.0), 4.0)
 			if stage_t >= VENT_TIME[phase]:
 				_announce()
 
@@ -382,6 +402,10 @@ func _announce() -> void:
 		test = tests_run % 3
 	game.lasers.force(true)
 	game.sfx.play("tick", 0.8, -4.0)
+	game.sfx.play("windup", 0.5, -6.0)
+	game.cam.add_trauma(0.1)
+	if test == 3:
+		game.hud.radio(Txt.t("radio_testbed_4"))
 
 
 func _begin_test() -> void:
@@ -465,6 +489,13 @@ func _step_flames(dt: float, pl: Vector2) -> bool:
 			if absf(wrapf(to.angle() - a, -PI, PI)) < FLAME_HALF and to.length() < _flame_reach(noz, to.angle()):
 				game.on_player_hit(Vector2.from_angle(a), null)
 				break
+	if randf() < 0.6:
+		# sparks thrown off the tip
+		for f in flames:
+			var fa := _flame_angle(f, k)
+			var fn: Vector2 = NOZZLES[f[0]] + _off()
+			var tip := fn + Vector2.from_angle(fa) * _flame_reach(fn, fa) * randf_range(0.55, 0.95)
+			game.fx.sparks(tip, Vector2.from_angle(fa), 1, Pal.red(1.0, 2.4), 220.0, 0.3, 0.9)
 	if int(flame_t * 8.0) != int((flame_t - dt) * 8.0):
 		game.sfx.play("p_drill", randf_range(0.5, 0.6), -14.0)
 	return flame_t >= lead + FLAME_TIME
@@ -577,7 +608,7 @@ func _draw() -> void:
 	var o := _off()
 	_draw_dangers(dim)
 	# gantry arms up to the wall it hangs from
-	for x: float in [HULL.position.x + 50.0, HULL.end.x - 50.0]:
+	for x: float in [HOME.x - 150.0, HOME.x + 150.0]:
 		draw_rect(Rect2(x - 14.0, 70.0, 28.0, HULL.position.y + o.y - 70.0 + 4.0), Pal.WALL)
 		draw_rect(Rect2(x - 14.0, 70.0, 28.0, HULL.position.y + o.y - 70.0 + 4.0), Pal.ink(0.4 * dim), false, 1.5)
 		var hatch := PackedVector2Array()
@@ -590,6 +621,9 @@ func _draw() -> void:
 			draw_multiline(hatch, Pal.ink(0.18 * dim), 1.0)
 	var hull := Rect2(HULL.position + o, HULL.size)
 	var col := Pal.foe(dim, 1.0 + 0.8 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
+	if test == 3 and (stage == ANNOUNCE or stage == TEST) and state == RUN and fmod(t * 4.0, 1.0) < 0.5:
+		# the full demonstration: the hull's edge strobes red
+		col = Pal.red(dim, 2.2)
 	# the hull: chamfered plate, darker than the floor
 	var ch := 18.0
 	var hp_pts := PackedVector2Array([hull.position + Vector2(ch, 0), Vector2(hull.end.x - ch, hull.position.y), Vector2(hull.end.x, hull.position.y + ch),
@@ -625,7 +659,7 @@ func _draw_screen(o: Vector2, dim: float) -> void:
 			head = Txt.t("tb_test_%d" % (test + 1))
 			if stage == ANNOUNCE and fmod(stage_t * 6.0, 1.0) < 0.5:
 				head = ""
-			sub = Txt.t("tb_running")
+			sub = Txt.t("tb_running" if test != 3 else "tb_running_4")
 			sub_col = Pal.red(0.8 * dim, 1.8)
 		PASS:
 			head = Txt.t("tb_test_%d" % (test + 1))
@@ -680,6 +714,20 @@ func _draw_pod(o: Vector2, dim: float) -> void:
 			if live and (c + row * 6 + int(stage_t * 10.0)) % 5 == 0:
 				draw_circle(p, 4.0, Pal.red(0.9 * dim, 2.6))
 	draw_multiline(rims, Pal.ink(0.4 * dim), 1.2)
+	# the lid slides back for a missile test
+	var lw := r.size.x * (1.0 - Pal.ease_io(pod_open))
+	if lw > 1.0:
+		var lid := Rect2(r.end.x - lw, r.position.y, lw, r.size.y)
+		draw_rect(lid, Color(0.06, 0.06, 0.07))
+		draw_rect(lid, Pal.ink(0.5 * dim), false, 1.5)
+		var st := PackedVector2Array()
+		var x := lid.position.x + 10.0
+		while x < lid.end.x - 14.0:
+			st.append(Vector2(x, lid.end.y - 8.0))
+			st.append(Vector2(x + 10.0, lid.position.y + 8.0))
+			x += 18.0
+		if st.size() > 0:
+			draw_multiline(st, Pal.ink(0.18 * dim), 2.0)
 
 
 func _draw_slot(o: Vector2, dim: float, col: Color) -> void:
@@ -707,8 +755,23 @@ func _draw_slot(o: Vector2, dim: float, col: Color) -> void:
 		# hazard stripes across the closed doors
 		var x := dr.position.x + 6.0
 		while x < dr.end.x - 6.0:
-			draw_line(Vector2(x, dr.end.y - 8.0), Vector2(x + 10.0, dr.end.y - 22.0), Pal.red(0.55 * dim, 1.3), 3.0)
+			draw_line(Vector2(x, dr.end.y - 8.0), Vector2(x + 10.0, dr.end.y - 22.0), Pal.ink(0.4 * dim, 1.1), 3.0)
 			x += 16.0
+	if stage == VENT and state == RUN:
+		# the window: a ring that beats round the core, chevrons rising into
+		# the slot, and a bar under it running down with the screen's count
+		var left := clampf(1.0 - stage_t / VENT_TIME[phase], 0.0, 1.0)
+		var pr := fmod(t * 1.6, 1.0)
+		draw_arc(c, CORE_HIT + 6.0 + 14.0 * pr, 0.0, TAU, 40, Pal.foe(0.6 * (1.0 - pr) * dim, 1.8), 2.0)
+		var chev := PackedVector2Array()
+		for j in 3:
+			var y := r.end.y + 70.0 - fmod(t * 60.0 + j * 22.0, 66.0)
+			chev.append(Vector2(c.x - 16.0, y + 10.0))
+			chev.append(Vector2(c.x, y))
+			chev.append(Vector2(c.x, y))
+			chev.append(Vector2(c.x + 16.0, y + 10.0))
+		draw_multiline(chev, Pal.foe(0.7 * dim, 1.6), 3.0)
+		draw_line(Vector2(r.position.x, r.end.y + 16.0), Vector2(r.position.x + r.size.x * left, r.end.y + 16.0), Pal.foe(0.9 * dim, 1.8), 4.0)
 	# a bracket under the slot so you can find it from across the room
 	var lit := 0.25 + 0.7 * core_open
 	draw_line(Vector2(r.position.x - 6.0, r.end.y + 8.0), Vector2(r.end.x + 6.0, r.end.y + 8.0), Pal.foe(lit * dim, 1.0 + core_open), 2.0)
@@ -751,31 +814,39 @@ func _draw_turret(o: Vector2, dim: float, col: Color) -> void:
 	draw_circle(m, 6.0, Pal.red((0.3 + 0.7 * charge) * dim, 1.0 + 2.0 * charge))
 
 
-# the warning marks and live attacks, under the hull
+# the warning marks and live attacks, under the hull. Each kind of attack has
+# its own shape: missile marks are dashed rings that fill as the round falls,
+# the flame is a ragged fan with a white-hot heart, the rail gun's aim is a
+# thin white line that only turns to fire when it shoots.
 func _draw_dangers(dim: float) -> void:
-	# missile circles: a ring that closes in, the round falling toward its mark
 	for m in missiles:
 		var at: Vector2 = m[1]
 		var k: float = m[2] / MIS_FALL
-		draw_circle(at, MIS_R, Pal.red(0.05 + 0.12 * k, 1.0))
-		draw_arc(at, MIS_R, 0.0, TAU, 40, Pal.red((0.45 + 0.4 * k) * dim, 1.6), 2.0)
-		draw_arc(at, MIS_R * (1.0 - k), 0.0, TAU, 32, Pal.red(0.8 * dim, 2.2), 2.0)
-		var cr := 14.0
-		draw_line(at - Vector2(cr, 0), at + Vector2(cr, 0), Pal.red(0.6 * dim, 1.6), 1.5)
-		draw_line(at - Vector2(0, cr), at + Vector2(0, cr), Pal.red(0.6 * dim, 1.6), 1.5)
-		# the round itself on its arc from the pod
+		# the fill is the timer: it reaches the rim as the round lands
+		draw_circle(at, MIS_R * k, Pal.red(0.08 + 0.14 * k, 1.0))
+		var dash := PackedVector2Array()
+		for j in 16:
+			var a0 := TAU * j / 16.0 + t * 0.9
+			for q in 3:
+				dash.append(at + Vector2.from_angle(a0 + 0.12 * q) * MIS_R)
+				dash.append(at + Vector2.from_angle(a0 + 0.12 * (q + 1)) * MIS_R)
+		draw_multiline(dash, Pal.red((0.5 + 0.45 * k) * dim, 1.5), 2.0)
+		var cr := 12.0
+		draw_multiline(PackedVector2Array([at - Vector2(cr, 0), at + Vector2(cr, 0), at - Vector2(0, cr), at + Vector2(0, cr)]), Pal.ink(0.6 * dim), 1.5)
+		# the round itself on its arc from the pod: white, with a short trail
 		var from: Vector2 = m[0]
 		var mid := from.lerp(at, 0.5) + Vector2(0, -260.0)
-		var e := Pal.ease_in(k) if k > 0.5 else k
-		var p := from.lerp(mid, e).lerp(mid.lerp(at, e), e)
-		draw_circle(p, 5.0 + 3.0 * (1.0 - absf(k - 0.5) * 2.0), Pal.red(dim, 3.0))
-	# flame fans: a pilot line first, then the sweep, cut short by cover
+		var p := _bez(from, mid, at, k)
+		var p0 := _bez(from, mid, at, maxf(0.0, k - 0.06))
+		draw_line(p0, p, Pal.ink(0.5 * dim, 1.4), 3.0)
+		draw_circle(p, 4.0 + 3.0 * (1.0 - absf(k - 0.5) * 2.0), Pal.ink(dim, 2.2))
 	if stage == TEST and test == 1:
 		var lead := 0.45
 		var k2 := clampf((flame_t - lead) / FLAME_TIME, 0.0, 1.0)
 		for f in flames:
 			var noz: Vector2 = NOZZLES[f[0]] + _off()
 			if flame_t < lead:
+				# the pilot: where the sweep starts
 				var a0: float = f[1]
 				var seg := PackedVector2Array()
 				var s := 30.0
@@ -783,25 +854,33 @@ func _draw_dangers(dim: float) -> void:
 					seg.append(noz + Vector2.from_angle(a0) * s)
 					seg.append(noz + Vector2.from_angle(a0) * (s + 14.0))
 					s += 30.0
-				draw_multiline(seg, Pal.red(0.5 * dim, 1.6), 2.0)
+				draw_multiline(seg, Pal.red(0.6 * dim, 1.6), 3.0)
 				continue
 			var a := _flame_angle(f, k2)
+			# the fan: a ragged rim that licks in and out, red at the edge
 			var pts := PackedVector2Array([noz])
-			var cols := PackedColorArray([Pal.red(0.9 * dim, 3.0)])
-			var rays := 9
+			var cols := PackedColorArray([Pal.red(0.9 * dim, 2.6)])
+			var rays := 15
+			var reach_mid := 0.0
 			for j in rays:
-				var aj := a + lerpf(-FLAME_HALF, FLAME_HALF, j / float(rays - 1))
-				var reach := _flame_reach(noz, aj) * (0.92 + 0.08 * sin(t * 40.0 + j * 1.7))
+				var u := j / float(rays - 1)
+				var aj := a + lerpf(-FLAME_HALF, FLAME_HALF, u)
+				var lick := 0.86 + 0.07 * sin(t * 37.0 + j * 2.3) + 0.06 * sin(t * 23.0 + j * 1.1)
+				var reach := _flame_reach(noz, aj) * minf(1.0, lick + 0.1 * (1.0 - absf(u - 0.5) * 2.0))
+				if j == rays / 2:
+					reach_mid = reach
 				pts.append(noz + Vector2.from_angle(aj) * reach)
-				cols.append(Pal.red(0.16 * dim, 1.4))
+				cols.append(Pal.red(0.22 * dim, 1.4))
 			draw_polygon(pts, cols)
-			# a hot core down the middle of the fan
-			draw_line(noz, noz + Vector2.from_angle(a) * _flame_reach(noz, a) * 0.8, Pal.red(0.6 * dim, 2.6), 4.0)
-	# the rail gun: a tracking line while it locks, a held bright line, then the shot
+			# its heart: a narrow white-hot tongue
+			var core := PackedVector2Array([noz, noz + Vector2.from_angle(a - FLAME_HALF * 0.35) * reach_mid * 0.5,
+				noz + Vector2.from_angle(a) * reach_mid * 0.72, noz + Vector2.from_angle(a + FLAME_HALF * 0.35) * reach_mid * 0.5])
+			draw_polygon(core, PackedColorArray([Pal.ink(0.95 * dim, 2.6), Pal.red(0.5 * dim, 2.0), Pal.red(0.1 * dim, 1.6), Pal.red(0.5 * dim, 2.0)]))
 	if rail_mode == 1 or rail_mode == 2:
 		var m0 := _rail_muzzle()
 		var e0 := _rail_line_end()
 		if rail_mode == 1:
+			# locking: a thin white dashed line that steadies
 			var seg2 := PackedVector2Array()
 			var s2 := fmod(t * 300.0, 26.0)
 			var len := m0.distance_to(e0)
@@ -810,12 +889,18 @@ func _draw_dangers(dim: float) -> void:
 				seg2.append(m0 + dd * s2)
 				seg2.append(m0 + dd * minf(len, s2 + 12.0))
 				s2 += 26.0
-			draw_multiline(seg2, Pal.red((0.25 + 0.4 * rail_t / RAIL_LOCK) * dim, 1.6), 1.5)
+			draw_multiline(seg2, Pal.ink((0.3 + 0.5 * rail_t / RAIL_LOCK) * dim, 1.4), 1.5)
 		else:
+			# held: the line goes solid and the width it will burn shows faintly
 			var fl := 0.6 + 0.4 * sin(t * 60.0)
-			draw_line(m0, e0, Pal.red(0.3 * dim, 1.6), RAIL_W * 2.0)
-			draw_line(m0, e0, Pal.red(fl * dim, 2.6), 2.0)
+			draw_line(m0, e0, Pal.red(0.14 * dim, 1.2), RAIL_W * 2.0)
+			draw_line(m0, e0, Pal.ink(fl * dim, 2.4), 2.0)
 	if rail_shot > 0.0:
 		var m1 := TURRET + _off() + (rail_end - TURRET - _off()).normalized() * BARREL
-		draw_line(m1, rail_end, Pal.red(0.35 * rail_shot * dim, 2.0), RAIL_W * 2.0 * (0.5 + 0.5 * rail_shot))
-		draw_line(m1, rail_end, Pal.red(rail_shot * dim, 4.0), 5.0 * rail_shot + 1.0)
+		draw_line(m1, rail_end, Pal.red(0.4 * rail_shot * dim, 2.2), RAIL_W * 2.0 * (0.5 + 0.5 * rail_shot))
+		draw_line(m1, rail_end, Pal.ink(rail_shot * dim, 3.4), 5.0 * rail_shot + 1.0)
+
+
+func _bez(a: Vector2, c: Vector2, b: Vector2, k: float) -> Vector2:
+	var e := Pal.ease_in(k) if k > 0.5 else k
+	return a.lerp(c, e).lerp(c.lerp(b, e), e)

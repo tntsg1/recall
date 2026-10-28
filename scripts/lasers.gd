@@ -150,27 +150,47 @@ func _draw() -> void:
 		var d := (b - a).normalized()
 		var n := d.orthogonal()
 		if live[g]:
-			# the beam: a wide dim glow, a hot core, and light running along it
-			draw_line(a, b, Pal.red(0.16, 1.4), 14.0)
-			draw_line(a, b, Pal.red(0.5, 2.0), 5.0)
-			draw_line(a, b, Pal.red(1.0, 3.4), 2.0)
+			# the beam: a hot core with a modest glow. Held on by the boss, the
+			# glow drops further so its own attacks read over the fences.
+			var soft := 0.55 if forced == 1 else 1.0
+			draw_line(a, b, Pal.red(0.08 * soft, 1.2), 12.0)
+			draw_line(a, b, Pal.red(0.3 * soft, 1.6), 4.0)
+			draw_line(a, b, Pal.red(1.0, 2.8), 2.0)
 			var span := a.distance_to(b)
+			var runs := PackedVector2Array()
 			var s := fmod(now * 520.0, 90.0)
 			while s < span:
-				var q := a + d * s
-				draw_line(q, q + d * 26.0, Pal.red(0.9, 4.0), 3.0)
+				runs.append(a + d * s)
+				runs.append(a + d * minf(span, s + 26.0))
 				s += 90.0
+			if runs.size() > 0:
+				draw_multiline(runs, Pal.red(0.8 * soft, 3.0), 3.0)
 		elif warn[g] > 0.0:
-			# about to light: a thin flickering thread that steadies as it nears
-			var fl := 0.5 + 0.5 * sin(now * (28.0 + 30.0 * warn[g]))
-			draw_line(a, b, Pal.red((0.12 + 0.5 * warn[g]) * fl, 2.0), 1.5)
+			# about to light: a thick pulsing band and hatching on the floor either
+			# side, both growing as it nears
+			var w: float = warn[g]
+			var fl := 0.5 + 0.5 * sin(now * (18.0 + 26.0 * w))
+			draw_line(a, b, Pal.red((0.18 + 0.4 * w) * fl, 1.8), 2.0 + 4.0 * w)
+			var span3 := a.distance_to(b)
+			var hatch := PackedVector2Array()
+			var s3 := 8.0
+			while s3 < span3 - 8.0:
+				for side: float in [-1.0, 1.0]:
+					var q := a + d * s3 + n * side * 12.0
+					hatch.append(q)
+					hatch.append(q + n * side * 9.0 + d * 7.0)
+				s3 += 18.0
+			draw_multiline(hatch, Pal.red(0.15 + 0.35 * w, 1.3), 2.0)
 		else:
 			# dark: only a dotted guide where the beam will be
 			var span2 := a.distance_to(b)
+			var dots := PackedVector2Array()
 			var s2 := 0.0
 			while s2 < span2:
-				draw_line(a + d * s2, a + d * minf(span2, s2 + 6.0), Pal.red(0.16, 1.0), 1.0)
+				dots.append(a + d * s2)
+				dots.append(a + d * minf(span2, s2 + 6.0))
 				s2 += 22.0
+			draw_multiline(dots, Pal.red(0.16, 1.0), 1.0)
 		for e: Vector2 in [a, b]:
 			_emitter(e, d if e == a else -d, n, live[g], warn[g], now)
 
@@ -187,7 +207,9 @@ func _emitter(at: Vector2, out: Vector2, n: Vector2, on: bool, w: float, now: fl
 		draw_circle(lens, 7.0, Pal.red(0.3, 1.6))
 		draw_circle(lens, 3.5, Pal.red(1.0, 3.6))
 	elif w > 0.0:
-		var bl := 1.0 if fmod(now * 8.0, 1.0) < 0.5 else 0.25
+		# charging: the lens swells and blinks faster as it nears
+		var bl := 1.0 if fmod(now * (6.0 + 10.0 * w), 1.0) < 0.5 else 0.3
+		draw_circle(lens, 4.0 + 5.0 * w, Pal.red(0.25 * w, 1.6))
 		draw_circle(lens, 3.5, Pal.red(0.9 * bl, 2.6))
 	else:
 		draw_circle(lens, 3.0, Pal.red(0.25, 1.0))

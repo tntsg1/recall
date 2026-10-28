@@ -154,7 +154,7 @@ func _draw() -> void:
 		_draw_weapon_crates(dim)
 		_draw_terminal(Vector2(80, 600), dim, "w3_log")
 		_draw_target(Vector2(1840, 600), Vector2(-1, 0), dim, 0)
-		_draw_target(Vector2(420, 70), Vector2(0, 1), dim, 1)
+		_draw_target(Vector2(600, 70), Vector2(0, 1), dim, 1)
 		if shows.get("w3_safety", 0.0) <= 0.01:
 			_draw_floor_notice(Vector2(1490, 1010), dim)
 	for w in Lore.walls(story):
@@ -216,6 +216,8 @@ func _draw_remnant(w: Array, k: float, dim: float) -> void:
 			_remnant_floor(w, shown, full, k, dim)
 		"scrawl":
 			_remnant_hand(w, shown, k, dim)
+		"crate":
+			_remnant_crate(w, shown, full, k, dim)
 		_:
 			_remnant_print(w, shown, full, k, dim)
 
@@ -267,10 +269,11 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	r.position.x = minf(r.position.x, Arena.ROOM.end.x - r.size.x - 8.0)
 	if (w[2] as Vector2).x < -0.5:
 		# on the right wall the paper unfolds leftward from where it hangs
-		r = Rect2(at.x - 24.0 - wide, at.y - 36.0, wide, 72.0)
+		# (clear of the target sheet when it is the sheet's own words)
+		r = Rect2(at.x - (106.0 if w[3] == "sheet" else 24.0) - wide, at.y - 36.0, wide, 72.0)
 	elif (w[2] as Vector2).y < -0.5:
-		# on the bottom wall it unfolds upward, centred on its board
-		r = Rect2(at.x - wide * 0.5, at.y - 112.0, wide, 72.0)
+		# on the bottom wall it unfolds upward and leftward of its board
+		r = Rect2(minf(at.x - wide * 0.5, at.x + 70.0 - wide), at.y - 150.0, wide, 72.0)
 	draw_rect(r, Color(0.08, 0.08, 0.085, 1.0))
 	draw_rect(r, Pal.ink(0.6 * dim), false, 1.5)
 	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
@@ -422,13 +425,19 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 		for w in Lore.walls(story):
 			if "w%d_%s" % [story, w[0]] == id:
 				full = w[4] if Txt.zh else w[5]
-		var rows := _rows(full, scr.size.x - 12.0, 15)
+		# four rows only fit a little smaller
+		var fs := 15
+		var rows := _rows(full, scr.size.x - 12.0, fs)
+		if rows.size() > 3:
+			fs = 13
+			rows = _rows(full, scr.size.x - 10.0, fs)
+		var step := 21.0 if fs == 15 else 18.0
 		var budget := int(ceil(full.length() * clampf(wake * 1.6, 0.0, 1.0)))
-		var yy := scr.position.y + 24.0
+		var yy := scr.position.y + (24.0 if fs == 15 else 19.0)
 		for row in rows:
-			draw_string(font, Vector2(scr.position.x + 6.0, yy), String(row).substr(0, clampi(budget, 0, String(row).length())), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.92 * wake * dim, 1.4))
+			draw_string(font, Vector2(scr.position.x + 6.0, yy), String(row).substr(0, clampi(budget, 0, String(row).length())), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.92 * wake * dim, 1.4))
 			budget -= String(row).length()
-			yy += 21.0
+			yy += step
 	elif id != "" or int(t * 2.0) % 3 != 0:
 		var dots := ".".repeat(int(t * 2.0) % 4)
 		draw_string(font, scr.position + Vector2(8, 30), Txt.t("term_idle" if story != 3 else "term_log") + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
@@ -607,12 +616,18 @@ func _draw_lanes(dim: float) -> void:
 	var y0 := 330.0
 	var x := 700.0
 	while x < 1220.0:
-		draw_line(Vector2(x, y0), Vector2(x + 14.0, y0 - 14.0), Pal.red(0.12 * dim, 1.0), 3.0)
+		draw_line(Vector2(x, y0), Vector2(x + 14.0, y0 - 14.0), Pal.ink(0.1 * dim), 3.0)
 		x += 26.0
-	draw_line(Vector2(700, y0 + 2.0), Vector2(1220, y0 + 2.0), Pal.red(0.18 * dim, 1.0), 1.0)
+	draw_line(Vector2(700, y0 + 2.0), Vector2(1220, y0 + 2.0), Pal.ink(0.16 * dim), 1.0)
+	# while the testbed vents, its guide marks take this spot
+	var zk := 1.0
+	if game.boss is Testbed and game.boss.alive():
+		zk = 1.0 - game.boss.core_open
+	if zk <= 0.01:
+		return
 	var tz := Txt.t("range_zone")
 	var tw := sf.get_string_size(tz, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-	draw_string(sf, Vector2(960.0 - tw / 2.0, y0 + 24.0), tz, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.red(0.3 * dim, 1.1))
+	draw_string(sf, Vector2(960.0 - tw / 2.0, y0 + 24.0), tz, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.28 * dim * zk))
 
 
 # The posts the beams hang from, and the crate stacks: arms crates with their
@@ -626,7 +641,7 @@ func _draw_weapon_crates(dim: float) -> void:
 			# a beam post: a dark column with a red band round it
 			draw_rect(r.grow(-6.0), Color(0.03, 0.03, 0.035, 1.0))
 			draw_rect(r.grow(-6.0), Pal.ink(0.3 * dim), false, 1.0)
-			draw_rect(Rect2(r.position.x + 6.0, r.get_center().y - 3.0, r.size.x - 12.0, 6.0), Pal.red(0.4 * dim, 1.2))
+			draw_rect(Rect2(r.position.x + 6.0, r.get_center().y - 3.0, r.size.x - 12.0, 6.0), Pal.ink(0.3 * dim))
 			continue
 		# an arms crate stack: two lids, a seam, its stencil and a seal
 		var ins := r.grow(-6.0)
@@ -636,7 +651,7 @@ func _draw_weapon_crates(dim: float) -> void:
 			draw_rect(hr.grow(-5.0), Pal.ink(0.16 * dim), false, 1.0)
 			draw_string(sf, hr.position + Vector2(8, 20), "PG-IV", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
 		# the seal on the lid's corner
-		draw_circle(Vector2(ins.end.x - 9.0, ins.position.y + 9.0), 4.0, Pal.red(0.5 * dim, 1.2))
+		draw_circle(Vector2(ins.end.x - 9.0, ins.position.y + 9.0), 4.0, Pal.ink(0.4 * dim))
 		var tag := Txt.t("crate_tag")
 		draw_string(sf, Vector2(ins.position.x + 8.0, ins.end.y - 8.0), tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.35 * dim))
 
@@ -657,13 +672,31 @@ func _draw_target(at: Vector2, inn: Vector2, dim: float, which: int) -> void:
 	draw_circle(m + Vector2(0, -26), 10.0, Pal.ink(0.22 * dim))
 	draw_polyline(PackedVector2Array([m + Vector2(-22, 34), m + Vector2(-20, -6), m + Vector2(-10, -14), m + Vector2(10, -14), m + Vector2(20, -6), m + Vector2(22, 34)]), Pal.ink(0.3 * dim), 2.0)
 	for k in 3:
-		draw_arc(m + Vector2(0, -6), 12.0 + k * 11.0, 0.0, TAU, 24, Pal.red((0.5 - k * 0.12) * dim, 1.2), 1.0)
+		draw_arc(m + Vector2(0, -6), 12.0 + k * 11.0, 0.0, TAU, 24, Pal.ink((0.4 - k * 0.1) * dim), 1.0)
 	# holes, mostly through the head and chest
 	for h in [Vector2(-3, -27), Vector2(4, -8), Vector2(-6, 2), Vector2(9, -22), Vector2(1, 12)]:
 		var hp: Vector2 = m + h + Vector2(which * 3.0, -which * 2.0)
 		draw_circle(hp, 2.2, Color(0.0, 0.0, 0.0, 1.0))
 		draw_arc(hp, 3.0, 0.0, TAU, 8, Pal.ink(0.5 * dim), 1.0)
 	draw_string(Fonts.get_font("SemiBold"), r.position + Vector2(6, 14), "C", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.5 * dim))
+
+
+# The crate's own stencil, sprayed across its lid in rows.
+func _remnant_crate(w: Array, shown: String, full: String, k: float, dim: float) -> void:
+	var at: Vector2 = w[1]
+	var lid := Rect2(at.x - 49.0, at.y + 6.0, 98.0, 52.0)
+	for r: Rect2 in game.arena.inner:
+		if r.has_point(at + Vector2(0, 10)):
+			lid = r.grow(-6.0)
+	draw_rect(lid, Color(0.05, 0.05, 0.055, k))
+	var sf := Fonts.get_font("SemiBold")
+	var rows := _rows(full, lid.size.x - 8.0, 13)
+	var budget := shown.length()
+	var yy := lid.position.y + 16.0
+	for row in rows:
+		draw_string(sf, Vector2(lid.position.x + 4.0, yy), String(row).substr(0, clampi(budget, 0, String(row).length())), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.75 * k * dim, 1.1))
+		budget -= String(row).length()
+		yy += 16.0
 
 
 # A safety board on the bottom wall.
@@ -673,8 +706,8 @@ func _draw_floor_notice(c: Vector2, dim: float) -> void:
 	draw_rect(r, Pal.ink(0.5 * dim), false, 1.5)
 	# a warning triangle and printed lines
 	var tc := r.position + Vector2(22, 30)
-	draw_polyline(PackedVector2Array([tc + Vector2(0, -13), tc + Vector2(12, 9), tc + Vector2(-12, 9), tc + Vector2(0, -13)]), Pal.red(0.7 * dim, 1.4), 2.0)
-	draw_line(tc + Vector2(0, -5), tc + Vector2(0, 2), Pal.red(0.7 * dim, 1.4), 2.0)
+	draw_polyline(PackedVector2Array([tc + Vector2(0, -13), tc + Vector2(12, 9), tc + Vector2(-12, 9), tc + Vector2(0, -13)]), Pal.ink(0.6 * dim), 2.0)
+	draw_line(tc + Vector2(0, -5), tc + Vector2(0, 2), Pal.ink(0.6 * dim), 2.0)
 	for j in 3:
 		draw_line(r.position + Vector2(44, 16 + j * 11), r.position + Vector2(108 - (j % 2) * 20, 16 + j * 11), Pal.ink(0.25 * dim), 1.0)
 

@@ -7,7 +7,7 @@ class_name Chapters
 const LIST := [
 	{"story": 1, "room": 0, "pool": 0, "music": 0, "boss": "lockdown", "note": "note_boss_lockdown", "par": [90.0, 130.0]},
 	{"story": 2, "room": 1, "pool": 1, "music": 1, "boss": "warden", "note": "note_boss_2", "par": [45.0, 70.0]},
-	{"story": 3, "room": 5, "pool": 6, "music": 1, "boss": "testbed", "note": "note_boss_testbed", "par": [80.0, 120.0]},
+	{"story": 3, "room": 5, "pool": 6, "music": 1, "boss": "testbed", "note": "note_boss_testbed", "par": [70.0, 110.0]},
 	{"story": 4, "room": 2, "pool": 2, "music": 2, "boss": "devourer", "note": "note_boss_3", "par": [45.0, 70.0]},
 	{"story": 5, "room": 0, "pool": 5, "music": 0, "boss": "train", "note": "note_boss", "par": [70.0, 105.0]},
 	{"story": 7, "room": 3, "pool": 3, "music": 3, "boss": "metronome", "note": "note_boss_4", "par": [70.0, 100.0]},

@@ -117,6 +117,8 @@ const S := {
 	"tb_test_3": ["测试 03 · 重点清除", "TEST 03 · PRIORITY REMOVAL"],
 	"tb_test_4": ["测试 04 · 全项联测", "TEST 04 · FULL DEMONSTRATION"],
 	"tb_running": ["进行中 · 请勿离开测试区", "IN PROGRESS · DO NOT LEAVE THE RANGE"],
+	"tb_running_4": ["采购方观摩中 · 请保持站立", "BUYERS OBSERVING · REMAIN STANDING"],
+	"radio_testbed_4": ["全项联测开始。采购方代表请就座观摩。", "FULL DEMONSTRATION BEGINS. BUYERS' DELEGATES, PLEASE BE SEATED."],
 	"tb_pass": ["结果：合格", "RESULT: PASSED"],
 	"tb_ok": ["合格", "PASSED"],
 	"tb_vent": ["散热中", "COOLING"],

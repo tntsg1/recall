@@ -52,6 +52,9 @@ func setup(ch: int) -> void:
 				inner.append(Rect2(c - Vector2(24, 24), Vector2(48, 48)))
 			inner.append(Rect2(230, 860, 110, 64))
 			inner.append(Rect2(1580, 860, 110, 64))
+			# two more stacks mid-range: cover from the flame and the rail gun
+			inner.append(Rect2(730, 530, 110, 64))
+			inner.append(Rect2(1080, 530, 110, 64))
 		2:
 			# the Maw: six blocks in a ring, the middle left for what lives there
 			for k in 6:
