@@ -121,7 +121,7 @@ func _draw() -> void:
 		_draw_scrawl(Vector2(1840, 780), dim)
 		if shows.get("w1_notice", 0.0) <= 0.01:
 			_draw_notice(Vector2(1500, 70), dim)
-		if worker_t >= 0.0:
+		if worker_t >= 0.0 and game.wave_ctl.index <= 0:
 			_draw_worker(dim)
 	for w in Lore.walls(story):
 		var id := "w%d_%s" % [story, w[0]]
@@ -184,11 +184,11 @@ func _draw_remnant(w: Array, k: float, dim: float) -> void:
 
 # Stencilled beside the door, letters spaced as if sprayed through a plate.
 func _remnant_stencil(w: Array, shown: String, k: float, dim: float) -> void:
-	var at: Vector2 = (w[1] as Vector2) + (w[2] as Vector2) * 70.0
+	var at: Vector2 = (w[1] as Vector2) + (w[2] as Vector2) * 74.0
 	var sf := Fonts.get_font("SemiBold")
-	# down the wall in two columns, above the door, never into the floor's edge
+	# down the wall beside the door's frame, two columns from its top edge
 	var x := at.x
-	var y0 := at.y - 360.0
+	var y0 := at.y - 112.0
 	var y := y0
 	var i := 0
 	for ch in shown:
@@ -204,7 +204,7 @@ func _remnant_stencil(w: Array, shown: String, k: float, dim: float) -> void:
 
 # Sprayed by hand: each letter a little off its line, larger, rough.
 func _remnant_hand(w: Array, shown: String, k: float, dim: float) -> void:
-	var at: Vector2 = (w[1] as Vector2) + (w[2] as Vector2) * 150.0
+	var at: Vector2 = (w[1] as Vector2) + (w[2] as Vector2) * 150.0 + Vector2(0, 92.0)
 	var sf := Fonts.get_font("SemiBold")
 	var total := sf.get_string_size(shown + "  ", HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
 	var x := at.x - total
@@ -230,7 +230,7 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	draw_rect(r, Pal.ink(0.6 * dim), false, 1.5)
 	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
 	draw_string(font, r.position + Vector2(15, 54), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * dim, 1.2))
-	draw_arc(r.end - Vector2(24, 22), 12.0, 0.0, TAU, 20, Pal.red(0.6 * k * dim, 1.4), 2.0, false)
+	draw_arc(Vector2(r.end.x - 22.0, r.position.y + 22.0), 11.0, 0.0, TAU, 20, Pal.red(0.6 * k * dim, 1.4), 2.0, false)
 
 
 # The old-era door R-0 came out of: two heavy panels, one slid half open,
@@ -276,28 +276,25 @@ func _draw_screen(c: Vector2, dim: float) -> void:
 		y += 6.0
 	# what is left of its slogan, running down the glass, stuttering
 	var wake: float = shows.get("w1_screen", 0.0)
-	if wake > 0.01:
-		# its real line, in rows down the glass, flickering in
-		var full: String = Txt.t("screen_full")
-		var rows: Array = Array(full.split("\n"))
-		full = full.replace("\n", "")
-		var n := int(ceil(full.length() * clampf(wake * 1.6, 0.0, 1.0)))
-		var yy := r.position.y + 30.0
-		var used := 0
-		for ln in rows:
-			var part: String = ln.substr(0, clampi(n - used, 0, ln.length()))
-			used += ln.length()
-			draw_string(font, Vector2(r.position.x + 7.0, yy), part, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.9 * wake * dim, 1.5))
-			yy += 21.0
-		return
-	var on2 := int(t * 3.0) % 5 != 0
-	if on2:
-		var sf := Fonts.get_font("SemiBold")
-		var l1 := Txt.t("prop_screen_1")
-		var l2 := Txt.t("prop_screen_2")
-		var cx := r.get_center().x
-		draw_string(sf, Vector2(cx - sf.get_string_size(l1, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x / 2.0, r.position.y + 96.0), l1, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Pal.ink(0.55 * dim, 1.4))
-		draw_string(sf, Vector2(cx - sf.get_string_size(l2, HORIZONTAL_ALIGNMENT_LEFT, -1, 28).x / 2.0, r.position.y + 134.0), l2, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Pal.ink(0.6 * dim, 1.5))
+	var sf := Fonts.get_font("SemiBold")
+	var full: String = Txt.t("screen_full")
+	var rows: Array = Array(full.split("\n"))
+	# asleep it shows only its first two rows, stuttering; awake, all of them
+	var show_n := rows.size() if wake > 0.01 else 2
+	var lit := wake > 0.01 or int(t * 3.0) % 5 != 0
+	if lit:
+		var total_chars := 0
+		for k in show_n:
+			total_chars += String(rows[k]).length()
+		var budget := int(ceil(total_chars * clampf(wake * 1.6, 0.0, 1.0))) if wake > 0.01 else total_chars
+		var yy := r.get_center().y - show_n * 13.0 + 18.0
+		for k in show_n:
+			var row: String = rows[k]
+			var part := row.substr(0, clampi(budget, 0, row.length()))
+			budget -= row.length()
+			var rw := sf.get_string_size(row, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+			draw_string(sf, Vector2(r.get_center().x - rw / 2.0, yy), part, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink((0.95 if wake > 0.01 else 0.6) * dim, 1.4))
+			yy += 26.0
 	# the crack
 	draw_polyline(PackedVector2Array([r.position + Vector2(6, 40), r.position + Vector2(40, 88), r.position + Vector2(26, 130), r.position + Vector2(70, 176), r.position + Vector2(58, 220)]), Pal.ink(0.7 * dim, 1.2), 1.5)
 	draw_line(r.position + Vector2(40, 88), r.position + Vector2(86, 102), Pal.ink(0.5 * dim, 1.2), 1.0)
@@ -395,7 +392,7 @@ func _draw_memory() -> void:
 	var a := clampf(memory_t / 0.3, 0.0, 1.0) * (1.0 - clampf((memory_t - 2.8) / 0.6, 0.0, 1.0))
 	var size := 18
 	# typed out, a few characters at a time, like a log being read
-	var n := int(memory.length() * clampf(memory_t / 1.0, 0.0, 1.0))
+	var n := int(memory.length() * clampf(memory_t / 0.5, 0.0, 1.0))
 	var txt := memory.substr(0, n)
 	var tw := font.get_string_size(memory, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var p: Vector2 = (sh.pos as Vector2) + Vector2(-tw / 2.0, -70.0)

@@ -24,7 +24,7 @@ const HP := LAMP_HP * 2.0 + LEG_HP * 4.0 + CORE_HP
 const SIZE := 1.25
 const HULL := [Vector2(-80, 0), Vector2(0, 0), Vector2(80, 0)]   # armour circles, local
 const HULL_R := 70.0
-const LAMPS := [Vector2(-190, 30), Vector2(190, 30)]
+const LAMPS := [Vector2(-170, 30), Vector2(170, 30)]
 const LAMP_R := 30.0
 const LAMP_HIT := 42.0          # a returning round only has to pass close
 const LEGS := [Vector2(-240, -20), Vector2(240, -20), Vector2(-160, 120), Vector2(160, 120)]
@@ -466,7 +466,7 @@ func _run(dt: float, pl: Vector2) -> void:
 	match phase:
 		0:
 			# patrols along the top, the lamps sweeping out of step
-			var gx := 960.0 + sin(t * 0.3) * 140.0
+			var gx := 960.0 + sin(t * 0.3) * 90.0
 			vel = Pal.damp2(vel, Vector2((gx - pos.x) * 1.2, (HOME.y - pos.y) * 2.0), 3.0, dt)
 			pos += vel * dt
 			for k in 2:
@@ -498,7 +498,7 @@ func _run(dt: float, pl: Vector2) -> void:
 			plant = maxf(0.0, plant - dt / 0.5)
 			core_open = minf(1.0, core_open + dt / 0.8)
 			tilt = Pal.damp(tilt, 0.0, 2.0, dt)
-			var gx2 := 960.0 + sin(t * 0.22) * 160.0
+			var gx2 := 960.0 + sin(t * 0.22) * 80.0
 			vel = Pal.damp2(vel, Vector2((gx2 - pos.x) * 1.0, (HOME.y + 30.0 - pos.y) * 2.0), 2.0, dt)
 			pos += vel * dt
 			_charge_sockets()
@@ -675,7 +675,7 @@ func _draw() -> void:
 				draw_rect(cl, Color(0.06, 0.06, 0.065, 1.0))
 				var sx := cl.position.x + 6.0
 				while sx < cl.end.x - 8.0:
-					draw_line(Vector2(sx, cl.end.y - 4.0), Vector2(sx + 10.0, cl.position.y + 4.0), Pal.red(0.55 * dim, 1.3), 4.0)
+					draw_line(Vector2(sx, cl.end.y - 4.0), Vector2(sx + 10.0, cl.position.y + 4.0), _alert_col(0.55 * dim), 4.0)
 					sx += 16.0
 				draw_rect(cl, lc, false, 2.5)
 				# how much is left: a bar under the clamp
@@ -702,12 +702,12 @@ func _draw() -> void:
 		var b0 := _local(Vector2(-112, -36))
 		var b1 := _local(Vector2(112, -36))
 		var bn := (b1 - b0).normalized().orthogonal()
-		draw_line(b0, b1, Pal.red(0.9 * dim, 1.8), 2.0)
-		draw_line(b0 + bn * 14.0, b1 + bn * 14.0, Pal.red(0.9 * dim, 1.8), 2.0)
+		draw_line(b0, b1, _alert_col(0.9 * dim), 2.0)
+		draw_line(b0 + bn * 14.0, b1 + bn * 14.0, _alert_col(0.9 * dim), 2.0)
 		var steps := 14
 		for j in steps:
 			var q := b0.lerp(b1, (j + 0.5) / steps)
-			draw_line(q, q + bn * 14.0 + (b1 - b0).normalized() * 8.0, Pal.red(0.8 * dim, 1.6), 3.0)
+			draw_line(q, q + bn * 14.0 + (b1 - b0).normalized() * 8.0, _alert_col(0.8 * dim), 3.0)
 	# the core
 	if open > 0.01:
 		var cr := CORE_R * Pal.back(open)
@@ -775,6 +775,27 @@ func _draw() -> void:
 			for j in 3:
 				var a := randf() * TAU
 				draw_line(b.pos, b.pos + Vector2.from_angle(a) * randf_range(6.0, 14.0), Pal.ink(0.9 * dim, 2.6), 1.0)
+
+
+# Its stripes stay grey while it waits; they go red only as it is about to
+# strike (a ring winding up, a lamp locked on, the arc warning), so red keeps
+# meaning "now".
+func _alert() -> float:
+	var a := 0.0
+	for w in waves:
+		if w[1] < 0.0:
+			a = 1.0
+	for k in 2:
+		if lamp_hp[k] > 0.0 and lamp_aim[k] >= 0.0:
+			a = 1.0
+	if phase == 2 and arc_t < ARC_WARN:
+		a = 1.0
+	return a
+
+
+func _alert_col(a: float) -> Color:
+	var k := _alert()
+	return Pal.ink(a * 0.6, 1.0).lerp(Pal.red(a, 2.0), k)
 
 
 func _draw_beam(k: int, dim: float) -> void:

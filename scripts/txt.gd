@@ -167,7 +167,7 @@ const S := {
 	"cap_wave": ["波次", "WAVE"],
 	"radio_tag": ["城市广播", "CITY BROADCAST"],
 	"prop_screen_1": ["幸福指数", "HAPPINESS"],
-	"screen_full": ["幸福指数\n100%\n连续\n87 年\n增长", "HAPPY\nINDEX\n100%\n87 YRS\nGROWTH"],
+	"screen_full": ["幸福指数\n100%\n连续 87 年\n增长", "HAPPY\n100%\n87 YEARS\nGROWTH"],
 	"notice_head": ["品牌安全管理局 · 通告", "BRAND SAFETY BUREAU · NOTICE"],
 	"prop_screen_2": ["100%", "100%"],
 	"worker_line": ["……你醒了？快，它们来了。", "...YOU'RE AWAKE? QUICK, THEY'RE COMING."],
