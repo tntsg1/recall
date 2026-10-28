@@ -330,6 +330,8 @@ func _draw_view() -> void:
 		if combo_stamp > 0.0:
 			var e := 1.0 - combo_stamp
 			view.draw_arc(cp, lerpf(40.0, 150.0, Pal.ease_out(e)), 0.0, TAU, 64, Possess.cyan(combo_stamp * 0.8, 2.0) if combo_seize else Pal.red(combo_stamp * 0.8, 2.0), 2.0, false)
+	if game.trial:
+		_draw_yard(vp)
 	if game.tutorial == null:
 		_draw_timer(vp)
 		_draw_title(vp)
@@ -1760,3 +1762,28 @@ func _draw_pause(vp: Vector2) -> void:
 		view.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	_text_c(font_s, Txt.t("pause_keys"), Vector2(vp.x / 2.0, vp.y * 0.44 + 350.0), 14, Pal.ink(0.4 * a))
 	_draw_build(vp, a)
+
+
+# 训练场: which key makes you what, and what the current shell's three moves are.
+func _draw_yard(vp: Vector2) -> void:
+	var x := 40.0
+	var y := 150.0
+	view.draw_string(font_b, Vector2(x, y), Txt.t("yard_title"), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Possess.cyan(0.95, 1.6))
+	y += 34.0
+	var cur := -1
+	if game.possess.hosting():
+		cur = game.possess.shell.kind
+	for i in Game.YARD_KEYS.size():
+		var k: int = Game.YARD_KEYS[i]
+		var on := k == cur
+		var line := "%d   %s" % [i + 1, Txt.t("yard_k%d" % k)]
+		view.draw_string(font_s, Vector2(x, y), line, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Possess.cyan(1.0, 2.0) if on else Pal.ink(0.6))
+		y += 24.0
+		if on:
+			for row in Txt.t("yard_m%d" % k).split("\n"):
+				view.draw_string(font_s, Vector2(x + 26.0, y), row, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Possess.cyan(0.75, 1.3))
+				y += 21.0
+	y += 12.0
+	for key in ["yard_e", "yard_r", "yard_t", "yard_esc"]:
+		view.draw_string(font_s, Vector2(x, y), Txt.t(key), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.45))
+		y += 20.0

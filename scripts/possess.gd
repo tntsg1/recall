@@ -71,6 +71,7 @@ var flow_t := 0.0
 var flow_from := Vector2.ZERO
 var marks := {}                 # enemy id -> [E, time left]
 var hinted := false
+var endless := false            # the training yard: no time limit, no cooldown
 var grow := 0.0
 var hits_left := SHELL_HITS
 var iframes := 0.0
@@ -199,6 +200,13 @@ func press() -> void:
 	game.fx.flash(flow_from, 60.0, 0.18, cyan(0.6, 2.2))
 	game.fx.ring(flow_from, 10.0, 70.0, 0.3, cyan(0.9, 2.2), 2.0)
 	game.player.visible = false
+
+
+# The training yard's number keys: straight in, no mark and no flight.
+func seize_now(e) -> void:
+	shell = e
+	game.player.visible = false
+	_begin_host()
 
 
 func _begin_host() -> void:
@@ -382,6 +390,8 @@ func host_step(sdt: float, dt: float, move: Vector2, aim_at: Vector2, fire_held:
 	if shell.state != Enemies.HOST:
 		_restore(shell.pos)
 		return
+	if endless:
+		t_left = DURATION
 	t_left -= sdt
 	iframes = maxf(0.0, iframes - sdt)
 	recover = maxf(0.0, recover - sdt)

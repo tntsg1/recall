@@ -1,9 +1,11 @@
 extends SceneTree
-# Headless: the title's 夺壳试玩 room keeps three chasers and one of every other seizable kind coming,
-# nothing else, never ends, and never writes the save.
+# Headless: the title's 训练场 (training yard). Dummies stand on their spots and come
+# back after they die; 1–7 put you straight into each shell with no time limit;
+# nothing ends and nothing is saved.
 # Run: Godot --headless --path . -s tests/trial_check.gd --fixed-fps 60
 
 var fails: Array[String] = []
+var game
 
 
 func check(ok: bool, what: String) -> void:
@@ -16,23 +18,47 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 
+func key(k: int) -> void:
+	var ev := InputEventKey.new()
+	ev.physical_keycode = k
+	ev.pressed = true
+	game._unhandled_input(ev)
+
+
 func _run() -> void:
 	Meta.possess_trial = true
-	var game = load("res://scenes/main.tscn").instantiate()
+	game = load("res://scenes/main.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
-	check(game.trial and Meta.test_mode, "进入夺壳试玩：不写存档")
-	for i in 60 * 12:
-		await process_frame
-	var have := {}
-	for e in game.enemies.list:
-		if e.state != Enemies.DEAD:
-			have[e.kind] = have.get(e.kind, 0) + 1
-	check(have.get(Enemies.CHASER, 0) == 3 and have.size() == 7, "七种能夺的敌人都在场：%s" % str(have))
-	for e in game.enemies.list:
-		e.state = Enemies.DEAD
+	check(game.trial and Meta.test_mode, "进入训练场：不写存档")
 	for i in 60 * 6:
 		await process_frame
-	check(game.wave_ctl.phase == Waves.FIGHT and game.enemies.remaining() == 9, "打光了会马上补，试玩不会结束（%d）" % game.enemies.remaining())
+	var alive := 0
+	for e in game.enemies.list:
+		if e.state == Enemies.ALIVE:
+			alive += 1
+	check(alive == game.yard_slots.size() and alive >= 10, "木桩全部站好（%d）" % alive)
+	var p0: Vector2 = game.yard_slots[0][1]
+	await process_frame
+	check(game.yard_slots[0][2].pos.distance_to(p0) < 20.0, "木桩待在原位不追人")
+	# every number key is a different shell, straight away
+	for i in 7:
+		key(KEY_1 + i)
+		for f in 20:
+			await process_frame
+		check(game.possess.hosting() and game.possess.shell.kind == game.YARD_KEYS[i], "按 %d 直接变成 %s" % [i + 1, Possess.NAMES[game.YARD_KEYS[i]]])
+	for f in 60 * 8:
+		await process_frame
+	check(game.possess.hosting(), "训练场里附身不限时（8 秒后还在）")
+	# kill everything: they come back, the wave never ends
+	for sl in game.yard_slots:
+		if sl[2] != null:
+			sl[2].state = Enemies.DEAD
+	for f in 60 * 3:
+		await process_frame
+	check(game.wave_ctl.phase == Waves.FIGHT and game.enemies.remaining() == game.yard_slots.size(), "打死的木桩 1.2 秒后原地复活（%d）" % game.enemies.remaining())
+	key(KEY_T)
+	check(game.yard_live, "T：木桩动起来")
+	key(KEY_E)
 	print("TRIAL CHECK " + ("PASS" if fails.is_empty() else "FAIL"))
 	quit(0 if fails.is_empty() else 1)

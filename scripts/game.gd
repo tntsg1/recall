@@ -23,7 +23,7 @@ var cam: Cam
 var player: Player
 var possess: Possess
 var possess_prev := false
-var trial := false            # 夺壳试玩: keep chasers and leeches coming, nothing ends, nothing saved
+var trial := false            # 训练场: dummies, number keys to any shell, nothing ends, nothing saved
 var trial_cd := 0.0
 var hud: Hud
 var sfx: Sfx
@@ -665,41 +665,85 @@ func _in_focus() -> bool:
 	return Input.is_action_pressed("recall") or Input.is_action_pressed("recall_mouse")
 
 
-# 夺壳试玩: once the first wave is up, keep three chasers and one of every other
-# seizable kind in the room (fresh ones walk in as others fall). You cannot lose here.
-const TRIAL_MIX := {Enemies.CHASER: 3, Enemies.LEECH: 1, Enemies.GUARD: 1, Enemies.CHARGER: 1, Enemies.PRISM: 1, Enemies.PULSE: 1, Enemies.ECHO: 1}
+# 训练场 (the title's training yard): no real fight. A field of target dummies that
+# never die for long, and the number keys put you straight into any shell:
+# 1 chaser · 2 leech · 3 guard · 4 charger · 5 prism · 6 pulse · 7 echo. No time
+# limit, no cooldown, nothing can hurt you; E steps out, R resets the dummies,
+# T makes them walk and fight back. Shooting and Q still work for the combos.
+const YARD_KEYS := [Enemies.CHASER, Enemies.LEECH, Enemies.GUARD, Enemies.CHARGER, Enemies.PRISM, Enemies.PULSE, Enemies.ECHO]
+var yard_slots: Array = []      # [kind, home position, enemy or null, respawn timer]
+var yard_live := false
+
+
+func _yard_layout() -> void:
+	yard_slots.clear()
+	var c := Arena.ROOM.get_center()
+	# an arc of chasers, two guards in front of the right wall to ram into it, two chargers
+	for k in 7:
+		yard_slots.append([Enemies.CHASER, c + Vector2.from_angle(-PI * 0.75 + k * PI * 0.25) * 300.0 + Vector2(120, 0), null, 0.0])
+	yard_slots.append([Enemies.GUARD, Vector2(Arena.ROOM.end.x - 200.0, c.y - 90.0), null, 0.0])
+	yard_slots.append([Enemies.GUARD, Vector2(Arena.ROOM.end.x - 200.0, c.y + 90.0), null, 0.0])
+	yard_slots.append([Enemies.CHARGER, c + Vector2(-80, -330), null, 0.0])
+	yard_slots.append([Enemies.CHARGER, c + Vector2(-80, 330), null, 0.0])
 
 
 func _trial_step(sdt: float) -> void:
 	dev_god = true
+	dev_ammo = true
+	possess.endless = true
+	possess.cooldown = 0.0
 	if wave_ctl.phase != Waves.FIGHT:
 		return
 	wave_ctl.queue.clear()
-	if not has_meta("trial_hinted"):
-		set_meta("trial_hinted", true)
-		hud.flash_text(Txt.t("trial_hint"))
-	trial_cd -= sdt
-	if trial_cd > 0.0:
+	if yard_slots.is_empty():
+		_yard_layout()
+		for e in enemies.list:
+			if e.state != Enemies.HOST:
+				e.state = Enemies.DEAD
+	for sl in yard_slots:
+		var e = sl[2]
+		if e != null and e.state == Enemies.DEAD:
+			sl[2] = null
+			sl[3] = 1.2
+		if sl[2] == null:
+			sl[3] -= sdt
+			if sl[3] <= 0.0:
+				var ne = enemies.spawn(sl[0], sl[1])
+				sl[2] = ne
+		elif not yard_live and e.state == Enemies.ALIVE:
+			# a dummy: it stays on its spot and does not come for you
+			e.vel = Vector2.ZERO
+			e.mode = Enemies.APPROACH
+			e.cool = 99.0
+			e.pos = e.pos.lerp(sl[1], 1.0 - exp(-2.0 * sdt))
+
+
+func yard_key(k: int) -> void:
+	if k == KEY_R:
+		for sl in yard_slots:
+			if sl[2] != null and sl[2].state != Enemies.HOST:
+				sl[2].state = Enemies.DEAD
+			sl[3] = 0.0
+		sfx.play("reroll", 1.0, -6.0)
 		return
-	var have := {}
-	for e in enemies.list:
-		if e.state != Enemies.DEAD:
-			have[e.kind] = have.get(e.kind, 0) + 1
-	var kind := -1
-	for k in TRIAL_MIX:
-		if have.get(k, 0) < TRIAL_MIX[k]:
-			kind = k
-			break
-	if kind < 0:
+	if k == KEY_T:
+		yard_live = not yard_live
+		for sl in yard_slots:
+			if sl[2] != null and sl[2].state == Enemies.ALIVE:
+				sl[2].speed = Enemies.SPEC[sl[0]].speed if yard_live else sl[2].speed
+		hud.flash_text(Txt.t("yard_live_on" if yard_live else "yard_live_off"))
+		sfx.play("tick", 1.0, -6.0)
 		return
-	trial_cd = 0.45
-	var room := Arena.ROOM.grow(-90.0)
-	var at := player.pos
-	for k in 12:
-		at = Vector2(randf_range(room.position.x, room.end.x), randf_range(room.position.y, room.end.y))
-		if at.distance_to(player.pos) > 420.0 and arena.raycast(at, at + Vector2(1, 1)).is_empty():
-			break
-	enemies.spawn(kind, at)
+	var i := k - KEY_1
+	if i < 0 or i >= YARD_KEYS.size():
+		return
+	# straight into that shell, wherever you stand
+	if possess.hosting():
+		possess.end(false, true)
+	var e = enemies.spawn(YARD_KEYS[i], player.pos + player.aim * 4.0)
+	e.state = Enemies.ALIVE
+	e.t = 0.0
+	possess.seize_now(e)
 
 
 func _in_possess() -> bool:
@@ -744,6 +788,12 @@ func _ask_dev_code() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(assist_panel):
 		return
+	if trial and not paused and event is InputEventKey and event.pressed and not event.echo:
+		var kc: int = event.physical_keycode
+		if (kc >= KEY_1 and kc <= KEY_7) or kc == KEY_R or kc == KEY_T:
+			yard_key(kc)
+			get_viewport().set_input_as_handled()
+			return
 	if tutorial != null and not paused and tutorial.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
