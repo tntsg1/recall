@@ -1486,9 +1486,9 @@ func _draw() -> void:
 	var hot := t_left < 1.5 and int(t * 10.0) % 2 == 0
 	for j in dots:
 		var on := j < lit
-		_px(pos + Vector2.from_angle(-PI / 2.0 + TAU * j / dots) * 44.0, 1.0, (Pal.red(0.9, 2.0) if hot else cyan(0.9, 1.8)) if on else cyan(0.15))
+		_px(pos + Vector2.from_angle(-PI / 2.0 + TAU * j / dots) * 44.0, 1.0, (Pal.red(0.75, 1.8) if hot else cyan(0.6, 1.5)) if on else cyan(0.1))
 	for j in SHELL_HITS:
-		_px(pos + Vector2((j - 1) * 8.0, 54.0), 2.0, cyan(0.9, 2.0) if j < hits_left else cyan(0.15))
+		_px(pos + Vector2((j - 1) * 8.0, 54.0), 2.0, cyan(0.6, 1.6) if j < hits_left else cyan(0.1))
 
 
 # A little pixel "E" keycap over the shell you can take.

@@ -38,6 +38,15 @@ var font_xl: Font
 var boss_hp_shown := 1.0
 var boss_hp_chip := 1.0
 var boss_flash := 0.0
+# In a shell the band's centre group becomes the shell's: the lives turn into
+# its three hits, the ammo into its seconds. Idle, a small E key beside the
+# ammo fills as the seize cools down and pings once when it is ready.
+var host_k := 0.0              # 0 your status .. 1 the shell's (eased when drawn)
+var host_hits_last := 3
+var host_break := [0.0, 0.0, 0.0]
+var host_name := ""
+var e_ready_last := false
+var e_ping := 0.0
 
 
 func _ready() -> void:
@@ -237,6 +246,7 @@ func step(dt: float) -> void:
 	else:
 		reticle = game.get_viewport().get_canvas_transform() * game.aim_world()
 	ammo_pop = maxf(0.0, ammo_pop - dt / 0.25)
+	_step_host(dt)
 	combo_pop = maxf(0.0, combo_pop - dt / 0.16)
 	combo_stamp = maxf(0.0, combo_stamp - dt / 0.3)
 	if combo_t >= 0.0:
@@ -291,26 +301,72 @@ func step(dt: float) -> void:
 	view.queue_redraw()
 
 
+# The camera drifts with you, so the arena's edge can slide under the bands;
+# a soft fade to black there keeps the HUD reading over whatever passes beneath.
+func _draw_band_shade(vp: Vector2) -> void:
+	var clear := Color(0, 0, 0, 0)
+	var dark := Color(0, 0, 0, 0.72)
+	var deep := Color(0, 0, 0, 0.86)
+	# fades in over 50 px, then holds under the band's row
+	var bt := vp.y - 120.0
+	var bm := vp.y - 70.0
+	view.draw_polygon(PackedVector2Array([Vector2(0, bt), Vector2(vp.x, bt), Vector2(vp.x, bm), Vector2(0, bm)]),
+		PackedColorArray([clear, clear, deep, deep]))
+	view.draw_rect(Rect2(0, bm, vp.x, vp.y - bm), deep)
+	view.draw_polygon(PackedVector2Array([Vector2(0, 0), Vector2(vp.x, 0), Vector2(vp.x, 70.0), Vector2(0, 70.0)]),
+		PackedColorArray([dark, dark, clear, clear]))
+
+
+func _step_host(dt: float) -> void:
+	var pz = game.possess
+	var inside: bool = pz.busy() and pz.shell != null
+	host_k = move_toward(host_k, 1.0 if inside else 0.0, dt / 0.32)
+	if inside:
+		host_name = Txt.t("yard_k%d" % pz.shell.kind)
+		if pz.hits_left < host_hits_last:
+			for j in range(pz.hits_left, mini(host_hits_last, 3)):
+				host_break[j] = 1.0
+		host_hits_last = pz.hits_left
+	else:
+		host_hits_last = Possess.SHELL_HITS
+	for j in 3:
+		host_break[j] = maxf(0.0, host_break[j] - dt / 0.45)
+	var ready: bool = pz.state == Possess.IDLE and pz.cooldown <= 0.0 and pz.target() != null
+	if ready and not e_ready_last:
+		e_ping = 1.0
+	e_ready_last = ready
+	e_ping = maxf(0.0, e_ping - dt / 0.55)
+
+
 func _draw_view() -> void:
 	var vp := view.get_viewport_rect().size
 	var f: float = game.focus
+	_draw_band_shade(vp)
 	_draw_reticle(f)
 	# ammo
 	var ammo: int = game.ammo
 	var s := str(ammo)
 	var size := int(44 * (1.0 + clampf(ammo_s.x, -0.2, 0.3)))
-	var base := Vector2(vp.x / 2.0, vp.y - 46.0)
-	var ac := Pal.ink(0.9) if ammo > 0 else Pal.ink(0.35)
+	var base := Vector2(vp.x / 2.0, vp.y - 40.0)
+	var hk := Pal.ease_io(host_k)
+	var mine := 1.0 - hk
+	var ac := Pal.ink(0.9 * mine) if ammo > 0 else Pal.ink(0.35 * mine)
 	ammo_odo.set_text(s, 1.0 if ammo > ammo_last else -1.0)
 	ammo_last = ammo
-	ammo_odo.draw(view, font_l, base.x - 4.0, base.y, size, ac, 1)
-	view.draw_string(font_s, base + Vector2(6.0, 0), "/ %d" % game.mag, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.35))
+	if mine > 0.01:
+		var sink := Vector2(0, 10.0 * hk)
+		ammo_odo.draw(view, font_l, base.x - 4.0, base.y + sink.y, size, ac, 1)
+		view.draw_string(font_s, base + Vector2(6.0, 0) + sink, "/ %d" % game.mag, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.35 * mine))
 	var emb: int = game.bullets.count_state(Bullets.EMBED)
-	if emb > 0:
-		var qa := 0.35 + 0.25 * sin(game.real_time * 3.0)
-		var qc := Pal.ink(qa).lerp(Pal.red(1.0, 2.0), f)
+	if emb > 0 and mine > 0.01:
+		var qa := (0.35 + 0.25 * sin(game.real_time * 3.0)) * mine
+		var qc := Pal.ink(qa).lerp(Pal.red(mine, 2.0), f)
 		var qs := "Q  " + str(emb)
 		view.draw_string(font_b, base + Vector2(60.0, 0), qs, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, qc)
+	if game.tutorial == null:
+		_draw_seize_key(base + Vector2(150.0, -14.0), mine)
+	if hk > 0.01:
+		_draw_host(vp, base, hk)
 	# pierce counter
 	if game.tutorial == null and combo > 0 and (combo_live or combo_t >= 0.0):
 		var a := 1.0
@@ -347,10 +403,9 @@ func _draw_view() -> void:
 	_draw_dev(vp)
 	# hints
 	if hint_a > 0.0:
-		var y := vp.y - 52.0
-		for key in ["hint_fire", "hint_recall", "hint_dash"]:
-			view.draw_string(font_s, Vector2(40.0, y), Txt.t(key), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.42 * hint_a))
-			y += 22.0
+		# one line in the band, left-aligned to the arena's edge
+		var hs: String = "    ·    ".join([Txt.t("hint_fire"), Txt.t("hint_recall"), Txt.t("hint_dash")])
+		view.draw_string(font_s, Vector2(BAND_EDGE, vp.y - 40.0), hs, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.42 * hint_a))
 	_draw_lines()
 	_draw_tip(vp)
 	_draw_motion(vp)
@@ -559,7 +614,7 @@ func _run_stats(cx: float, y: float, a: float) -> void:
 
 const CARD := Vector2(300, 400)
 const CARD_GAP := 340.0
-const SLOT := 40.0
+const SLOT := 32.0
 
 var cards: Array = []        # offers: {type, id, level?, full?}
 var cards_t := -1.0
@@ -617,7 +672,7 @@ func crack_break(n: int) -> void:
 	if n >= 0 and n < crack_anim.size():
 		crack_anim[n] = 1.0
 		var vp := view.get_viewport_rect().size
-		var c := Vector2(vp.x / 2.0 - 230.0, vp.y - 60.0) + Vector2(n * 24.0, 0)
+		var c := Vector2(vp.x / 2.0 - 230.0, vp.y - 54.0) + Vector2(n * 24.0, 0)
 		var pts := [Vector2(0, -9), Vector2(5.6, 0), Vector2(0, 9), Vector2(-5.6, 0)]
 		for e in 4:
 			var a: Vector2 = pts[e]
@@ -633,7 +688,7 @@ func crack_mend(n: int) -> void:
 		if i >= cracks_shown:
 			crack_anim[i] = -1.0
 			var vp := view.get_viewport_rect().size
-			mend_rings.append([Vector2(vp.x / 2.0 - 230.0, vp.y - 60.0) + Vector2(i * 24.0, 0), -0.04 * (i - cracks_shown)])
+			mend_rings.append([Vector2(vp.x / 2.0 - 230.0, vp.y - 54.0) + Vector2(i * 24.0, 0), -0.04 * (i - cracks_shown)])
 	cracks_shown = n
 
 
@@ -680,13 +735,19 @@ func reroll_hit(p: Vector2) -> bool:
 	return cards_t >= 0.0 and chosen < 0 and _reroll_rect(view.get_viewport_rect().size).has_point(p)
 
 
-# Bottom-right: schools on the lower row, relics above.
+# The band under the arena holds the whole build in one row, right-aligned to
+# the arena's edge: relics, a gap, then schools. Nothing of it sits in play.
+const BAND_EDGE := 80.0        # the arena frame's inner edge, from either screen side
+const BAND_Y := 46.0           # the band's centre line, up from the screen's bottom
+
+
 func _school_slot_i(i: int, vp: Vector2) -> Vector2:
-	return Vector2(vp.x - 96.0 - (Cards.SCHOOL_SLOTS - 1 - i) * 62.0, vp.y - 58.0)
+	return Vector2(vp.x - BAND_EDGE - 12.0 - (Cards.SCHOOL_SLOTS - 1 - i) * 62.0, vp.y - BAND_Y)
 
 
 func _relic_slot_i(i: int, vp: Vector2) -> Vector2:
-	return Vector2(vp.x - 78.0 - (Cards.RELIC_SLOTS - 1 - i) * (SLOT + 8.0), vp.y - 128.0)
+	var right := _school_slot_i(0, vp).x - 12.0 - 36.0
+	return Vector2(right - SLOT / 2.0 - (Cards.RELIC_SLOTS - 1 - i) * (SLOT + 8.0), vp.y - BAND_Y)
 
 
 func _held_schools() -> Array:
@@ -1130,12 +1191,67 @@ func _draw_slots(vp: Vector2) -> void:
 		else:
 			view.draw_rect(rr, Pal.ink(0.1), false, 1.0)
 	# armed items wait beside the ammo
-	var ax := vp.x / 2.0 - 150.0
+	var ax := vp.x / 2.0 - 230.0 - 40.0
 	for k in ["overload", "firststrike", "stasis", "ward", "longhold", "slowfield", "tempo", "haste", "calm_mind"]:
 		if game.armed.get(k, false):
 			var pulse := 0.6 + 0.4 * sin(game.real_time * 5.0)
-			_item_glyph(Vector2(ax, vp.y - 58.0), 10.0, Pal.ink(pulse, 1.3), 1.4)
+			_item_glyph(Vector2(ax, vp.y - 54.0), 10.0, Pal.ink(pulse, 1.3), 1.4)
 			ax -= 30.0
+
+
+# The shell's status where yours was: its three hits as cyan diamonds on the
+# lives' row, its seconds as the big number, its name in place of "/ 24".
+func _draw_host(vp: Vector2, base: Vector2, hk: float) -> void:
+	var pz = game.possess
+	var rise := (1.0 - hk) * -10.0
+	var row := Vector2(vp.x / 2.0 - 230.0 + 2.0 * 24.0, vp.y - 54.0 + rise)
+	var s := 9.0
+	for j in Possess.SHELL_HITS:
+		var c := row + Vector2((j - 1) * 24.0, 0)
+		var pts := PackedVector2Array([c + Vector2(0, -s), c + Vector2(s * 0.62, 0), c + Vector2(0, s), c + Vector2(-s * 0.62, 0)])
+		var k: float = host_break[j]
+		if k > 0.0:
+			# a hit taken: the diamond splits like a crack, in cyan
+			var e := 1.0 - k
+			for side in [-1.0, 1.0]:
+				var off := Vector2(side * 6.0 * Pal.ease_out(e), 4.0 * e * e)
+				var half := PackedVector2Array([c + off + Vector2(0, -s), c + off + Vector2(side * s * 0.62, 0), c + off + Vector2(0, s), c + off + Vector2(0, -s)])
+				view.draw_polyline(half, Possess.cyan(k * hk, 2.0), 1.6, false)
+		elif j < pz.hits_left:
+			view.draw_colored_polygon(pts, Possess.cyan(0.9 * hk, 1.6))
+		else:
+			pts.append(pts[0])
+			view.draw_polyline(pts, Possess.cyan(0.22 * hk), 1.0, false)
+	var left: float = pz.t_left if pz.hosting() else pz.duration()
+	var hot: bool = pz.hosting() and left < 1.5
+	var col := Possess.cyan(hk, 1.8)
+	if hot:
+		col = Pal.red(hk, 2.0) if int(game.real_time * 10.0) % 2 == 0 else Possess.cyan(hk, 1.8)
+	var ts := "%.1f" % maxf(0.0, left)
+	var tw := font_l.get_string_size(ts, HORIZONTAL_ALIGNMENT_LEFT, -1, 44).x
+	view.draw_string(font_l, Vector2(base.x - 4.0 - tw, base.y + rise), ts, HORIZONTAL_ALIGNMENT_LEFT, -1, 44, col)
+	view.draw_string(font_s, base + Vector2(6.0, rise), host_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Possess.cyan(0.6 * hk, 1.2))
+
+
+# E, beside the ammo: dim while cooling down (its underline fills), lit cyan
+# when there is a marked shell to take, with one ping the moment it becomes so.
+func _draw_seize_key(c: Vector2, a: float) -> void:
+	if a <= 0.01:
+		return
+	var pz = game.possess
+	var cooling: bool = pz.cooldown > 0.0 and not pz.endless
+	var ready: bool = e_ready_last
+	var r := Rect2(c - Vector2(12, 12), Vector2(24, 24))
+	var line: Color = Possess.cyan(0.95 * a, 2.0) if ready else Pal.ink((0.22 if cooling else 0.32) * a)
+	view.draw_rect(r, line, false, 1.0)
+	_text_c(font_b, "E", c + Vector2(0, 5.0), 14, Possess.cyan(a, 2.0) if ready else Pal.ink((0.35 if cooling else 0.5) * a))
+	var y := r.end.y + 6.0
+	view.draw_line(Vector2(r.position.x, y), Vector2(r.end.x, y), Pal.ink(0.12 * a), 2.0)
+	var k: float = 1.0 if not cooling else 1.0 - pz.cooldown / Possess.COOLDOWN
+	view.draw_line(Vector2(r.position.x, y), Vector2(r.position.x + r.size.x * k, y), Possess.cyan((0.8 if ready else 0.45) * a, 1.6), 2.0)
+	if e_ping > 0.0:
+		var e := Pal.ease_out(1.0 - e_ping)
+		view.draw_rect(r.grow(lerpf(0.0, 14.0, e)), Possess.cyan(e_ping * 0.8 * a, 2.2), false, 1.5)
 
 
 # 1 -> 0 timer into a pop that swells, overshoots below rest and settles.
@@ -1155,7 +1271,10 @@ func _draw_cracks(vp: Vector2) -> void:
 			continue
 		var e := Pal.ease_in(minf(1.0, mr[1] / 0.4))
 		view.draw_arc(mr[0], lerpf(34.0, 6.0, e), 0.0, TAU, 28, Pal.ink(0.7 * e, 1.8), 1.5, false)
-	var base := Vector2(vp.x / 2.0 - 230.0, vp.y - 60.0)
+	var mine := 1.0 - Pal.ease_io(host_k)
+	if mine <= 0.01:
+		return
+	var base := Vector2(vp.x / 2.0 - 230.0, vp.y - 54.0 + 8.0 * (1.0 - mine))
 	for i in game.max_cracks:
 		var c := base + Vector2(i * 24.0, 0)
 		var whole: bool = i < game.cracks
@@ -1167,15 +1286,15 @@ func _draw_cracks(vp: Vector2) -> void:
 			for side in [-1.0, 1.0]:
 				var off := Vector2(side * 6.0 * Pal.ease_out(e), 4.0 * e * e)
 				var half := PackedVector2Array([c + off + Vector2(0, -s), c + off + Vector2(side * s * 0.6, 0), c + off + Vector2(0, s), c + off + Vector2(0, -s)])
-				view.draw_polyline(half, Pal.ink(k, 1.6), 1.6, false)
+				view.draw_polyline(half, Pal.ink(k * mine, 1.6), 1.6, false)
 			continue
 		var pts := PackedVector2Array([c + Vector2(0, -s), c + Vector2(s * 0.62, 0), c + Vector2(0, s), c + Vector2(-s * 0.62, 0)])
 		if whole:
 			var mend := -k
-			view.draw_colored_polygon(pts, Pal.ink(0.85, 1.0 + 1.5 * mend))
+			view.draw_colored_polygon(pts, Pal.ink(0.85 * mine, 1.0 + 1.5 * mend))
 		else:
 			pts.append(pts[0])
-			view.draw_polyline(pts, Pal.ink(0.18), 1.0, false)
+			view.draw_polyline(pts, Pal.ink(0.18 * mine), 1.0, false)
 
 
 func _draw_cards(vp: Vector2) -> void:
