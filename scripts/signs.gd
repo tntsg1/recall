@@ -49,7 +49,7 @@ func _draw() -> void:
 		var seed := floorf(_t * 6.0) + i * 31.0
 		var off := fposmod(sin(seed * 12.9898) * 43758.5453, 1.0) > 0.965
 		var hum := 0.88 + 0.12 * sin(_t * 23.0 + i)
-		var col := (Pal.you(1.0, 1.25) if i == 0 else Pal.red(1.0, 1.25)) if ch % 2 == 0 else (Pal.red(1.0, 1.25) if i == 0 else Pal.you(1.0, 1.25))
-		var a: float = (0.12 if off else 0.55 * hum) * dim
+		var col := Pal.ink(1.0, 1.15)
+		var a: float = (0.08 if off else 0.38 * hum) * dim
 		draw_string_outline(font, at, s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 5, Color(col.r, col.g, col.b, a * 0.1))
 		draw_string(font, at, s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(col.r, col.g, col.b, a))

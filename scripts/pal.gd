@@ -1,23 +1,12 @@
 class_name Pal
-# NEON RAID, kept quiet: a near-black night with a hint of blue. Cyan is you
-# (your body, your rounds, the shells you seize), red is everything that hunts
-# you, a dusty rose-magenta is the recall's own signal, and the walls are a cool
-# grey-blue. All of them are held back from full saturation, and brightness
-# above 1 is compressed and leans toward white, so the glow reads as light
-# rather than paint. White ink stays for text.
+# Black ground, white ink, and one signal red that belongs to the recall alone.
+# Cyan is the only other colour, and it belongs to seizing (Possess.cyan).
+# Values above 1.0 feed the HDR glow pass.
 
-const BG := Color(0.036, 0.036, 0.048)
-const WALL := Color(0.068, 0.066, 0.085)
-const INK := Color(0.925, 0.93, 0.94)
-const RED := Color(0.86, 0.38, 0.64)      # the recall signal (rose-magenta; the name stays for the call sites)
-const YOU := Color(0.5, 0.84, 0.92)
-const FOE := Color(0.88, 0.37, 0.38)
-const LINE := Color(0.6, 0.62, 0.8)
-
-
-# Brightness above 1 is compressed so nothing blooms too hard.
-static func _soft(k: float) -> float:
-	return k if k <= 1.0 else 1.0 + (k - 1.0) * 0.55
+const BG := Color(0.043, 0.043, 0.047)
+const WALL := Color(0.078, 0.078, 0.084)
+const INK := Color(0.925, 0.93, 0.935)
+const RED := Color(1.0, 0.29, 0.24)
 
 # The browser build (Compatibility renderer) draws into a plain sRGB buffer:
 # no HDR, so faint lines blend much darker and nothing goes above 1. Alphas
@@ -32,45 +21,32 @@ static func ink(a: float = 1.0, k: float = 1.0) -> Color:
 	return Color(INK.r * k, INK.g * k, INK.b * k, a)
 
 
-# The recall's magenta. Brightness above 1 goes into red and blue, so the glow
-# pass keeps it magenta instead of washing it white.
+# Brightness above 1 goes into the red channel only: scaling green and blue too
+# turns the signal red pink once the glow pass blows it out.
 static func red(a: float = 1.0, k: float = 1.0) -> Color:
 	if ldr:
 		a = pow(clampf(a, 0.0, 1.0), LDR_ALPHA)
 	if k <= 1.0:
 		return Color(RED.r * k, RED.g * k, RED.b * k, a)
-	k = _soft(k)
-	return Color(RED.r * k, RED.g * (1.0 + (k - 1.0) * 0.45), RED.b * (1.0 + (k - 1.0) * 0.85), a)
+	return Color(RED.r * k, RED.g * (1.0 + (k - 1.0) * 0.08), RED.b * (1.0 + (k - 1.0) * 0.05), a)
 
 
-# Enemies and bosses: brightness into the red channel only, or it turns pink.
+# Roles, all drawn in the same white ink: enemies and bosses, you, the walls.
 static func foe(a: float = 1.0, k: float = 1.0) -> Color:
-	if ldr:
-		a = pow(clampf(a, 0.0, 1.0), LDR_ALPHA)
-	if k <= 1.0:
-		return Color(FOE.r * k, FOE.g * k, FOE.b * k, a)
-	k = _soft(k)
-	return Color(FOE.r * k, FOE.g * (1.0 + (k - 1.0) * 0.3), FOE.b * (1.0 + (k - 1.0) * 0.3), a)
+	return ink(a, k)
 
 
-# You: brightness into green and blue so the glow stays cyan.
 static func you(a: float = 1.0, k: float = 1.0) -> Color:
-	if ldr:
-		a = pow(clampf(a, 0.0, 1.0), LDR_ALPHA)
-	if k <= 1.0:
-		return Color(YOU.r * k, YOU.g * k, YOU.b * k, a)
-	k = _soft(k)
-	return Color(YOU.r * (1.0 + (k - 1.0) * 0.7), YOU.g * k, YOU.b * k, a)
+	return ink(a, k)
 
 
-# The walls' cold violet-blue neon.
 static func line(a: float = 1.0, k: float = 1.0) -> Color:
-	if ldr:
-		a = pow(clampf(a, 0.0, 1.0), LDR_ALPHA)
-	if k <= 1.0:
-		return Color(LINE.r * k, LINE.g * k, LINE.b * k, a)
-	k = _soft(k)
-	return Color(LINE.r * k, LINE.g * k, LINE.b * k, a)
+	return ink(a, k)
+
+
+# Brightness above 1 is compressed (used by the seize cyan's glow).
+static func _soft(k: float) -> float:
+	return k if k <= 1.0 else 1.0 + (k - 1.0) * 0.55
 
 
 static func ease_out(x: float) -> float:

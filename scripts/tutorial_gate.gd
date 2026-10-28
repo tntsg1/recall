@@ -221,7 +221,7 @@ func _draw() -> void:
 		draw_line(game.player.pos + Vector2(45, 0), p - Vector2(20, 0), Pal.ink(0.18), 1.0)
 	elif stage == POSSESS:
 		if host_dummy != null and host_dummy.state == Enemies.ALIVE and not game.possess.busy():
-			draw_arc(host_dummy.pos, 34.0 + sin(age * 4.0) * 3.0, 0, TAU, 40, Pal.you(0.8, 1.6), 1.5, true)
+			draw_arc(host_dummy.pos, 34.0 + sin(age * 4.0) * 3.0, 0, TAU, 40, Possess.cyan(0.8, 1.6), 1.5, true)
 		for d in targets:
 			if d.state == Enemies.ALIVE:
 				draw_arc(d.pos, 26.0, 0, TAU, 32, Pal.foe(0.5), 1.0, true)
