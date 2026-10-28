@@ -126,6 +126,7 @@ var clones: Array = []          # {pos, path, replay, idx, hit, done}
 var clone_t := 0.0
 
 var _parts := {}
+var boss_hit := {}              # one boss hit per dash / ram / beam
 # the floor infection: the shell itself, its recent trail, and the big landings
 var residue: Array = []         # [pos, radius, life, max life]
 var residue_cd := 0.0
@@ -155,6 +156,21 @@ func hosting() -> bool:
 	return state == HOST
 
 
+# The 夺壳 school. Lv1: longer in the shell, marks last longer. Lv2: when a shell
+# ends, the mind jumps straight into the nearest marked enemy. Lv3: every shell
+# hits a third harder and its last blast is twice as wide.
+func lvl() -> int:
+	return game.lv.get("possess", 0)
+
+
+func duration() -> float:
+	return DURATION * (1.5 if lvl() >= 1 else 1.0)
+
+
+func power() -> float:
+	return 1.35 if lvl() >= 3 else 1.0
+
+
 func busy() -> bool:
 	return state != IDLE
 
@@ -165,7 +181,7 @@ func mark(e) -> void:
 	if e.state != Enemies.ALIVE or not KINDS.has(e.kind):
 		return
 	var fresh := not marks.has(e.id)
-	marks[e.id] = [e, MARK_TIME]
+	marks[e.id] = [e, MARK_TIME * (1.5 if lvl() >= 1 else 1.0)]
 	if fresh:
 		game.fx.ring(e.pos, e.r, e.r + 22.0, 0.3, cyan(0.9, 2.0), 2.0)
 		if not hinted and game.bot == null:
@@ -190,7 +206,7 @@ func target():
 # E: in, or (while seized) out early.
 func press() -> void:
 	if state == HOST:
-		end(false)
+		end(false, false, true)
 		return
 	if state != IDLE:
 		return
@@ -235,7 +251,7 @@ func _begin_host() -> void:
 			game.bullets.send_home(b)
 	vel = Vector2.ZERO
 	aim = Vector2.from_angle(shell.rot)
-	t_left = DURATION
+	t_left = duration()
 	hits_left = SHELL_HITS
 	iframes = 0.35
 	grow = 0.0
@@ -272,24 +288,46 @@ func _begin_host() -> void:
 
 
 # Time up, E, broken, or the wave is over: the shell goes off and you step out.
-func end(broken: bool, quiet: bool = false) -> void:
+func end(broken: bool, quiet: bool = false, by_hand: bool = false) -> void:
 	if state != HOST:
 		return
 	var at: Vector2 = shell.pos
+	var blast_r := BLAST_R * (2.0 if lvl() >= 3 else 1.0)
 	if not quiet:
 		for e in game.enemies.list:
-			if e.state == Enemies.ALIVE and e.pos.distance_to(at) < BLAST_R + e.r:
+			if e.state == Enemies.ALIVE and e.pos.distance_to(at) < blast_r + e.r:
 				_deal(e, BLAST_DMG, (e.pos - at).normalized(), true)
+		_boss_area(at, blast_r, BLAST_DMG)
 		game.sfx.play("p_blast", 1.0, -1.0)
 		game.cam.add_trauma(0.45)
 		game.cam.punch(0.04)
 		game.post.shock(game.screen_uv(at), 1.1, 1.8)
 		game.post.pulse(0.006)
 		game.add_hitstop(0.06)
-		bursts.append([at, BLAST_R, 0.0])
-		game.fx.ring(at, 10.0, BLAST_R + 20.0, 0.4, cyan(1.0, 2.6), 3.0)
-		game.fx.flash(at, BLAST_R, 0.25, cyan(0.55, 2.0))
+		bursts.append([at, blast_r, 0.0])
+		game.fx.ring(at, 10.0, blast_r + 20.0, 0.4, cyan(1.0, 2.6), 3.0)
+		game.fx.flash(at, blast_r, 0.25, cyan(0.55, 2.0))
 	_shatter(at, broken)
+	# Lv2 chain: out of the blast and straight into the next marked shell
+	if not quiet and not by_hand and lvl() >= 2:
+		var next = null
+		var nd := 450.0
+		for id in marks:
+			var me = marks[id][0]
+			if me.state == Enemies.ALIVE and me.pos.distance_to(at) < nd:
+				nd = me.pos.distance_to(at)
+				next = me
+		if next != null:
+			shell = next
+			marks.erase(next.id)
+			state = FLOW
+			flow_t = 0.0
+			flow_from = at
+			game.player.pos = at
+			game.player.position = at
+			game.sfx.play("p_possess", 1.2, -2.0)
+			game.hud.flash_text(Txt.t("possess_chain"), at)
+			return
 	_restore(at)
 	game.player.invuln = 1.0
 	cooldown = COOLDOWN
@@ -404,7 +442,7 @@ func host_step(sdt: float, dt: float, move: Vector2, aim_at: Vector2, fire_held:
 		_restore(shell.pos)
 		return
 	if endless:
-		t_left = DURATION
+		t_left = duration()
 	t_left -= sdt
 	iframes = maxf(0.0, iframes - sdt)
 	recover = maxf(0.0, recover - sdt)
@@ -518,6 +556,7 @@ func _chaser(sdt: float, pressed: bool, move: Vector2) -> void:
 					e.knock += -d * 260.0
 			game.fx.sparks(shell.pos, Vector2.from_angle(shell.rot), 3, cyan(1.0, 2.4), 620.0, 0.2, 0.4)
 			game.cam.add_trauma(0.06)
+			_boss_area(shell.pos, SPIN_R, SPIN_TICK_DMG)
 		if spin_t >= SPIN_TIME:
 			_spin_burst()
 	else:
@@ -527,6 +566,7 @@ func _chaser(sdt: float, pressed: bool, move: Vector2) -> void:
 
 
 func _start_dash() -> void:
+	boss_hit.clear()
 	stage += 1
 	dash_dir = aim
 	dash_t = DRILL_TIME
@@ -538,6 +578,7 @@ func _start_dash() -> void:
 
 
 func _drill_sweep(a: Vector2, b: Vector2) -> void:
+	_boss_line(a, b, 50.0, "dash%d" % ram_seg if ram_t > 0.0 else "dash%d" % stage)
 	var dmg: float = DRILL_DMG[clampi(stage - 1, 0, 1)]
 	if ram_t > 0.0:
 		dmg = RAM_DMG[clampi(ram_seg - 1, 0, 2)]
@@ -569,6 +610,7 @@ func _spin_burst() -> void:
 			var d: Vector2 = (e.pos - at).normalized()
 			_deal(e, SPIN_BURST_DMG, d, true)
 			e.knock += d * 620.0
+	_boss_area(at, SPIN_BURST_R, SPIN_BURST_DMG)
 	_finisher(at, SPIN_BURST_R)
 
 
@@ -605,6 +647,7 @@ func _leech(sdt: float, fire_held: bool, move: Vector2, aim_at: Vector2) -> void
 			for e in game.enemies.list:
 				if e.state == Enemies.ALIVE and e.pos.distance_to(well_pos) < 85.0 + e.r:
 					_deal(e, SQUEEZE_DMG, (e.pos - well_pos).normalized(), false)
+			_boss_area(well_pos, 85.0, SQUEEZE_DMG)
 			game.cam.add_trauma(0.05)
 			bursts.append([well_pos, 70.0, 0.25])
 	if not fire_held or well_t >= WELL_MAX:
@@ -621,6 +664,7 @@ func _well_release() -> void:
 				var d: Vector2 = (e.pos - at).normalized()
 				_deal(e, WELL_BURST_DMG, d, true)
 				e.knock += d * 700.0
+		_boss_area(at, WELL_BURST_R, WELL_BURST_DMG)
 		_finisher(at, WELL_BURST_R)
 	else:
 		for e in game.enemies.list:
@@ -662,6 +706,13 @@ func _step_wakes(sdt: float) -> void:
 		var b: Vector2 = a + w[1] * sdt
 		w[0] = b
 		w[2] += sdt
+		if not w[3].has("boss"):
+			var bs = game.boss
+			if bs != null and bs.alive():
+				var bh: Dictionary = bs.hit_test(a, b)
+				if not bh.is_empty() and bh.get("core", false):
+					w[3]["boss"] = true
+					bs.damage(WAKE_DMG * power() * BOSS_MULT * bh.get("mult", 1.0), true, bh.point, w[1].normalized(), bh.get("frame", -1))
 		for e in game.enemies.list:
 			if e.state == Enemies.ALIVE and not w[3].has(e.id):
 				var q := Geometry2D.get_closest_point_to_segment(e.pos, a, b)
@@ -741,6 +792,7 @@ func _cone(dir: Vector2, half: float, reach: float, dmg: float, push: float, sid
 		_deal(e, dmg, kd, true)
 		e.knock += kd * push
 		e.bounce = 0.0      # a shove sets them up for the rush; only the rush slams them into walls
+	_boss_area(at + dir * reach * 0.5, reach * 0.6, dmg)
 	for k in 7:
 		var a := dir.angle() + lerpf(-half, half, k / 6.0)
 		bursts.append([at + Vector2.from_angle(a) * reach * 0.6, 14.0, 0.15])
@@ -759,6 +811,7 @@ func _rush_end(hit_wall: bool) -> void:
 		e.pinned = 2.0 if hit_wall else 1.0
 		_deal(e, RUSH_DMG * (1.4 if hit_wall else 1.0), dash_dir, true)
 	carried.clear()
+	_boss_area(at, 120.0, RUSH_DMG)
 	if hit_wall:
 		game.sfx.play("p_slam", 1.1, -1.0)
 	_finisher(at, 120.0)
@@ -797,6 +850,7 @@ func _charger(sdt: float, fire_held: bool, move: Vector2) -> void:
 				dash_hit.clear()
 				ghost_cd = 0.0
 				game.sfx.play("dash_e", 1.0, -2.0)
+				boss_hit.clear()
 				game.cam.kick(-aim, 3.5)
 				game.fx.ring(shell.pos, 10.0, 50.0, 0.25, cyan(0.9, 2.2), 2.0)
 		return
@@ -822,6 +876,7 @@ func _on_wall(n: Vector2) -> void:
 					var d: Vector2 = (e.pos - at).normalized()
 					_deal(e, RAM_BURST_DMG, d, true)
 					e.knock += d * 640.0
+			_boss_area(at, RAM_BURST_R, RAM_BURST_DMG)
 			game.sfx.play("p_slam", 1.0, 0.0)
 			_finisher(at, RAM_BURST_R)
 			return
@@ -830,6 +885,7 @@ func _on_wall(n: Vector2) -> void:
 		dash_dir = dash_dir.bounce(n).normalized() if absf(dash_dir.dot(n)) > 0.05 else n
 		ram_t = maxf(ram_t, 0.6)
 		dash_hit.clear()
+		boss_hit.clear()
 		game.sfx.play("slam", randf_range(1.0, 1.1), -3.0)
 		game.cam.add_trauma(0.25)
 		game.add_hitstop(0.04)
@@ -880,6 +936,8 @@ func _beam(dir: Vector2, dmg: float) -> void:
 	for e in game.enemies.list:
 		if e.state == Enemies.ALIVE and Geometry2D.get_closest_point_to_segment(e.pos, a, b).distance_to(e.pos) <= e.r + 16.0:
 			_deal(e, dmg, dir, false)
+	boss_hit.clear()
+	_boss_line(a, b, dmg, "beam")
 	beams.append([a, b, 0.0])
 	game.fx.flash(b, 18.0, 0.1, cyan(0.4, 1.8))
 
@@ -947,6 +1005,7 @@ func _blink_land(at: Vector2, radius: float, dmg: float, slam: bool) -> void:
 			var d: Vector2 = (e.pos - at).normalized()
 			_deal(e, dmg * mult, d, true)
 			e.knock += d * (640.0 if slam else 420.0)
+	_boss_area(at, radius, dmg * mult)
 	bursts.append([at, radius, 0.0])
 	if beat:
 		bursts.append([at, radius * 0.6, 0.1])
@@ -1042,6 +1101,7 @@ func _clone_replay(c: Dictionary, sdt: float) -> void:
 				var dd: Vector2 = (e.pos - at).normalized()
 				_deal(e, ECHO_BURST_DMG, dd, true)
 				e.knock += dd * 520.0
+		_boss_area(at, ECHO_BURST_R, ECHO_BURST_DMG)
 		_finisher(at, ECHO_BURST_R)
 		stage = 0
 
@@ -1059,12 +1119,46 @@ func on_recall_release() -> void:
 			wakes.append([c.pos + to.normalized().orthogonal() * (k - 1.5) * 8.0, v, 0.0, {}, to.length() / 1700.0])
 
 
+# ---------------------------------------------------------------- bosses
+# A boss cannot be seized, but a shell's moves hurt it — through the same armour
+# rules as a round: only what reaches the open core counts, at half weight.
+const BOSS_MULT := 0.5
+
+
+func _boss_line(a: Vector2, b: Vector2, dmg: float, key: String) -> void:
+	var bs = game.boss
+	if bs == null or not bs.alive() or boss_hit.has(key):
+		return
+	var bh: Dictionary = bs.hit_test(a, b)
+	if bh.is_empty() or not bh.get("core", false):
+		return
+	boss_hit[key] = true
+	bs.damage(dmg * power() * BOSS_MULT * bh.get("mult", 1.0), true, bh.point, (b - a).normalized(), bh.get("frame", -1))
+	game.fx.sparks(bh.point, (b - a).normalized(), 10, cyan(1.0, 2.4), 560.0, 0.25, 0.8)
+
+
+func _boss_area(at: Vector2, radius: float, dmg: float) -> void:
+	var bs = game.boss
+	if bs == null or not bs.alive():
+		return
+	var cp: Vector2 = bs.core_pos()
+	if cp.distance_to(at) > radius + 60.0:
+		return
+	var d := (cp - at).normalized() if cp.distance_to(at) > 1.0 else Vector2.RIGHT
+	var bh: Dictionary = bs.hit_test(at - d * 4.0, cp + d * 20.0)
+	if bh.is_empty() or not bh.get("core", false):
+		return
+	bs.damage(dmg * power() * BOSS_MULT * bh.get("mult", 1.0), true, bh.point, d, bh.get("frame", -1))
+	game.fx.sparks(bh.point, d, 10, cyan(1.0, 2.4), 560.0, 0.25, 0.8)
+
+
 # ---------------------------------------------------------------- damage
 
 func _deal(e, dmg: float, dir: Vector2, heavy: bool) -> void:
 	if e.state != Enemies.ALIVE:
 		return
 	# no damage numbers here: the shell's hits speak through sparks, shake and sound
+	dmg *= power()
 	e.hp -= dmg
 	e.red = 0.0
 	e.squash = 1.0
@@ -1386,7 +1480,7 @@ func _draw() -> void:
 	if grow > 0.35:
 		_part(kind_name + ("_spk2" if grow > 0.75 else "_spk1"), pos + shake, shell.rot, Color(mod.r * 1.2, mod.g * 1.2, mod.b * 1.2, mod.a))
 	# time left: a ring of pixels that empties; hits left: three pips under it
-	var frac := clampf(t_left / DURATION, 0.0, 1.0)
+	var frac := clampf(t_left / duration(), 0.0, 1.0)
 	var dots := 28
 	var lit := int(ceil(dots * frac))
 	var hot := t_left < 1.5 and int(t * 10.0) % 2 == 0

@@ -39,6 +39,7 @@ func _start() -> void:
 	brain = preload("res://tests/brain.gd").new(bot)
 	brain.skill_jitter = jit
 	brain.skill_turn = turn
+	brain.possess_ai = not ("nopossess" in OS.get_cmdline_user_args())
 	wave_hits = []
 	last_hits = 0
 

@@ -41,7 +41,7 @@ func _process(_dt: float) -> bool:
 		game.wave_ctl.phase = Waves.CLEAR
 		game.wave_ctl.pick_state = 2
 		game.wave_ctl.t = 10.0
-		game.lv = {"bounce": 1, "split": 2, "orbit": 2, "magnet": 0, "blast": 0, "charge": 0, "shadow": 0, "chain": 0}
+		game.lv = {"bounce": 1, "split": 2, "orbit": 2, "magnet": 0, "blast": 0, "charge": 0, "shadow": 0, "chain": 0, "possess": 0}
 	if frame < 3:
 		return false
 	brain.think(game)

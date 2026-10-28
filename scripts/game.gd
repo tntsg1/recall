@@ -62,7 +62,7 @@ var dash_prev := false
 # test driver: {move: Vector2, aim: Vector2 (world), fire: bool, focus: bool, dash: bool}
 var bot = null
 var hits_taken := 0
-var lv := {"bounce": 0, "split": 0, "orbit": 0, "magnet": 0, "blast": 0, "charge": 0, "shadow": 0, "chain": 0}
+var lv := {"bounce": 0, "split": 0, "orbit": 0, "magnet": 0, "blast": 0, "charge": 0, "shadow": 0, "chain": 0, "possess": 0}
 var picking := false
 var offers: Array = []
 var pick_cd := 0.0
@@ -277,7 +277,7 @@ func _setup_input() -> void:
 
 func _dev_key(ev: InputEventKey) -> bool:
 	var k := ev.physical_keycode
-	if ev.ctrl_pressed and k >= KEY_1 and k <= KEY_8:
+	if ev.ctrl_pressed and k >= KEY_1 and k <= KEY_9:
 		dev_action("sch:" + Cards.SCHOOLS[k - KEY_1], null)
 		return true
 	if ev.ctrl_pressed and k == KEY_R:

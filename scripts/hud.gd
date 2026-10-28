@@ -556,7 +556,7 @@ var cards_t := -1.0
 var chosen := -1
 var chosen_t := 0.0
 var chosen_card := {}
-var school_pop := {"bounce": 0.0, "split": 0.0, "orbit": 0.0, "magnet": 0.0, "blast": 0.0, "charge": 0.0, "shadow": 0.0, "chain": 0.0}
+var school_pop := {"bounce": 0.0, "split": 0.0, "orbit": 0.0, "magnet": 0.0, "blast": 0.0, "charge": 0.0, "shadow": 0.0, "chain": 0.0, "possess": 0.0}
 var relic_pop := {}
 var hover := -1
 var hover_k := [0.0, 0.0, 0.0]
@@ -765,6 +765,22 @@ func _step_cards(dt: float) -> void:
 # A small animated glyph per school.
 func _icon(key: String, c: Vector2, r: float, t: float, col: Color, w: float = 2.0) -> void:
 	match key:
+		"possess":
+			# a white triangle, its outline eaten by cyan pixels that spread and recede
+			var tri := PackedVector2Array([c + Vector2(r, 0), c + Vector2(-r * 0.7, -r * 0.8), c + Vector2(-r * 0.7, r * 0.8), c + Vector2(r, 0)])
+			var f := 0.5 - 0.5 * cos(t * 1.6)
+			for k in 3:
+				var a0: Vector2 = tri[k]
+				var a1: Vector2 = tri[k + 1]
+				for j in 6:
+					var q0 := a0.lerp(a1, j / 6.0)
+					var q1 := a0.lerp(a1, (j + 1) / 6.0)
+					if fposmod(sin((k * 6 + j) * 12.9898) * 43758.5453, 1.0) > f * 0.8:
+						view.draw_line(q0, q1, col, w)
+					else:
+						var m := (q0 + q1) * 0.5
+						view.draw_rect(Rect2((m / 2.0).floor() * 2.0 - Vector2(w, w), Vector2(w, w) * 2.0), Possess.cyan(1.0, 2.2))
+			view.draw_rect(Rect2(((c - Vector2(r * 0.1, 0)) / 2.0).floor() * 2.0 - Vector2(w, w), Vector2(w, w) * 2.0), Possess.cyan(1.0, 2.4))
 		"bounce":
 			var pts := PackedVector2Array([c + Vector2(-r, -r * 0.7), c + Vector2(-r * 0.3, r * 0.7), c + Vector2(r * 0.35, -r * 0.7), c + Vector2(r, r * 0.7)])
 			view.draw_polyline(pts, col, w, false)

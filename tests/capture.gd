@@ -25,7 +25,7 @@ func _initialize() -> void:
 	await process_frame
 	for i in ch - 1:
 		game.next_chapter()
-	game.lv = {"bounce": 2, "split": 2, "orbit": 1, "magnet": 1, "blast": 1, "charge": 0, "shadow": 1, "chain": 1} if "max" in a else {"bounce": 1, "split": 1, "orbit": 0, "magnet": 0, "blast": 0, "charge": 0, "shadow": 0, "chain": 0}
+	game.lv = {"bounce": 2, "split": 2, "orbit": 1, "magnet": 1, "blast": 1, "charge": 0, "shadow": 1, "chain": 1, "possess": 0} if "max" in a else {"bounce": 1, "split": 1, "orbit": 0, "magnet": 0, "blast": 0, "charge": 0, "shadow": 0, "chain": 0, "possess": 0}
 	game.hud.hint_a = 0.0
 	if boss:
 		game.wave_ctl.index = Waves.BOSS - 1

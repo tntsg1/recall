@@ -6,7 +6,7 @@ class_name Cards
 const SCHOOL_SLOTS := 4
 const RELIC_SLOTS := 5
 
-const SCHOOLS := ["bounce", "split", "orbit", "magnet", "blast", "charge", "shadow", "chain"]
+const SCHOOLS := ["bounce", "split", "orbit", "magnet", "blast", "charge", "shadow", "chain", "possess"]
 # what has to happen before some of the pool appears (Meta unlock keys)
 const SCHOOL_LOCK := {"charge": "boss_3", "shadow": "boss_4", "chain": "win"}
 const LEGEND_LOCK := "boss_1"

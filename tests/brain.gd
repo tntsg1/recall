@@ -9,6 +9,8 @@ var aim_ang := 0.0
 var skill_jitter := 0.14
 var skill_turn := 7.0
 var frame := 0
+var possess_ai := true      # use E on marked enemies and fight with the shell
+var hold_t := 0
 
 
 func _init(b: Dictionary) -> void:
@@ -117,3 +119,30 @@ func think(game) -> void:
 		bot.focus = true
 	else:
 		bot.focus = false
+	if possess_ai:
+		_possess_think(game, nearest, p)
+
+
+func _possess_think(game, nearest, p: Vector2) -> void:
+	var ps = game.possess
+	bot.possess = false
+	if ps.state == Possess.IDLE:
+		if ps.cooldown <= 0.0 and ps.target() != null and frame % 6 == 0:
+			bot.possess = true
+		return
+	if not ps.hosting():
+		return
+	# inside a shell: close in on the nearest enemy and use the shell's moves
+	bot.dash = false
+	if nearest != null:
+		var np: Vector2 = nearest.pos
+		var d: float = np.distance_to(p)
+		var want: Vector2 = (np - p).normalized() if d > 150.0 else (np - p).orthogonal().normalized() * 0.6
+		bot.move = want
+		bot.aim = np
+		match ps.shell.kind:
+			Enemies.LEECH, Enemies.CHARGER:
+				hold_t += 1
+				bot.fire = hold_t % 60 < 48
+			_:
+				bot.fire = frame % 10 < 2

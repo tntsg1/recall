@@ -20,7 +20,7 @@ func _initialize() -> void:
 	root.add_child(scene)
 	game = scene
 	if "max" in OS.get_cmdline_user_args():
-		game.lv = {"bounce": 3, "split": 3, "orbit": 3, "magnet": 0, "blast": 0, "charge": 0, "shadow": 0, "chain": 0}
+		game.lv = {"bounce": 3, "split": 3, "orbit": 3, "magnet": 0, "blast": 0, "charge": 0, "shadow": 0, "chain": 0, "possess": 0}
 
 
 func _process(_dt: float) -> bool:

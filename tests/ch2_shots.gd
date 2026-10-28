@@ -32,7 +32,7 @@ func _process(_dt: float) -> bool:
 	frame += 1
 	if frame == 3:
 		game.next_chapter()
-		game.lv = {"bounce": 1, "split": 1, "orbit": 1, "magnet": 1, "blast": 0, "charge": 0, "shadow": 0, "chain": 0}
+		game.lv = {"bounce": 1, "split": 1, "orbit": 1, "magnet": 1, "blast": 0, "charge": 0, "shadow": 0, "chain": 0, "possess": 0}
 	if frame < 4:
 		return false
 	brain.think(game)
