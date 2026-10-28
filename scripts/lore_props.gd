@@ -62,8 +62,13 @@ func step(dt: float) -> void:
 				near = true
 				break
 		if near:
-			if shows.get(id, 0.0) <= 0.01 and Lore.find(id):
-				game.hud.lore_found()
+			if shows.get(id, 0.0) <= 0.01:
+				# the wall answers: a click of current, a flicker where it wakes
+				game.sfx.play("lit", 0.62, -5.0)
+				game.cam.add_trauma(0.05)
+				game.fx.flash(at, 46.0, 0.22, Pal.ink(0.5, 1.6))
+				if Lore.find(id):
+					game.hud.lore_found()
 			hold[id] = HOLD
 		var h: float = hold.get(id, 0.0)
 		if h > 0.0:
@@ -204,7 +209,7 @@ func _remnant_stencil(w: Array, shown: String, k: float, dim: float) -> void:
 
 # Sprayed by hand: each letter a little off its line, larger, rough.
 func _remnant_hand(w: Array, shown: String, k: float, dim: float) -> void:
-	var at: Vector2 = (w[1] as Vector2) + (w[2] as Vector2) * 150.0 + Vector2(0, 92.0)
+	var at: Vector2 = (w[1] as Vector2) + (w[2] as Vector2) * 150.0 + Vector2(0, 54.0)
 	var sf := Fonts.get_font("SemiBold")
 	var total := sf.get_string_size(shown + "  ", HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
 	var x := at.x - total
@@ -230,7 +235,12 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	draw_rect(r, Pal.ink(0.6 * dim), false, 1.5)
 	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
 	draw_string(font, r.position + Vector2(15, 54), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * dim, 1.2))
-	draw_arc(Vector2(r.end.x - 22.0, r.position.y + 22.0), 11.0, 0.0, TAU, 20, Pal.red(0.6 * k * dim, 1.4), 2.0, false)
+	var sc := Vector2(r.end.x - 26.0, r.end.y - 20.0)
+	draw_arc(sc, 15.0, 0.0, TAU, 24, Pal.red(0.7 * k * dim, 1.4), 2.0, false)
+	draw_set_transform(sc, -0.3, Vector2.ONE)
+	var sw := Txt.t("notice_stamp")
+	draw_string(Fonts.get_font("SemiBold"), Vector2(-Fonts.get_font("SemiBold").get_string_size(sw, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x / 2.0, 4.0), sw, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.red(0.85 * k * dim, 1.5))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 # The old-era door R-0 came out of: two heavy panels, one slid half open,
@@ -246,6 +256,9 @@ func _draw_door(c: Vector2, dim: float) -> void:
 	var gap := Rect2(c.x - 10.0, top + 2.0, 74.0, h - 4.0)
 	var glow := 0.10 + 0.05 * sin(t * 1.3)
 	draw_rect(gap, Color(1, 1, 1, glow * dim))
+	# and that light spills out across the floor in front of the door
+	var spill := PackedVector2Array([Vector2(gap.position.x, top), Vector2(gap.end.x, top), Vector2(gap.end.x + 40.0, top - 110.0), Vector2(gap.position.x - 40.0, top - 110.0)])
+	draw_polygon(spill, PackedColorArray([Color(1, 1, 1, glow * 0.28 * dim), Color(1, 1, 1, glow * 0.28 * dim), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
 	for j in 4:
 		draw_line(Vector2(gap.position.x + 8.0 + j * 16.0, gap.position.y + 4.0), Vector2(gap.position.x + 8.0 + j * 16.0, gap.end.y - 4.0), Color(1, 1, 1, 0.05 * dim), 1.0)
 	var left := Rect2(c.x - w / 2.0, top, w / 2.0 - 10.0, h)
@@ -265,7 +278,7 @@ func _draw_door(c: Vector2, dim: float) -> void:
 
 # A propaganda screen on the left wall, cracked, still trying to say its line.
 func _draw_screen(c: Vector2, dim: float) -> void:
-	var r := Rect2(c.x + 4.0, c.y - 130.0, 92.0, 260.0)
+	var r := Rect2(c.x + 4.0, c.y - 110.0, 150.0, 220.0)
 	draw_rect(r, Color(0.04, 0.04, 0.045, 1.0))
 	draw_rect(r, Pal.ink(0.6 * dim), false, 2.0)
 	draw_rect(r.grow(-4.0), Pal.ink(0.2 * dim), false, 1.0)
@@ -275,12 +288,15 @@ func _draw_screen(c: Vector2, dim: float) -> void:
 		draw_line(Vector2(r.position.x + 6.0, y), Vector2(r.end.x - 6.0, y), Pal.ink((0.3 if on else 0.08) * dim), 1.0)
 		y += 6.0
 	# what is left of its slogan, running down the glass, stuttering
+	# the crack, under whatever the glass still says
+	draw_polyline(PackedVector2Array([r.position + Vector2(6, 40), r.position + Vector2(40, 88), r.position + Vector2(26, 130), r.position + Vector2(70, 176), r.position + Vector2(58, 220)]), Pal.ink(0.35 * dim, 1.1), 1.5)
+	draw_line(r.position + Vector2(40, 88), r.position + Vector2(86, 102), Pal.ink(0.25 * dim, 1.1), 1.0)
 	var wake: float = shows.get("w1_screen", 0.0)
 	var sf := Fonts.get_font("SemiBold")
 	var full: String = Txt.t("screen_full")
 	var rows: Array = Array(full.split("\n"))
 	# asleep it shows only its first two rows, stuttering; awake, all of them
-	var show_n := rows.size() if wake > 0.01 else 2
+	var show_n := rows.size() if wake > 0.01 else 1
 	var lit := wake > 0.01 or int(t * 3.0) % 5 != 0
 	if lit:
 		var total_chars := 0
@@ -295,9 +311,7 @@ func _draw_screen(c: Vector2, dim: float) -> void:
 			var rw := sf.get_string_size(row, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
 			draw_string(sf, Vector2(r.get_center().x - rw / 2.0, yy), part, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink((0.95 if wake > 0.01 else 0.6) * dim, 1.4))
 			yy += 26.0
-	# the crack
-	draw_polyline(PackedVector2Array([r.position + Vector2(6, 40), r.position + Vector2(40, 88), r.position + Vector2(26, 130), r.position + Vector2(70, 176), r.position + Vector2(58, 220)]), Pal.ink(0.7 * dim, 1.2), 1.5)
-	draw_line(r.position + Vector2(40, 88), r.position + Vector2(86, 102), Pal.ink(0.5 * dim, 1.2), 1.0)
+
 
 
 func _rows(txt: String, width: float, size: int) -> Array:
@@ -375,7 +389,7 @@ func _draw_worker(dim: float) -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	var lamp_w := Vector2(150.0, y) + Vector2(12, -20) * 1.7
 	var aim_w: Vector2 = (game.player.pos - lamp_w).normalized()
-	draw_polygon(PackedVector2Array([lamp_w, lamp_w + aim_w.rotated(0.22) * 220.0, lamp_w + aim_w.rotated(-0.22) * 220.0]), PackedColorArray([Color(1, 1, 1, 0.14 * a * dim), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
+	draw_polygon(PackedVector2Array([lamp_w, lamp_w + aim_w.rotated(0.2) * 140.0, lamp_w + aim_w.rotated(-0.2) * 140.0]), PackedColorArray([Color(1, 1, 1, 0.14 * a * dim), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
 	# what he says, once, as you wake
 	var say := Txt.t("worker_line")
 	var sa := a * clampf((k - 0.8) / 0.3, 0.0, 1.0) * (1.0 - clampf((k - 3.0) / 0.4, 0.0, 1.0))

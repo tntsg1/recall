@@ -155,9 +155,12 @@ func _draw() -> void:
 	draw_rect(ROOM, edge, false, 2.0)
 	draw_rect(ROOM.grow(10), faint, false, 1.0)
 	_corner_marks(ROOM.grow(22), Pal.ink(0.35 - 0.2 * f))
+	# cover sits a step below you and the enemies in brightness: the room's
+	# edge, then its blocks, then whatever moves
+	var block := Pal.ink(0.62 - 0.25 * f)
 	for r in inner:
 		draw_rect(r, Pal.WALL)
-		draw_rect(r, edge, false, 2.0)
+		draw_rect(r, block, false, 2.0)
 		draw_rect(r.grow(-7), faint, false, 1.0)
 	# mirrors: bright glass with a sheen that slides along when struck
 	for m in mirrors:

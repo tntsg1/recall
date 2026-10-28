@@ -561,6 +561,7 @@ func _draw() -> void:
 	var bm := bg.material as ShaderMaterial
 	bm.set_shader_parameter("cursor", cur_p.x)
 	bm.set_shader_parameter("size", vp)
+	_draw_searchlight(vp)
 	_draw_word(vp)
 	var dim_word := 0.0
 	for pg in ["achievements", "archive", "settings", "keys"]:
@@ -586,6 +587,16 @@ func _draw() -> void:
 		draw_string(font_b, Vector2(28, 44), db, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.red(1.0, 1.6))
 	_draw_start(vp)
 	_draw_cursor()
+
+
+# A searchlight from somewhere above the city sweeps slowly behind the menu.
+func _draw_searchlight(vp: Vector2) -> void:
+	var o := Vector2(vp.x * 0.12, -60.0)
+	var a := 1.05 + sin(t * 0.21) * 0.32
+	var len := vp.length() * 1.1
+	var k := clampf((t - 1.2) / 2.0, 0.0, 1.0)
+	var pts := PackedVector2Array([o, o + Vector2.from_angle(a - 0.09) * len, o + Vector2.from_angle(a + 0.09) * len])
+	draw_polygon(pts, PackedColorArray([Color(1, 1, 1, 0.028 * k), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
 
 
 func _draw_word(vp: Vector2) -> void:
@@ -789,7 +800,7 @@ func _draw_archive(vp: Vector2) -> void:
 			if Lore.found(it[0]):
 				have += 1
 	# a dark sheet over the word behind
-	draw_rect(Rect2(0.0, 80.0, vp.x, vp.y - 140.0), Color(0.02, 0.02, 0.022, 0.96 * pk.x))
+	draw_rect(Rect2(0.0, 80.0, vp.x, vp.y - 140.0), Color(0.02, 0.02, 0.022, pk.x))
 	_text_c(font_xl, Txt.t("t_archive") + "  %d / %d" % [have, total], Vector2(vp.x / 2.0, 130 + pk.y * 0.5), 34, Pal.ink(pk.x))
 	_text_c(font_s, Txt.t("archive_hint"), Vector2(vp.x / 2.0, 166 + pk.y * 0.5), 15, Pal.ink(0.5 * pk.x))
 	var colw := 400.0
@@ -871,6 +882,8 @@ func _draw_archive(vp: Vector2) -> void:
 		view_label(sealed, Vector2(x0 + colw * 3.0 + gap * 2.0 - sw, y), 14, Pal.ink(0.3 * kl.x), font_s)
 		draw_line(Vector2(x0, y + 10.0), Vector2(x0 + (colw * 3.0 + gap * 2.0) * kl.x, y + 10.0), Pal.ink(0.08 * kl.x), 1.0)
 		y += 38.0
+	# where each kind is found, along the foot of the page
+	_text_c(font_s, Txt.t("arch_how"), Vector2(vp.x / 2.0, vp.y - 92.0), 15, Pal.ink(0.42 * pk.x))
 	_text_c(font_s, Txt.t("t_back"), Vector2(vp.x / 2.0, vp.y - 40), 15, Pal.ink(0.5 * pk.x))
 
 

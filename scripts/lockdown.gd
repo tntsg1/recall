@@ -107,6 +107,7 @@ func start() -> void:
 	_fresh()
 	pos = HOME + Vector2(0, -90)
 	game.sfx.play("horn", 0.8, -2.0)
+	game.hud.radio(Txt.t("radio_lockdown"))
 	game.cam.add_trauma(0.35)
 
 
