@@ -17,8 +17,8 @@ const COUNT := 7
 const BOSS := 6
 const COST := {C: 1, G: 5, H: 4, P: 3, L: 3, U: 4, E: 3}
 const BUDGET := [16, 22, 28, 32, 40, 48]
-const BOSS_PAR := [[70.0, 105.0], [45.0, 70.0], [45.0, 70.0], [70.0, 100.0], [60.0, 90.0]]
-const NOTES := [{2: "note_guard", 3: "note_charger", 6: "note_boss"}, {1: "note_prism", 6: "note_boss_2"}, {1: "note_leech", 6: "note_boss_3"}, {1: "note_pulse", 6: "note_boss_4"}, {1: "note_echo", 6: "note_boss_5"}]
+# the waves' own notes, by enemy pool (the boss wave's note comes from Chapters)
+const NOTES := [{2: "note_guard", 3: "note_charger"}, {1: "note_prism"}, {1: "note_leech"}, {1: "note_pulse"}, {1: "note_echo"}, {}]
 const SIDES := ["T", "B", "L", "R"]
 
 var game
@@ -33,6 +33,7 @@ var pick_state := 0       # 0 none yet, 1 cards up, 2 chosen
 var pick_done_t := 0.0
 var plan: Array = []      # per wave: {groups: [[delay, kind, count, side]], par: [S, A]}
 var chapter := 0
+var pool := 0                 # which enemies this chapter teaches and mixes (Chapters)
 var chapter_log: Array = []   # finished chapters: [label, time, grades]
 
 
@@ -42,6 +43,7 @@ func _ready() -> void:
 
 func start_chapter(ch: int) -> void:
 	chapter = ch
+	pool = Chapters.pool(ch)
 	index = -1
 	phase = INTRO
 	t = 0.0
@@ -62,18 +64,18 @@ func _build_plan() -> void:
 		match i:
 			0:
 				pass
-			1 when chapter == 0:
+			1 when pool == 0 or pool == 5:
 				pass
-			1 when chapter == 1:
+			1 when pool == 1:
 				kinds.append(P)
 				kinds.append(P)
 				left -= COST[P] * 2
-			1 when chapter == 2:
+			1 when pool == 2:
 				kinds.append(L)
 				kinds.append(L)
 				kinds.append(L)
 				left -= COST[L] * 3
-			1 when chapter == 3:
+			1 when pool == 3:
 				for k in 3:
 					kinds.append(U)
 				left -= COST[U] * 3
@@ -81,26 +83,28 @@ func _build_plan() -> void:
 				for k in 3:
 					kinds.append(E)
 				left -= COST[E] * 3
-			2 when chapter == 0:
+			2 when pool == 0:
 				kinds.append(G)
 				left -= COST[G]
-			3 when chapter == 0:
+			3 when pool == 0:
 				kinds.append(H)
 				kinds.append(H)
 				left -= COST[H] * 2
 			_:
 				var specials := randi_range(2, 4) + chapter
-				var pool: Array = [G, H]
-				if chapter == 1:
-					pool = [G, H, P, P]
-				elif chapter == 2:
-					pool = [G, H, P, L, L]
-				elif chapter == 3:
-					pool = [G, H, L, U, U]
-				elif chapter >= 4:
-					pool = [G, H, P, L, U, E, E]
+				var mix: Array = [G, H]
+				if pool == 1:
+					mix = [G, H, P, P]
+				elif pool == 2:
+					mix = [G, H, P, L, L]
+				elif pool == 5:
+					mix = [G, H, H, P, L]
+				elif pool == 3:
+					mix = [G, H, L, U, U]
+				elif pool == 4:
+					mix = [G, H, P, L, U, E, E]
 				for k in specials:
-					var kind: int = pool[randi() % pool.size()]
+					var kind: int = mix[randi() % mix.size()]
 					if left - COST[kind] >= 8:
 						kinds.append(kind)
 						left -= COST[kind]
@@ -127,7 +131,7 @@ func _build_plan() -> void:
 			last = maxf(last, g[0])
 		var s := roundf(3.0 + 0.26 * budget + 0.45 * last)
 		plan.append({"groups": groups, "par": [s, roundf(s * 1.5)]})
-	plan.append({"groups": [], "par": BOSS_PAR[mini(chapter, BOSS_PAR.size() - 1)]})
+	plan.append({"groups": [], "par": Chapters.at(chapter).par})
 
 
 func time_now() -> float:
@@ -195,10 +199,10 @@ func step(dt: float) -> void:
 						sum += r[0]
 						if grades.has(r[1]):   # waves skipped in dev mode carry "-"
 							grades[r[1]] += 1
-					chapter_log.append([Txt.t("chapter_n") % (chapter + 1) + " · " + Txt.t("chapter_%d" % (chapter + 1)), sum, "S%d A%d B%d" % [grades.S, grades.A, grades.B]])
+					chapter_log.append([Chapters.label(chapter) + " · " + Chapters.title(chapter), sum, "S%d A%d B%d" % [grades.S, grades.A, grades.B]])
 		CLEAR:
 			# the run ends after the last chapter's boss; other bosses lead on
-			var last: bool = index + 1 >= COUNT and chapter + 1 >= Game.CHAPTERS
+			var last: bool = index + 1 >= COUNT and chapter + 1 >= Chapters.count()
 			if not last and pick_state == 0 and t >= 1.1:
 				pick_state = 1
 				game.start_pick()
@@ -225,7 +229,8 @@ func _next() -> void:
 	index += 1
 	phase = TITLE
 	t = 0.0
-	game.on_wave_title(index, (NOTES[mini(chapter, NOTES.size() - 1)] as Dictionary).get(index, ""))
+	var note: String = Chapters.at(chapter).note if index == BOSS else (NOTES[pool] as Dictionary).get(index, "")
+	game.on_wave_title(index, note)
 	if index == BOSS:
 		game.boss.begin_track()
 

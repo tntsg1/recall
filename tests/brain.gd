@@ -86,7 +86,40 @@ func think(game) -> void:
 			move += (p - bs.pos) / maxf(wd, 1.0) * (260.0 - wd) / 60.0
 		# circle round to its open back
 		move += (p - bs.pos).orthogonal().normalized() * 0.8
-	if (bs is Boss and (bs.state == Boss.RUN or bs.state == Boss.ENTER)) or (bs is Warden and bs.state == Warden.RUN) or (bs is Devourer and bs.state == Devourer.RUN) or (bs is Metronome and bs.state == Metronome.RUN) or (bs is Zero and bs.state == Zero.RUN):
+	if bs is Lockdown and bs.state == Lockdown.RUN:
+		# keep off the hull, step out of a beam that is locking, sidestep the shot
+		var hd: float = bs.pos.distance_to(p)
+		if hd < 330.0:
+			move += (p - bs.pos) / maxf(hd, 1.0) * (330.0 - hd) / 50.0
+		for k in 2:
+			if bs.lamp_hp[k] <= 0.0:
+				continue
+			var lp: Vector2 = bs.lamp_pos(k)
+			var side: Vector2 = (p - lp).orthogonal().normalized()
+			if bs.lamp_aim[k] >= 0.0:
+				move += side * 2.0
+				if bs.lamp_aim[k] > Lockdown.AIM_TIME - 0.15:
+					bot.dash = true
+			elif bs.lamp_lock[k] > 0.1:
+				move += side * 1.6
+		for w in bs.waves:
+			if w[1] >= 0.0 and absf(bs.pos.distance_to(p) - w[0]) < 70.0 and bs.pos.distance_to(p) > w[0]:
+				bot.dash = true
+		if bs.phase == 2:
+			# the core shows to the front: stand below it
+			move += (Vector2(bs.pos.x, 700.0) - p).normalized() * 0.6
+			var ae: Vector2 = bs._arc_end()
+			var q2 := Geometry2D.get_closest_point_to_segment(p, bs.pos, ae)
+			if q2.distance_to(p) < 120.0:
+				move += (p - q2).normalized() * 2.0
+			# the arc turns toward you: dash through it just before it arrives
+			var ahead: float = wrapf((p - bs.pos).angle() - bs.arc_a, -PI, PI)
+			if bs.arc_live() and ahead > 0.0 and ahead < 0.12:
+				bot.dash = true
+	if bs is Lockdown and bs.state == Lockdown.RUN:
+		var lcp: Vector2 = bs.core_pos()
+		nearest = {"pos": lcp, "vel": Vector2.ZERO}
+	elif (bs is Boss and (bs.state == Boss.RUN or bs.state == Boss.ENTER)) or (bs is Warden and bs.state == Warden.RUN) or (bs is Devourer and bs.state == Devourer.RUN) or (bs is Metronome and bs.state == Metronome.RUN) or (bs is Zero and bs.state == Zero.RUN):
 		if bs.core_open > 0.5 or not (bs is Boss):
 			var cp: Vector2 = bs.core_pos()
 			nearest = {"pos": cp, "vel": bs.core_vel()}
@@ -114,7 +147,7 @@ func think(game) -> void:
 	if focus_hold > 0.0:
 		focus_hold -= 1.0 / 60.0
 		bot.focus = focus_hold > 0.0
-	elif emb >= 8 and (game.ammo <= 3 or emb >= 18) and (es.size() > 0 or game.boss.core_open > 0.5):
+	elif emb >= 8 and (game.ammo <= 3 or emb >= 18) and (es.size() > 0 or game.boss.core_open > 0.5 or (game.boss is Lockdown and game.boss.state == Lockdown.RUN)):
 		focus_hold = 0.25
 		bot.focus = true
 	else:

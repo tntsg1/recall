@@ -1492,10 +1492,10 @@ func _draw_intro(vp: Vector2) -> void:
 	var cy := vp.y * 0.4
 	var w := 520.0 * Pal.ease_out(t / 0.7)
 	view.draw_line(Vector2(vp.x / 2.0 - w / 2.0, cy + 34.0), Vector2(vp.x / 2.0 + w / 2.0, cy + 34.0), Pal.ink(0.5 * a), 1.0)
-	_text_c(font_s, Txt.t("chapter_n") % (game.chapter + 1), Vector2(vp.x / 2.0, cy + 10.0 - 60.0 * 0.86 - 18.0), 16, Pal.ink(0.55 * a))
+	_text_c(font_s, Chapters.label(game.chapter), Vector2(vp.x / 2.0, cy + 10.0 - 60.0 * 0.86 - 18.0), 16, Pal.ink(0.55 * a))
 	var rise := (1.0 - Pal.ease_out(clampf((t - 0.15) / 0.6, 0.0, 1.0))) * 20.0
-	_text_stagger(font_xl, Txt.t("chapter_%d" % (game.chapter + 1)), Vector2(vp.x / 2.0, cy + 10.0), 60, Pal.ink(1.0, 1.15), t - 0.15, t - 2.15, 0.05)
-	_text_c(font_s, Txt.t("chapter_%d_sub" % (game.chapter + 1)), Vector2(vp.x / 2.0, cy + 70.0), 16, Pal.ink(0.6 * a * clampf((t - 0.5) / 0.4, 0.0, 1.0)))
+	_text_stagger(font_xl, Chapters.title(game.chapter), Vector2(vp.x / 2.0, cy + 10.0), 60, Pal.ink(1.0, 1.15), t - 0.15, t - 2.15, 0.05)
+	_text_c(font_s, Chapters.sub(game.chapter), Vector2(vp.x / 2.0, cy + 70.0), 16, Pal.ink(0.6 * a * clampf((t - 0.5) / 0.4, 0.0, 1.0)))
 
 
 func _draw_over(vp: Vector2) -> void:
@@ -1512,7 +1512,7 @@ func _draw_over(vp: Vector2) -> void:
 	view.draw_line(Vector2(cx - 240.0 * a, y + 28.0), Vector2(cx + 240.0 * a, y + 28.0), Pal.ink(0.4 * a), 1.0)
 	var rk := Pal.ease_out(clampf((t - 0.45) / 0.9, 0.0, 1.0))
 	var rows := [
-		[Txt.t("reached"), Txt.t("chapter_n") % (game.chapter + 1) + "  ·  " + Txt.t("wave") % (game.wave_ctl.index + 1)],
+		[Txt.t("reached"), Chapters.label(game.chapter) + "  ·  " + Txt.t("wave") % (game.wave_ctl.index + 1)],
 		[Txt.t("time"), "%.1f s" % (game.run_time * rk)],
 		[Txt.t("kills"), str(int(round(game.kills * rk)))],
 	]

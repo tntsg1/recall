@@ -9,7 +9,7 @@ const FIRE_INTERVAL := 0.105
 const FOCUS_MAX := 1.2
 const SLOW := 0.08
 const CRACKS := 5
-const CHAPTERS := 5   # chapters built so far
+# how many chapters a run has: see Chapters (story order, built ones only)
 const REGEN_TIME := 1.4
 
 var arena: Arena
@@ -17,6 +17,7 @@ var bullets: Bullets
 var enemies: Enemies
 var boss                      # the current chapter's boss (train, warden, ...)
 var bosses: Array = []
+var bosses_by := {}           # boss name (Chapters) -> node
 var wave_ctl: Waves
 var fx: Fx
 var cam: Cam
@@ -177,12 +178,13 @@ func _ready() -> void:
 	possess = Possess.new()
 	possess.game = self
 	add_child(possess)
-	for cls in [Boss, Warden, Devourer, Metronome, Zero]:
-		var bn = cls.new()
+	for pair in [["lockdown", Lockdown], ["warden", Warden], ["devourer", Devourer], ["train", Boss], ["metronome", Metronome], ["zero", Zero]]:
+		var bn = pair[1].new()
 		bn.game = self
 		add_child(bn)
+		bosses_by[pair[0]] = bn
 		bosses.append(bn)
-	boss = bosses[0]
+	boss = bosses_by[Chapters.boss(0)]
 	wave_ctl = Waves.new()
 	wave_ctl.game = self
 	add_child(wave_ctl)
@@ -303,7 +305,7 @@ func dev_action(id: String, arg) -> void:
 			"boss":
 				dev_jump(Waves.BOSS)
 			"nextch":
-				if chapter + 1 < CHAPTERS:
+				if chapter + 1 < Chapters.count():
 					replacing = {}
 					picking = false
 					hud.replace_done()
@@ -1657,7 +1659,7 @@ func run_snapshot() -> Dictionary:
 		"assist_retries_used": assist_retries_used, "assist_damage": assist_damage,
 		"plan": wave_ctl.plan.duplicate(true), "phoenix_used": phoenix_used,
 		"undying_used": undying_used, "waves_cleared": waves_cleared,
-		"v": 1, "chapter": chapter, "wave": wave_ctl.index, "gun": Loadout.gun, "stake": Loadout.stake,
+		"v": 2, "chapter": chapter, "wave": wave_ctl.index, "gun": Loadout.gun, "stake": Loadout.stake,
 		"cracks": cracks, "max_cracks": max_cracks, "relics": relics.duplicate(), "lv": lv.duplicate(),
 		"armed": armed.duplicate(), "rerolls": rerolls, "run_time": run_time, "kills": kills,
 		"hits_taken": hits_taken, "chapter_hits": chapter_hits, "max_combo": max_combo, "crosses": crosses,
@@ -1667,7 +1669,11 @@ func run_snapshot() -> Dictionary:
 
 
 func _resume(snap: Dictionary) -> void:
-	for i in int(snap.get("chapter", 0)):
+	# runs saved before the story-order table counted the old five chapters
+	var ch := int(snap.get("chapter", 0))
+	if int(snap.get("v", 1)) < 2:
+		ch = Chapters.OLD_RUN[clampi(ch, 0, Chapters.OLD_RUN.size() - 1)]
+	for i in ch:
 		next_chapter()
 	assist_retries_used = int(snap.get("assist_retries_used", 0))
 	assist_damage = float(snap.get("assist_damage", 0.0))
@@ -1721,10 +1727,10 @@ func next_chapter() -> void:
 	for e in enemies.list:
 		e.state = Enemies.DEAD
 	boss.reset()
-	boss = bosses[mini(chapter, bosses.size() - 1)]
+	boss = bosses_by[Chapters.boss(chapter)]
 	boss.reset()
-	arena.setup(chapter)
-	sfx.start_chapter(chapter)
+	arena.setup(Chapters.room(chapter))
+	sfx.start_chapter(Chapters.music(chapter))
 	sfx.play("chapter", 1.0, -2.0)
 	hud.chapter_intro()
 	wave_ctl.start_chapter(chapter)

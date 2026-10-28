@@ -700,7 +700,10 @@ func _draw_menu(vp: Vector2) -> void:
 		match key:
 			"continue":
 				var snap = Meta.run_saved()
-				var where := Txt.t("chapter_n") % (int(snap.chapter) + 1) + " · " + Txt.t("wave") % (int(snap.wave) + 1)
+				var sch := int(snap.chapter)
+				if int(snap.get("v", 1)) < 2:
+					sch = Chapters.OLD_RUN[clampi(sch, 0, Chapters.OLD_RUN.size() - 1)]
+				var where := Chapters.label(sch) + " · " + Txt.t("wave") % (int(snap.wave) + 1)
 				_row(i, "menu", Txt.t("t_continue") + "  ·  " + where, "", a, dx)
 			"start":
 				_row(i, "menu", Txt.t("t_start") if Meta.run_saved() == null else Txt.t("t_new_run"), "", a, dx, not (gun_ok and stake_ok))

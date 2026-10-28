@@ -1129,6 +1129,11 @@ func _boss_line(a: Vector2, b: Vector2, dmg: float, key: String) -> void:
 	var bs = game.boss
 	if bs == null or not bs.alive() or boss_hit.has(key):
 		return
+	# some bosses have parts only a shell can break (the lockdown's legs)
+	if bs.has_method("shell_strike") and bs.shell_strike(a, b, 0.0, dmg * power()):
+		boss_hit[key] = true
+		game.fx.sparks(b, (b - a).normalized(), 10, cyan(1.0, 2.4), 560.0, 0.25, 0.8)
+		return
 	var bh: Dictionary = bs.hit_test(a, b)
 	if bh.is_empty() or not bh.get("core", false):
 		return
@@ -1140,6 +1145,9 @@ func _boss_line(a: Vector2, b: Vector2, dmg: float, key: String) -> void:
 func _boss_area(at: Vector2, radius: float, dmg: float) -> void:
 	var bs = game.boss
 	if bs == null or not bs.alive():
+		return
+	if bs.has_method("shell_strike") and bs.shell_strike(at, at, radius, dmg * power()):
+		game.fx.sparks(at, Vector2.UP, 10, cyan(1.0, 2.4), 560.0, 0.25, PI)
 		return
 	var cp: Vector2 = bs.core_pos()
 	if cp.distance_to(at) > radius + 60.0:

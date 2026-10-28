@@ -101,7 +101,12 @@ func _run() -> void:
 	check(is_equal_approx(game.possess.power(), 1.35), "3 级：招式伤害 ×1.35")
 	game.lv.possess = 0
 
-	# ---- bosses: a shell's moves hurt the open core
+	# ---- bosses: a shell's moves hurt the open core (the train's tail)
+	for i in Chapters.count():
+		if Chapters.boss(i) == "train":
+			for k in i:
+				game.next_chapter()
+			break
 	game.dev_action("boss", null)
 	n = 0
 	var bs = game.boss
