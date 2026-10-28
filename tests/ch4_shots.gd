@@ -95,8 +95,11 @@ func _run() -> void:
 		bs.guard_t = 0.0
 		bs.damage(bs.HP * 0.36 * Loadout.boss_hp(), false, bs.pos, Vector2.UP)
 	bs.guard_t = 0.0
-	game.arms.feed_cd = 1.0
-	await frames(100)
-	print("FULL phase ", bs.phase, " state ", bs.state, " hp ", bs.hp)
+	# keep the crate's stock fresh so it is still there to be fed
+	for b in game.arms.crate:
+		b.life = 0.0
+	game.arms.feed_cd = 2.3
+	await frames(160)
+	print("FULL crate ", game.arms.crate.size(), " carry ", game.arms.carry.size())
 	await shot("8_full")
 	quit()

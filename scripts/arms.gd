@@ -267,9 +267,9 @@ func _draw_beacons(dim: float) -> void:
 	for c: Vector2 in [r.position + Vector2(18, 18), Vector2(r.end.x - 18, r.position.y + 18), r.end - Vector2(18, 18), Vector2(r.position.x + 18, r.end.y - 18)]:
 		var a := t * 4.0 + k * PI * 0.5
 		var beam := PackedVector2Array([c, c + Vector2.from_angle(a - 0.22) * 260.0, c + Vector2.from_angle(a + 0.22) * 260.0])
-		draw_polygon(beam, PackedColorArray([Pal.red(0.18 * dim, 1.6), Pal.red(0.0, 1.0), Pal.red(0.0, 1.0)]))
+		draw_polygon(beam, PackedColorArray([Pal.red(0.1 * dim, 1.2), Pal.red(0.0, 1.0), Pal.red(0.0, 1.0)]))
 		draw_circle(c, 9.0, Pal.WALL)
-		draw_circle(c, 6.0, Pal.red(dim, 2.6))
+		draw_circle(c, 5.0, Pal.red(0.8 * dim, 1.6))
 		k += 1
 
 
@@ -388,9 +388,12 @@ func _draw_arm(arm: Dictionary, dim: float) -> void:
 	for s2: float in [-1.0, 1.0]:
 		var root := cl + dir * 8.0 + wn * 8.0 * s2
 		var prong := dir.rotated(open * s2)
-		var tip := root + prong * 26.0
-		draw_line(root, tip, Color(0.1, 0.1, 0.11), 7.0)
-		draw_line(root, tip, col, 2.5)
-		draw_line(tip, tip + dir.rotated(-0.7 * s2) * 12.0, col, 2.5)
+		var tip := root + prong * 28.0
+		var hook := tip + dir.rotated(-0.7 * s2) * 13.0
+		draw_line(root, tip, Color(0.1, 0.1, 0.11), 9.0)
+		draw_line(root, tip, col, 3.5)
+		draw_line(tip, hook, Color(0.1, 0.1, 0.11), 8.0)
+		draw_line(tip, hook, col, 3.5)
+		draw_circle(hook, 3.0, Pal.ink(0.95 * dim, 1.6))
 	if live:
 		draw_circle(cl + dir * 14.0, 5.0, Pal.foe(dim, 2.4))

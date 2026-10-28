@@ -798,7 +798,7 @@ func _draw_stations(dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
 	var lines := PackedVector2Array()
 	var n := 0
-	for st: Vector2 in [Vector2(360, 360), Vector2(680, 360), Vector2(1240, 360), Vector2(1560, 360), Vector2(1140, 900), Vector2(1500, 900)]:
+	for st: Vector2 in [Vector2(360, 360), Vector2(680, 360), Vector2(1240, 360), Vector2(1560, 360), Vector2(1140, 900), Vector2(1290, 900)]:
 		n += 1
 		var r := Rect2(st - Vector2(34, 22), Vector2(68, 44))
 		lines.append_array(PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.position.y), r.end,
@@ -809,11 +809,31 @@ func _draw_stations(dim: float) -> void:
 		draw_string(sf, r.position + Vector2(4, -4), Txt.t("station") % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 1, 1, 0.12 * dim))
 		# each station's lamp: off, or red when the line runs flat out
 		var lamp := Vector2(r.end.x - 6.0, r.position.y - 8.0)
-		if _full() and fmod(t * 3.0 + n * 0.17, 1.0) < 0.6:
+		if _full() and (n == 2 or n == 5) and fmod(t * 3.0 + n * 0.17, 1.0) < 0.6:
 			draw_circle(lamp, 5.0, Pal.red(dim, 2.4))
 		else:
 			draw_circle(lamp, 4.0, Pal.ink(0.2 * dim))
 	draw_multiline(lines, Color(1, 1, 1, 0.07 * dim), 2.0)
+	# what the people at these stations left behind: a lunch box half eaten
+	# (four minutes was not enough), a cup, a badge on the belt's edge
+	for lb: Vector2 in [Vector2(398, 372), Vector2(1598, 372)]:
+		var box := Rect2(lb - Vector2(13, 8), Vector2(26, 16))
+		draw_rect(box, Color(0.08, 0.08, 0.085))
+		draw_rect(box, Pal.ink(0.5 * dim), false, 1.5)
+		draw_line(box.position + Vector2(13, 0), box.position + Vector2(13, 16), Pal.ink(0.35 * dim), 1.0)
+		draw_circle(box.position + Vector2(6, 8), 3.0, Pal.ink(0.3 * dim))
+		var lid := PackedVector2Array([box.position + Vector2(0, -2), box.position + Vector2(24, -12)])
+		draw_line(lid[0], lid[1], Pal.ink(0.45 * dim), 2.0)
+	for cp: Vector2 in [Vector2(712, 378), Vector2(1272, 378), Vector2(1170, 918)]:
+		draw_circle(cp, 6.0, Color(0.08, 0.08, 0.085))
+		draw_arc(cp, 6.0, 0.0, TAU, 14, Pal.ink(0.5 * dim), 1.5)
+		draw_arc(cp + Vector2(7, 0), 3.0, -PI / 2.0, PI / 2.0, 6, Pal.ink(0.4 * dim), 1.2)
+	var badge := Rect2(Vector2(612, 318), Vector2(18, 24))
+	draw_rect(badge, Color(0.09, 0.09, 0.095))
+	draw_rect(badge, Pal.ink(0.55 * dim), false, 1.2)
+	draw_circle(badge.position + Vector2(9, 9), 4.0, Pal.ink(0.3 * dim))
+	draw_line(badge.position + Vector2(4, 18), badge.position + Vector2(14, 18), Pal.ink(0.35 * dim), 1.5)
+	draw_line(badge.position + Vector2(9, 0), badge.position + Vector2(9, -6), Pal.ink(0.4 * dim), 1.0)
 
 
 # Oil under the presses, scuffed lanes where the carts run, stacked ration
@@ -858,8 +878,12 @@ func _draw_presses(dim: float) -> void:
 			var ph := fmod(t * 2.5, 1.0)
 			var ram := 1.0 - Pal.ease_out(ph) if ph < 0.5 else (ph - 0.5) * 2.0
 			var rr := ins.grow(-6.0 - 10.0 * (1.0 - ram))
-			draw_rect(rr, Color(0.1, 0.1, 0.11))
-			draw_rect(rr, Pal.ink((0.4 + 0.5 * (1.0 - ram)) * dim, 1.4), false, 2.0)
+			draw_rect(rr, Color(0.07, 0.07, 0.08))
+			var strike := ph < 0.1
+			draw_rect(rr, Pal.ink((0.9 if strike else 0.3) * dim, 1.5 if strike else 1.0), false, 2.0)
+			if ph < 0.18:
+				# the strike rings out round the base
+				draw_rect(r.grow(4.0 + ph * 60.0), Pal.ink(0.5 * (1.0 - ph / 0.18) * dim, 1.2), false, 1.5)
 		for b: Vector2 in [ins.position, Vector2(ins.end.x, ins.position.y)]:
 			draw_circle(b + Vector2(0, 26), 2.5, Pal.ink(0.35 * dim))
 
