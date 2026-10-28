@@ -1144,9 +1144,16 @@ func _circle_w(o: Vector2, r: float, n: int, c: Color, a0: float = 0.0, a1: floa
 
 
 func _draw_glow() -> void:
+	# a flock coming home stacks its light: thin each halo as the flock grows,
+	# so one round glows as before and twenty do not wash the arena out
+	var homing := 0
 	for b in list:
 		if b.state == RETURN:
-			glow.draw_texture_rect(glow_tex, Rect2(b.pos - Vector2(26, 26), Vector2(52, 52)), false, Pal.red(0.55, 1.6))
+			homing += 1
+	var share := clampf(sqrt(4.0 / maxf(1.0, homing)), 0.4, 1.0)
+	for b in list:
+		if b.state == RETURN:
+			glow.draw_texture_rect(glow_tex, Rect2(b.pos - Vector2(22, 22), Vector2(44, 44)), false, Pal.red(0.55 * share, 1.6))
 		elif b.state == EMBED and b.light > 0.0:
 			var p := b.pos - b.dir * 9.0
 			var r := 18.0 + 4.0 * sin(game.real_time * 6.0 + b.seed)

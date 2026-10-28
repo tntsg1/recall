@@ -144,7 +144,8 @@ func _dummy(kind: int, at: Vector2, hp: float):
 
 
 func skip_rect(vp: Vector2) -> Rect2:
-	return Rect2(vp.x - 330, 28, 290, 48)
+	# in the top band, right-aligned to the arena's edge, clear of its frame
+	return Rect2(vp.x - Hud.BAND_EDGE - 290, 14, 290, 40)
 
 func done_rect(vp: Vector2) -> Rect2:
 	return Rect2(vp.x / 2.0 - 280, 340, 560, 64)
@@ -186,22 +187,33 @@ func instructions() -> String:
 		"recall": Settings.key_name("recall"), "dash": Settings.key_name("dash"), "possess": "E"}
 	return Txt.t("teach_%d_body" % stage).format(binds)
 
+var para: TextParagraph
+var para_text := ""
+
+
 func draw_hud(hud, vp: Vector2) -> void:
 	var v: CanvasItem = hud.view
 	var width := minf(1100, vp.x - 100)
 	var x := (vp.x - width) / 2.0
-	v.draw_rect(Rect2(x, 104, width, 210), Color(0.035, 0.035, 0.04, 1.0))
+	# shaped once per text, not every frame
+	var txt := instructions()
+	if para == null or para_text != txt or para.width != width - 60:
+		para = TextParagraph.new()
+		para.width = width - 60
+		para.add_string(txt, hud.font_s, 22)
+		para_text = txt
+	var paragraph: TextParagraph = para
+	# the panel is as tall as what it says
+	var ph := 74.0 + paragraph.get_size().y + 32.0
+	v.draw_rect(Rect2(x, 104, width, ph), Color(0.035, 0.035, 0.04, 1.0))
 	v.draw_line(Vector2(x, 104), Vector2(x + width * (stage + 1.0) / STEPS, 104), Pal.red(0.9, 1.5), 3.0)
-	v.draw_string(hud.font_s, Vector2(40, 60), Txt.t("t_tutorial") + "  %d / %d" % [stage + 1, STEPS], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.7))
+	v.draw_string(hud.font_s, Vector2(Hud.BAND_EDGE, 41), Txt.t("t_tutorial") + "  %d / %d" % [stage + 1, STEPS], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.7))
 	hud._text_c(hud.font_s, Txt.t("teach_skip"), skip_rect(vp).get_center() + Vector2(0, 7), 18, Pal.ink(0.7))
 	v.draw_string(hud.font_xl, Vector2(x + 30, 153), Txt.t("teach_%d_title" % stage), HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Pal.ink(1.0))
-	var paragraph := TextParagraph.new()
-	paragraph.width = width - 60
-	paragraph.add_string(instructions(), hud.font_s, 22)
 	paragraph.draw(v.get_canvas_item(), Vector2(x + 30, 178), Pal.ink(0.8))
 	if stage == HOLD:
 		var progress: float = clampf(game.focus_time / 0.35, 0.0, 1.0) if game.focusing else 0.0
-		v.draw_rect(Rect2(x + 30, 290, (width - 60) * progress, 4), Pal.red(1.0))
+		v.draw_rect(Rect2(x + 30, 104 + ph - 20, (width - 60) * progress, 4), Pal.red(1.0))
 	if retry_note and stage == SHOOT:
 		hud._text_c(hud.font_s, Txt.t("teach_retry"), Vector2(vp.x / 2.0, 350), 18, Pal.ink(0.65))
 	if stage == COMPLETE:

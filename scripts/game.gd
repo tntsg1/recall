@@ -894,6 +894,9 @@ static func make_environment() -> Environment:
 	return e
 
 
+var resume_note := false
+
+
 # per-section frame timings, filled only while a perf test asks for them
 var prof_on := false
 var prof := {}
@@ -1705,8 +1708,11 @@ func _resume(snap: Dictionary) -> void:
 		wave_ctl.index = w - 1
 		wave_ctl.phase = Waves.CLEAR
 		wave_ctl.pick_state = 2
-		wave_ctl.t = 10.0
-	hud.flash_text(Txt.t("resumed"))
+		# the chapter's opening plays out first; the wave's title follows it
+		wave_ctl.t = 0.0
+		wave_ctl.pick_done_t = 2.2
+	# "from the start of this wave" rides under that title, not over the opening
+	resume_note = true
 
 
 func next_chapter() -> void:
@@ -1754,6 +1760,9 @@ func on_chapter_clear() -> void:
 
 
 func on_wave_title(index: int, note: String) -> void:
+	if resume_note:
+		resume_note = false
+		note = "resumed"
 	hud.wave_title(index, note)
 	sfx.play("title", 1.0, -4.0)
 

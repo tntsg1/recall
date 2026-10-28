@@ -504,7 +504,7 @@ func _draw_title(vp: Vector2) -> void:
 	# two hairlines sweep in from the sides, the label rises between them, then all wipe out
 	var inn := Pal.ease_out(t / 0.45)
 	var out := Pal.ease_in(clampf((t - 1.55) / 0.45, 0.0, 1.0))
-	var half := 360.0 * inn
+	var half := 280.0 * inn
 	var a := 1.0 - out
 	var cx := vp.x / 2.0
 	var shift := out * 80.0
@@ -512,6 +512,8 @@ func _draw_title(vp: Vector2) -> void:
 	# the hairlines keep the same air above the glyphs' tops and below their baseline
 	var top := cy - size * 0.86 - 16.0
 	var bot := cy + 18.0
+	# a soft plate behind, so the label reads over whatever the arena has there
+	view.draw_rect(Rect2(cx - half - 14.0, top, (half + 14.0) * 2.0, bot - top), Color(0, 0, 0, 0.55 * a))
 	view.draw_line(Vector2(cx - half + shift, top), Vector2(cx + half * (1.0 - out) + shift, top), Pal.ink(0.5 * a), 1.0)
 	view.draw_line(Vector2(cx - half * (1.0 - out) - shift, bot), Vector2(cx + half - shift, bot), Pal.ink(0.5 * a), 1.0)
 	var label := Txt.t("wave") % (title_i + 1)
@@ -1021,9 +1023,9 @@ func _card_face(c: Dictionary, r: Rect2, a: float, hov: float, idx: int) -> void
 			_item_glyph(Vector2(0, -80), 38.0, ic, 2.5)
 	_text_c(font_xl, title, Vector2(0, 22), 28, Pal.ink(a))
 	var y := 88.0
-	for ln in _wrap(desc, 16, CARD.x - 56.0):
-		_text_c(font_s, ln, Vector2(0, y), 16, Pal.ink(0.78 * a))
-		y += 24.0
+	for ln in _wrap(desc, 17, CARD.x - 56.0):
+		_text_c(font_s, ln, Vector2(0, y), 17, Pal.ink(0.82 * a))
+		y += 25.0
 	if c.get("full", false) or (c.type == "relic" and game.relics.size() >= Cards.RELIC_SLOTS):
 		_text_c(font_s, Txt.t("card_full"), Vector2(0, CARD.y / 2.0 - 50.0), 13, Pal.ink(0.5 * a))
 	_text_c(font_b, str(idx + 1), Vector2(0, CARD.y / 2.0 - 22.0), 18, Pal.ink((0.35 + 0.4 * hov) * a))
@@ -1124,11 +1126,13 @@ func _draw_tip(vp: Vector2) -> void:
 
 func _draw_build(vp: Vector2, a: float) -> void:
 	# the pause screen's right column: every school and relic with what it does
-	var x := vp.x - 470.0
-	var y := vp.y * 0.2
+	var w := 430.0
+	var x := vp.x - BAND_EDGE - w
+	var y := vp.y * 0.3
 	var i := 0
-	view.draw_string(font_b, Vector2(x, y), Txt.t("build_title"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.red(a, 1.6))
-	y += 30.0
+	view.draw_string(font_b, Vector2(x, y), Txt.t("build_title"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.55 * a))
+	view.draw_line(Vector2(x, y + 12.0), Vector2(x + w * a, y + 12.0), Pal.ink(0.25 * a), 1.0)
+	y += 42.0
 	var entries: Array = []
 	for k in _held_schools():
 		entries.append("school:" + k)
@@ -1142,12 +1146,12 @@ func _draw_build(vp: Vector2, a: float) -> void:
 		var ea := a * ki
 		var L := _tip_lines(key)
 		var dx := (1.0 - ki) * 30.0
-		view.draw_string(font_xl, Vector2(x + dx, y), L[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, (Pal.red(ea, 1.6) if L[3] == 2 else Pal.ink(ea)))
-		y += 22.0
-		for ln in _wrap(L[2], 13, 430.0):
-			view.draw_string(font_s, Vector2(x + dx, y), ln, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.6 * ea))
-			y += 19.0
-		y += 10.0
+		view.draw_string(font_xl, Vector2(x + dx, y), L[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, (Pal.red(ea, 1.6) if L[3] == 2 else Pal.ink(ea)))
+		y += 24.0
+		for ln in _wrap(L[2], 15, w):
+			view.draw_string(font_s, Vector2(x + dx, y), ln, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.6 * ea))
+			y += 22.0
+		y += 14.0
 		i += 1
 
 
@@ -1230,7 +1234,7 @@ func _draw_host(vp: Vector2, base: Vector2, hk: float) -> void:
 	var ts := "%.1f" % maxf(0.0, left)
 	var tw := font_l.get_string_size(ts, HORIZONTAL_ALIGNMENT_LEFT, -1, 44).x
 	view.draw_string(font_l, Vector2(base.x - 4.0 - tw, base.y + rise), ts, HORIZONTAL_ALIGNMENT_LEFT, -1, 44, col)
-	view.draw_string(font_s, base + Vector2(6.0, rise), host_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Possess.cyan(0.6 * hk, 1.2))
+	view.draw_string(font_s, base + Vector2(6.0, rise), "s   " + host_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Possess.cyan(0.6 * hk, 1.2))
 
 
 # E, beside the ammo: dim while cooling down (its underline fills), lit cyan

@@ -539,9 +539,11 @@ func _text_c(font: Font, txt: String, center: Vector2, size: int, c: Color) -> v
 
 
 # How present page `pg` is right now (0..1), and its slide offset.
+# The old page leaves first and fast; the new one comes in only once it has
+# mostly gone, so the two never sit on top of each other.
 func _page_k(pg: String, i: int) -> Vector2:
-	var k_in := Pal.ease_out(Motion.stagger(page_t, i, 0.04, PAGE_T * 0.75))
-	var k_out := 1.0 - Pal.ease_in(Motion.stagger(page_t, i, 0.025, PAGE_T * 0.5))
+	var k_in := Pal.ease_out(Motion.stagger(page_t - PAGE_T * 0.4, i, 0.035, PAGE_T * 0.7))
+	var k_out := 1.0 - Pal.ease_in(Motion.stagger(page_t, i, 0.006, PAGE_T * 0.32))
 	if pg == page:
 		return Vector2(k_in, (1.0 - k_in) * 60.0)
 	if pg == prev_page:
@@ -582,7 +584,7 @@ func _draw() -> void:
 func _draw_word(vp: Vector2) -> void:
 	var cur: Vector2 = cur_p.x
 	# the word sits a touch off the cursor, as if it floated above the grid
-	var par := (cur - vp / 2.0) * -0.012
+	var par := ((cur - vp / 2.0) * -0.012).limit_length(6.0)
 	var cyc := fmod(maxf(0.0, t - 3.4), 6.5)
 	var sweep := lerpf(500.0, 1420.0, Pal.ease_io(clampf(cyc / 1.8, 0.0, 1.0)))
 	var sweep_a := sin(clampf(cyc / 1.8, 0.0, 1.0) * PI) if t > 3.4 else 0.0
