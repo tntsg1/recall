@@ -669,6 +669,13 @@ func _fly(b: B, dt: float) -> void:
 		b.set_head(b.pos)
 		game.enemies.on_shield(sh.e, sh.point, b.dir, false)
 		return
+	var mg: Dictionary = game.maglev.cross(a, end, b)
+	if mg:
+		# a powered guide rail grips the round and turns it along the rail
+		game.enemies.sweep(a, mg.point, b, false)
+		_bend(b, mg.point, mg.dir)
+		game.maglev.on_bend(mg.point)
+		return
 	var ph: Dictionary = game.enemies.prism_hit(a, end, b)
 	if ph:
 		# a prism bends the round by a fixed angle; the bend joins its path

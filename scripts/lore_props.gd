@@ -45,6 +45,11 @@ func start_chapter(ch: int) -> void:
 	shows.clear()
 	hold.clear()
 	shutter_up = 0.0
+	if story == 5 and game.bosses_by.has("train"):
+		# the line runs here: its loop is laid from the start
+		var tr = game.bosses_by["train"]
+		tr.track_draw = 1.0
+		tr.rails.queue_redraw()
 	memory_t = -1.0
 	worker_t = 0.0 if story == 1 else -1.0
 
@@ -163,6 +168,13 @@ func _draw() -> void:
 		_draw_target(Vector2(600, 70), Vector2(0, 1), dim, 1)
 		if shows.get("w3_safety", 0.0) <= 0.01:
 			_draw_floor_notice(Vector2(1490, 1010), dim)
+	elif story == 5:
+		_draw_platform(dim)
+		_draw_containers(dim)
+		_draw_terminal(Vector2(80, 300), dim, "w5_timetable")
+		if shows.get("w5_manifest", 0.0) <= 0.01:
+			_draw_wall_notice(Vector2(1840, 760), dim)
+		_draw_scrawl(Vector2(1840, 160), dim)
 	elif story == 4:
 		_draw_stations(dim)
 		_draw_presses(dim)
@@ -456,7 +468,7 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 			yy += step
 	elif id != "" or int(t * 2.0) % 3 != 0:
 		var dots := ".".repeat(int(t * 2.0) % 4)
-		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
+		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output", 5: "term_timetable"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
 
 
 # The queue: posts with a rope slung between them, and the waiting line.
@@ -795,6 +807,66 @@ func _draw_floor_notice(c: Vector2, dim: float) -> void:
 	draw_line(tc + Vector2(0, -5), tc + Vector2(0, 2), Pal.ink(0.6 * dim), 2.0)
 	for j in 3:
 		draw_line(r.position + Vector2(44, 16 + j * 11), r.position + Vector2(108 - (j % 2) * 20, 16 + j * 11), Pal.ink(0.25 * dim), 1.0)
+
+
+# ---------------------------------------------------------------- the superconducting line
+
+# 13th Street's platform, between the loop's bottom run and the wall: its
+# edge, the yellow line, the station's name board, and the people painted
+# where they wait, facing a train that never stops.
+func _draw_platform(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	var r := Rect2(640, 936, 640, 64)
+	draw_rect(r, Color(0.06, 0.06, 0.065))
+	draw_line(r.position, Vector2(r.end.x, r.position.y), Pal.ink(0.6 * dim), 2.0)
+	draw_rect(r, Pal.ink(0.3 * dim), false, 1.0)
+	# the yellow line, a dashed band a step back from the edge
+	var yl := PackedVector2Array()
+	var x := r.position.x + 6.0
+	while x < r.end.x - 6.0:
+		yl.append(Vector2(x, r.position.y + 10.0))
+		yl.append(Vector2(x + 18.0, r.position.y + 10.0))
+		x += 28.0
+	draw_multiline(yl, Pal.ink(0.55 * dim, 1.2), 4.0)
+	# the name board at its middle
+	var nb := Rect2(Vector2(r.position.x + 12.0, r.position.y + 22.0), Vector2(120, 30))
+	draw_rect(nb, Color(0.09, 0.09, 0.095))
+	draw_rect(nb, Pal.ink(0.6 * dim), false, 1.5)
+	var nm := Txt.t("station_name")
+	var nw := sf.get_string_size(nm, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+	draw_string(sf, Vector2(nb.get_center().x - nw / 2.0, nb.position.y + 22.0), nm, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.85 * dim, 1.2))
+	# the people waiting: outlines, a head and shoulders each, one with a child
+	var figs := PackedVector2Array()
+	for fx: float in [1185.0, 1222.0, 1259.0]:
+		var c := Vector2(fx, r.position.y + 36.0)
+		draw_circle(c + Vector2(0, -8), 6.0, Pal.ink(0.3 * dim))
+		figs.append(c + Vector2(-10, 12))
+		figs.append(c + Vector2(-8, 0))
+		figs.append(c + Vector2(-8, 0))
+		figs.append(c + Vector2(8, 0))
+		figs.append(c + Vector2(8, 0))
+		figs.append(c + Vector2(10, 12))
+	draw_multiline(figs, Pal.ink(0.35 * dim), 2.0)
+	draw_circle(Vector2(1203, r.position.y + 38.0), 4.0, Pal.ink(0.3 * dim))
+
+
+# The four pillars are freight containers bound for the centre.
+func _draw_containers(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	var n := 0
+	for rr: Rect2 in game.arena.inner:
+		n += 1
+		var ins := rr.grow(-6.0)
+		var ribs := PackedVector2Array()
+		var y := ins.position.y + 8.0
+		while y < ins.end.y - 4.0:
+			ribs.append(Vector2(ins.position.x, y))
+			ribs.append(Vector2(ins.end.x, y))
+			y += 9.0
+		draw_multiline(ribs, Pal.ink(0.12 * dim), 1.0)
+		draw_string(sf, ins.position + Vector2(4, 14), "CX-%04d" % (n * 4127 % 9973), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.55 * dim))
+		if ins.size.y > 40.0:
+			draw_string(sf, Vector2(ins.position.x + 4, ins.end.y - 6), Txt.t("cx_dest"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.4 * dim))
 
 
 # ---------------------------------------------------------------- the production union

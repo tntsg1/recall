@@ -1,7 +1,9 @@
 class_name Boss
 extends Node2D
-# 逆行列车 THE RETROGRADE: a seven-car train on a loop around the middle of the
-# room. Its armour turns bullets away; only the core in the tail car can be
+# 中央直达专列 THE CENTRAL EXPRESS (chapter 5; it was the Retrograde): a
+# seven-car train on a loop around the middle of the room, running past 13th
+# Street's platform without stopping. It runs faster while the floor's guide
+# rails are powered. Its armour turns bullets away; only the core in the tail car can be
 # hurt, and only while its shutters are open. Every quarter of the core's
 # health strips armour off the front cars and the train runs faster. Now and
 # then it brakes, stops and runs backwards.
@@ -18,6 +20,8 @@ const CORE_R := 20.0
 const SPEEDS := [360.0, 430.0, 500.0, 580.0]
 const OPEN_TIME := [3.8, 3.5, 3.2, 3.0]
 const BREAKS := [[1, 2], [3, 4], [5]]   # cars whose armour falls at 75 / 50 / 25 %
+const STATION := Vector2(960, 910)       # 13th Street's platform, on the loop's bottom run
+const STENCIL := ["直达", "中央", "沿途", "不停", "货运", "专列"]
 
 var game
 var state := OFF
@@ -38,6 +42,7 @@ var core := CLOSED
 var core_t := 0.0
 var core_open := 0.0               # shutter 0..1 (eased)
 var core_flash := 0.0
+var station_cd := 0.0
 var core_red := 0.0
 var stripped := []                 # per car: armour gone
 var strip_t := []                  # per car: time since stripped (for the burst)
@@ -182,7 +187,9 @@ func dev_strike() -> void:
 
 
 func begin_track() -> void:
-	track_draw = 0.0001
+	# already laid (the line's own chapter shows it from the start): keep it
+	if track_draw < 1.0:
+		track_draw = 0.0001
 
 
 func start() -> void:
@@ -198,6 +205,7 @@ func start() -> void:
 	core_t = 0.0
 	game.sfx.play("horn", 1.0, -2.0)
 	game.cam.add_trauma(0.2)
+	game.hud.radio(Txt.t("radio_express"))
 
 
 func core_pos() -> Vector2:
@@ -421,8 +429,16 @@ func _run(dt: float) -> void:
 		if reverse_t <= 0.0:
 			next_reverse = randf_range(10.0, 14.0) - phase * 1.2
 	else:
-		speed = Pal.damp(speed, target_speed, 1.2, dt)
+		speed = Pal.damp(speed, target_speed * (1.15 if game.maglev.any_lit() else 1.0), 1.2, dt)
 	head += speed * dir * dt
+	# past the platform at 13th Street: the horn, and it does not slow
+	station_cd -= dt
+	if station_cd <= 0.0 and at(car_s(0)).distance_to(STATION) < 40.0:
+		station_cd = 3.0
+		game.sfx.play("horn", 0.95, -5.0)
+		game.cam.add_trauma(0.12)
+		for j in 6:
+			game.fx.spark(STATION + Vector2(randf_range(-200, 200), 40.0), Vector2(randf_range(-80, 80), randf_range(40, 120)), 0.4, Pal.ink(0.4, 1.2), 1.0, 6.0)
 	if horn_t >= 0.0:
 		horn_t += dt
 		if horn_t > 2.0:
@@ -569,11 +585,22 @@ func _draw() -> void:
 			draw_rect(r, Color(0.06, 0.06, 0.065, appear))
 			draw_rect(r, edge, false, 2.0)
 			draw_rect(r.grow(-5), Pal.foe(0.16 * dim * appear), false, 1.0)
-			# armour seams and windows
-			var n := 3 if k > 0 else 2
-			for j in n:
-				var x := lerpf(r.position.x + 12.0, r.end.x - 12.0, (j + 0.5) / n)
-				draw_rect(Rect2(x - 5.0, -4.0, 10.0, 8.0), Pal.foe(0.22 * dim * appear), false, 1.0)
+			# armour seams, and the stencil along its side, read the right way up
+			if k > 0 and k < CARS - 1:
+				var word: String = STENCIL[(k - 1) % STENCIL.size()] if Txt.zh else ["EXPRESS", "TO", "CENTRE", "NO", "STOPS", "FREIGHT"][(k - 1) % 6]
+				var flip := tr.x.x < 0.0
+				if flip:
+					draw_set_transform_matrix(tr * Transform2D(PI, Vector2.ZERO))
+				var sf := Fonts.get_font("SemiBold")
+				var ww := sf.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+				draw_string(sf, Vector2(-ww / 2.0, 5.0), word, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.foe(0.55 * dim * appear))
+				if flip:
+					draw_set_transform_matrix(tr)
+			else:
+				var n := 2
+				for j in n:
+					var x := lerpf(r.position.x + 12.0, r.end.x - 12.0, (j + 0.5) / n)
+					draw_rect(Rect2(x - 5.0, -4.0, 10.0, 8.0), Pal.foe(0.22 * dim * appear), false, 1.0)
 		if k == 0:
 			# the engine's nose and headlight, pointing the way it runs
 			var front := r.end.x if dir > 0.0 else r.position.x

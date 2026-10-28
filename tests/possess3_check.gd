@@ -126,7 +126,9 @@ func _run() -> void:
 	var hp1: float = bs.hp
 	var cp: Vector2 = bs.core_pos()
 	game.possess.boss_hit.clear()
-	game.possess._boss_line(cp + Vector2(-300, 0), cp + Vector2(300, 0), 100.0, "t")
+	# across the track at the tail, so no other car is in the way
+	var across: Vector2 = bs.tangent(bs.car_s(Boss.CARS - 1)).orthogonal()
+	game.possess._boss_line(cp - across * 300.0, cp + across * 300.0, 100.0, "t")
 	check(bs.hp < hp1 or not bs.core_open > 0.5, "壳的直线招式穿过核心也能打 Boss")
 
 	print("POSSESS3 CHECK " + ("PASS" if fails.is_empty() else "FAIL (%d)" % fails.size()))

@@ -153,6 +153,14 @@ func think(game) -> void:
 					move += v.normalized() * 2.2
 					if arm.mode == Arms.SWEEP and absf(wrapf(v.angle() - arm.a, -PI, PI)) < 0.35:
 						bot.dash = true
+	# guide rails: keep off a powered one (it drags at your feet)
+	if game.maglev.active():
+		for rl in game.maglev.rails:
+			if game.maglev.live[rl[2]]:
+				var q4 := Geometry2D.get_closest_point_to_segment(p, rl[0], rl[1])
+				var md2: float = q4.distance_to(p)
+				if md2 < 50.0:
+					move += (p - q4) / maxf(md2, 1.0) * (50.0 - md2) / 25.0
 	# laser fences: stand clear of a beam that is lit or about to be
 	if game.lasers.active():
 		for fe in game.lasers.fences:

@@ -36,6 +36,14 @@ const SEIZE := {
 		Enemies.CHARGER: [["装配线每年提速一成。工人的工资不变。", "THE LINE RUNS TEN PER CENT FASTER EVERY YEAR. THE WAGES DO NOT."]],
 		Enemies.LEECH: [["我把一切吸进来，再交上去。自己什么也不留。", "I TAKE EVERYTHING IN AND HAND IT UP. I KEEP NOTHING."]],
 	},
+	5: {
+		Enemies.CHASER: [["押运第 9 年。车厢里装着什么，我没有权限知道。", "NINE YEARS ESCORTING. WHAT THE CARS CARRY, I AM NOT CLEARED TO KNOW."],
+			["车过第十三街时会鸣笛。不是打招呼，是让人让开。", "IT SOUNDS ITS HORN AT 13TH STREET. NOT A GREETING. A WARNING TO MOVE."]],
+		Enemies.GUARD: [["站台上的人想上车。我的任务是让他们一直想。", "THE PEOPLE ON THE PLATFORM WANT TO BOARD. MY JOB IS TO KEEP THEM WANTING."]],
+		Enemies.CHARGER: [["专列时速六百。第十三街的公交，上次来是三年前。", "THE EXPRESS RUNS AT SIX HUNDRED. 13TH STREET'S BUS LAST CAME THREE YEARS AGO."]],
+		Enemies.PRISM: [["我把站台的灯调亮，让等车的人看起来有希望。", "I TURN UP THE PLATFORM LIGHTS SO THE WAITING LOOK HOPEFUL."]],
+		Enemies.LEECH: [["货单上写着“民生物资”。终点写着“中央储备”。", "THE MANIFEST SAYS 'GOODS FOR THE PEOPLE'. THE DESTINATION SAYS 'CENTRAL RESERVE'."]],
+	},
 }
 
 # remnants: [id, wall point, inward normal, kind of mark, zh, en]
@@ -64,6 +72,12 @@ const WALL := {
 		["notice", Vector2(1500, 70), Vector2(0, 1), "notice", "为庆祝产量再创新高，午餐时间缩短为 4 分钟。", "TO CELEBRATE RECORD OUTPUT, LUNCH IS NOW FOUR MINUTES."],
 		["scrawl", Vector2(1840, 820), Vector2(-1, 0), "scrawl", "我们造的面包，我们买不起。", "WE BAKE THE BREAD. WE CAN'T AFFORD IT."],
 	],
+	5: [
+		["timetable", Vector2(80, 300), Vector2(1, 0), "screen", "下一班：中央专列 · 本站不停 · 候车：无限期", "NEXT: CENTRAL EXPRESS · DOES NOT STOP HERE · WAIT: INDEFINITE"],
+		["yellow", Vector2(960, 1010), Vector2(0, -1), "floor", "请勿越过黄线 · 越线者按货物处理", "DO NOT CROSS THE YELLOW LINE · THOSE WHO DO ARE CARGO"],
+		["manifest", Vector2(1840, 760), Vector2(-1, 0), "notice", "货单：民生物资 1200 吨 · 收货方：中央储备", "MANIFEST: GOODS FOR THE PEOPLE, 1,200 T · CONSIGNEE: CENTRAL RESERVE"],
+		["scrawl", Vector2(1840, 160), Vector2(-1, 0), "scrawl", "它每天都经过。我们一次也没上去。", "IT PASSES EVERY DAY. WE HAVE NEVER BEEN ON IT."],
+	],
 }
 
 const RADIO := {
@@ -86,6 +100,11 @@ const RADIO := {
 		"wave": [["中央生产联合体本季度超额完成任务，战略储备再创新高。", "THE CENTRAL PRODUCTION UNION BEAT ITS QUOTA. THE STRATEGIC RESERVE HITS A NEW HIGH."],
 			["口粮配给调整为每日一份，以支援战略储备建设。", "RATIONS ARE NOW ONE A DAY, IN SUPPORT OF THE STRATEGIC RESERVE."]],
 		"boss": [["储备回收机进入例行检修。储备物资安全，无需关注。", "THE RESERVE INTAKE IS UNDER ROUTINE MAINTENANCE. RESERVES ARE SAFE. NO NEED TO LOOK."]],
+	},
+	5: {
+		"wave": [["超导运输网络今日准点率 100%。第十三街站暂停服务第 12 年。", "THE SUPERCONDUCTING LINE RAN 100% ON TIME TODAY. 13TH STREET STATION: CLOSED, YEAR 12."],
+			["专列运载的全部是民生物资，请市民放心。", "THE EXPRESS CARRIES ONLY GOODS FOR THE PEOPLE. CITIZENS NEED NOT WORRY."]],
+		"boss": [["中央专列因故临时停运。请市民不要靠近事故现场，也不要拍照。", "THE CENTRAL EXPRESS IS TEMPORARILY SUSPENDED. KEEP AWAY FROM THE SITE. NO PHOTOGRAPHS."]],
 	},
 }
 

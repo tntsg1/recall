@@ -21,6 +21,7 @@ var bosses_by := {}           # boss name (Chapters) -> node
 var lore: LoreProps          # the world's fragments in this room (design/LORE.md)
 var lasers: Lasers           # the laser range's fences (chapter 3)
 var arms: Arms               # the production floor's robot arms and reserve crate (chapter 4)
+var maglev: Maglev           # the superconducting line's guide rails (chapter 5)
 var radio_n := 0
 var wave_ctl: Waves
 var fx: Fx
@@ -179,6 +180,9 @@ func _ready() -> void:
 	arms = Arms.new()
 	arms.game = self
 	add_child(arms)
+	maglev = Maglev.new()
+	maglev.game = self
+	add_child(maglev)
 	player = Player.new()
 	player.game = self
 	add_child(player)
@@ -987,6 +991,7 @@ func _run_frame(dt: float) -> void:
 	lore.step(dt)
 	lasers.step(sdt)
 	arms.step(sdt)
+	maglev.step(sdt)
 	if prof_on:
 		_lap("player+possess")
 	trail.append([sim_time, player.pos])
@@ -1747,6 +1752,7 @@ func next_chapter() -> void:
 	arena.setup(Chapters.room(chapter))
 	lasers.setup(Chapters.room(chapter))
 	arms.setup(Chapters.room(chapter))
+	maglev.setup(Chapters.room(chapter), Chapters.story(chapter))
 	lore.start_chapter(chapter)
 	sfx.start_chapter(Chapters.music(chapter))
 	sfx.play("chapter", 1.0, -2.0)

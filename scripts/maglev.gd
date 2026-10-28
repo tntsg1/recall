@@ -1,0 +1,166 @@
+class_name Maglev
+extends Node2D
+# The superconducting line's floor (chapter 5): magnetic guide rails set into
+# the floor inside the train's loop. Two groups take turns to power up, with a
+# flicker first. A powered rail grips any round of yours that flies across it
+# and turns it to run along the rail, so a shot can be bent onto the train's
+# path; standing on one drags at your feet. While any rail is live the
+# central express runs faster.
+
+const WARN := 0.8
+const PERIOD := 8.0
+const LIVE := 4.0
+const HALF_W := 18.0
+
+var rails: Array = []     # [a, b, group]
+var live := [false, false]
+var warn := [0.0, 0.0]
+var bend_flash: Array = []   # [point, t]
+var t := 0.0
+var game
+
+
+func _init() -> void:
+	z_index = 2
+	z_as_relative = false
+
+
+func setup(room: int, story: int) -> void:
+	rails.clear()
+	bend_flash.clear()
+	t = 0.0
+	live = [false, false]
+	warn = [0.0, 0.0]
+	if room == 0 and story == 5:
+		rails.append([Vector2(700, 540), Vector2(1220, 540), 0])
+		rails.append([Vector2(960, 250), Vector2(960, 430), 1])
+		rails.append([Vector2(960, 650), Vector2(960, 830), 1])
+	visible = not rails.is_empty()
+	queue_redraw()
+
+
+func active() -> bool:
+	return not rails.is_empty()
+
+
+func any_lit() -> bool:
+	return live[0] or live[1]
+
+
+func step(dt: float) -> void:
+	if rails.is_empty():
+		return
+	t += dt
+	for g in 2:
+		var ph := fmod(t + g * PERIOD * 0.5, PERIOD)
+		var on := ph < LIVE
+		var w := 0.0
+		if ph > PERIOD - WARN:
+			w = (ph - (PERIOD - WARN)) / WARN
+		if on and not live[g] and game:
+			game.sfx.play("lit", 0.5, -10.0)
+		live[g] = on
+		warn[g] = w
+	# a powered rail drags at your feet
+	if game:
+		var p: Vector2 = game.player.pos
+		for r in rails:
+			if live[r[2]] and Geometry2D.get_closest_point_to_segment(p, r[0], r[1]).distance_to(p) < HALF_W + Player.R * 0.5:
+				game.player.pos -= game.player.vel * dt * 0.45
+				break
+	var i := 0
+	while i < bend_flash.size():
+		bend_flash[i][1] += dt
+		if bend_flash[i][1] > 0.35:
+			bend_flash.remove_at(i)
+		else:
+			i += 1
+	queue_redraw()
+
+
+# A round flying a->b across a powered rail: where it is gripped and the way
+# it is turned. Each rail grips a round once.
+func cross(a: Vector2, b: Vector2, bullet) -> Dictionary:
+	if not (live[0] or live[1]):
+		return {}
+	var best := {}
+	var bt := INF
+	var k := -1
+	for r in rails:
+		k += 1
+		if not live[r[2]]:
+			continue
+		var key := "mg%d" % k
+		if bullet.hit.has(key):
+			continue
+		var x = Geometry2D.segment_intersects_segment(a, b, r[0], r[1])
+		if x == null:
+			continue
+		var d: Vector2 = ((r[1] as Vector2) - (r[0] as Vector2)).normalized()
+		if absf(bullet.dir.dot(d)) > 0.97:
+			continue
+		var dist: float = a.distance_to(x)
+		if dist < bt:
+			bt = dist
+			best = {"point": x, "dir": d if bullet.dir.dot(d) >= 0.0 else -d, "key": key}
+	if not best.is_empty():
+		bullet.hit[best.key] = true
+	return best
+
+
+func on_bend(at: Vector2) -> void:
+	bend_flash.append([at, 0.0])
+	game.fx.flash(at, 26.0, 0.12, Pal.ink(0.6, 2.0))
+	game.fx.sparks(at, Vector2.UP, 3, Pal.ink(0.9, 1.8), 220.0, 0.15, PI)
+	game.sfx.play("shield", randf_range(1.6, 1.8), -12.0)
+
+
+func _draw() -> void:
+	var f: float = game.focus if game else 0.0
+	var dim := 1.0 - 0.45 * f
+	var now: float = game.real_time if game else t
+	for r in rails:
+		var a: Vector2 = r[0]
+		var b: Vector2 = r[1]
+		var g: int = r[2]
+		var d := (b - a).normalized()
+		var n := d.orthogonal()
+		var span := a.distance_to(b)
+		# the bed: two conductor bars and the coils between them
+		var bed := PackedVector2Array([a + n * HALF_W, b + n * HALF_W, b - n * HALF_W, a - n * HALF_W])
+		draw_colored_polygon(bed, Color(0.05, 0.05, 0.055))
+		var coils := PackedVector2Array()
+		var s := 8.0
+		while s < span - 4.0:
+			coils.append(a + d * s + n * (HALF_W - 4.0))
+			coils.append(a + d * s - n * (HALF_W - 4.0))
+			s += 14.0
+		var lit: bool = live[g]
+		var w: float = warn[g]
+		draw_multiline(coils, Pal.ink((0.35 if lit else 0.14) * dim, 1.4 if lit else 1.0), 2.0)
+		for side: float in [-1.0, 1.0]:
+			draw_line(a + n * HALF_W * side, b + n * HALF_W * side, Pal.ink(0.5 * dim), 1.5)
+		if lit:
+			# powered: a white running core and pulses travelling both ways
+			draw_line(a, b, Pal.ink(0.12 * dim, 1.4), 12.0)
+			draw_line(a, b, Pal.ink(0.9 * dim, 2.4), 2.0)
+			var pulses := PackedVector2Array()
+			var ps := fmod(now * 300.0, 60.0)
+			while ps < span:
+				pulses.append(a + d * ps)
+				pulses.append(a + d * minf(span, ps + 14.0))
+				pulses.append(b - d * ps)
+				pulses.append(b - d * minf(span, ps + 14.0))
+				ps += 60.0
+			draw_multiline(pulses, Pal.ink(dim, 3.0), 3.0)
+		elif w > 0.0:
+			var fl := 0.5 + 0.5 * sin(now * (20.0 + 24.0 * w))
+			draw_line(a, b, Pal.ink((0.15 + 0.5 * w) * fl * dim, 1.8), 1.5 + 2.0 * w)
+		# end lamps
+		for e: Vector2 in [a, b]:
+			draw_circle(e, 7.0, Pal.WALL)
+			draw_arc(e, 7.0, 0.0, TAU, 14, Pal.ink(0.55 * dim), 1.5)
+			draw_circle(e, 3.0, Pal.ink((1.0 if lit else (0.8 * w if w > 0.0 else 0.2)) * dim, 2.4 if lit else 1.0))
+	for bf in bend_flash:
+		var k: float = bf[1] / 0.35
+		draw_arc(bf[0], 6.0 + 22.0 * k, 0.0, TAU, 16, Pal.ink((1.0 - k) * dim, 2.0), 2.0)
