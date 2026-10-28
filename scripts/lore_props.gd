@@ -86,7 +86,7 @@ func step(dt: float) -> void:
 		mem_layer.queue_redraw()
 	mem_shown = memory_t >= 0.0
 	# the props only flicker: ten redraws a second do; anything moving gets all
-	var busy: bool = worker_t >= 0.0 or focus_last != game.focus
+	var busy: bool = worker_t >= 0.0 or focus_last != game.focus or (story == 4 and _full())
 	for k in shows:
 		if shows[k] > 0.0:
 			busy = true
@@ -288,8 +288,8 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
 	draw_string(font, r.position + Vector2(15, 54), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * dim, 1.2))
 	var on_top := (w[2] as Vector2).y > 0.5
-	var sc := Vector2(r.end.x + 4.0, r.end.y + 4.0) if on_top else Vector2(r.end.x - 20.0, r.position.y + 20.0)
-	var sr := 22.0 if on_top else 17.0
+	var sc := Vector2(r.end.x - 20.0, r.position.y + 20.0)
+	var sr := 17.0
 	draw_arc(sc, sr, 0.0, TAU, 28, Pal.red(0.75 * k * dim, 1.4), 2.5 if on_top else 1.5, false)
 	draw_set_transform(sc, -0.3, Vector2.ONE)
 	var sw := Txt.t("notice_stamp")
@@ -807,6 +807,12 @@ func _draw_stations(dim: float) -> void:
 			var fp := st + Vector2(fs * 9.0, 4.0)
 			draw_colored_polygon(PackedVector2Array([fp + Vector2(-4, -9), fp + Vector2(4, -9), fp + Vector2(5, 8), fp + Vector2(-5, 8)]), Color(1, 1, 1, 0.05 * dim))
 		draw_string(sf, r.position + Vector2(4, -4), Txt.t("station") % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 1, 1, 0.12 * dim))
+		# each station's lamp: off, or red when the line runs flat out
+		var lamp := Vector2(r.end.x - 6.0, r.position.y - 8.0)
+		if _full() and fmod(t * 3.0 + n * 0.17, 1.0) < 0.6:
+			draw_circle(lamp, 5.0, Pal.red(dim, 2.4))
+		else:
+			draw_circle(lamp, 4.0, Pal.ink(0.2 * dim))
 	draw_multiline(lines, Color(1, 1, 1, 0.07 * dim), 2.0)
 
 
@@ -818,20 +824,16 @@ func _draw_floor_wear(dim: float) -> void:
 		var orr: float = oil[1]
 		for j in 3:
 			draw_circle(op + Vector2.from_angle(j * 2.1) * orr * 0.35, orr * (0.8 - j * 0.15), Color(0, 0, 0, 0.3 * dim))
-	var scuff := PackedVector2Array()
-	for j in 14:
-		var x := 300.0 + j * 97.0
-		scuff.append(Vector2(x, 470.0 + sin(j * 1.3) * 6.0))
-		scuff.append(Vector2(x + 40.0, 470.0 + sin(j * 1.3 + 1.0) * 6.0))
-		scuff.append(Vector2(x + 10.0, 612.0 + cos(j * 1.7) * 6.0))
-		scuff.append(Vector2(x + 52.0, 612.0 + cos(j * 1.7 + 1.0) * 6.0))
-	draw_multiline(scuff, Color(1, 1, 1, 0.01 * dim), 5.0)
 	for st: Vector2 in [Vector2(820, 300), Vector2(1080, 300), Vector2(1700, 980)]:
 		for j in 3:
 			var br := Rect2(st + Vector2(j * 24.0 - 36.0, -(j % 2) * 10.0), Vector2(22, 22))
 			draw_rect(br, Color(0.07, 0.07, 0.075))
 			draw_rect(br, Pal.ink(0.35 * dim), false, 1.0)
 			draw_line(br.position + Vector2(0, 11), br.position + Vector2(22, 11), Pal.ink(0.18 * dim), 1.0)
+
+
+func _full() -> bool:
+	return game.boss is Devourer and game.boss.state == Devourer.RUN and game.boss.phase >= 2
 
 
 # The six blocks are stamping-press bases: a hazard band, a number, bolts.
@@ -851,6 +853,13 @@ func _draw_presses(dim: float) -> void:
 			x += 10.0
 		draw_multiline(hz, Pal.ink(0.3 * dim), 2.0)
 		draw_string(sf, ins.position + Vector2(4, 16), "PR-%02d" % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+		if _full():
+			# the ram comes down and springs back, every press together
+			var ph := fmod(t * 2.5, 1.0)
+			var ram := 1.0 - Pal.ease_out(ph) if ph < 0.5 else (ph - 0.5) * 2.0
+			var rr := ins.grow(-6.0 - 10.0 * (1.0 - ram))
+			draw_rect(rr, Color(0.1, 0.1, 0.11))
+			draw_rect(rr, Pal.ink((0.4 + 0.5 * (1.0 - ram)) * dim, 1.4), false, 2.0)
 		for b: Vector2 in [ins.position, Vector2(ins.end.x, ins.position.y)]:
 			draw_circle(b + Vector2(0, 26), 2.5, Pal.ink(0.35 * dim))
 

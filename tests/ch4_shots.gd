@@ -52,8 +52,8 @@ func _run() -> void:
 	anchor.hp = 1e9
 	# rounds into the left wall, then the left arm marks and sweeps them off
 	game.player.pos = Vector2(700, 640)
-	for k in 6:
-		game.bullets.fire(game.player.pos, Vector2.from_angle(PI + (k - 2.5) * 0.12))
+	for k in 10:
+		game.bullets.fire(game.player.pos, Vector2.from_angle(PI + (k - 4.5) * 0.09))
 	await frames(40)
 	var arm: Dictionary = game.arms.arms[0]
 	arm.mode = Arms.RISE
@@ -95,8 +95,8 @@ func _run() -> void:
 		bs.guard_t = 0.0
 		bs.damage(bs.HP * 0.36 * Loadout.boss_hp(), false, bs.pos, Vector2.UP)
 	bs.guard_t = 0.0
-	game.arms.feed_cd = 0.3
-	await frames(58)
+	game.arms.feed_cd = 1.0
+	await frames(100)
 	print("FULL phase ", bs.phase, " state ", bs.state, " hp ", bs.hp)
 	await shot("8_full")
 	quit()

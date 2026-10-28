@@ -418,8 +418,12 @@ func _draw_counter(dim: float, appear: float, full: bool) -> void:
 	draw_line(Vector2(r.get_center().x, r.end.y), pos + Vector2(0, -R - 46.0), Pal.ink(0.35 * dim), 2.0)
 	if full:
 		if fmod(t * 3.0, 1.0) < 0.6:
-			var w := font.get_string_size(Txt.t("intake_full"), HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
-			draw_string(font, Vector2(r.get_center().x - w / 2.0, r.position.y + 36.0), Txt.t("intake_full"), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Pal.red(dim, 2.0))
+			var w := font.get_string_size(Txt.t("intake_full"), HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
+			draw_string(font, Vector2(r.get_center().x - w / 2.0, r.position.y + 25.0), Txt.t("intake_full"), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.red(dim, 2.0))
+		# the share runs past every decimal it has
+		var wild := "%.4f%%" % (99.9 + 0.0999 * fmod(t * 7.3, 1.0))
+		var w2 := font.get_string_size(wild, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+		draw_string(font, Vector2(r.get_center().x - w2 / 2.0, r.position.y + 47.0), wild, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.foe(0.9 * dim, 1.6))
 		return
 	# the reserve share ticks up past 99.7 and never down
 	var share := 99.7 + 0.05 * minf(held(), 6.0)

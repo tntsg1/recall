@@ -21,7 +21,7 @@ const PERIOD := 9.0
 const CARRY := 0.65
 const CRATE := Rect2(220, 840, 190, 100)
 
-var arms: Array = []      # {base, face, offset, mode, t, a, prev}
+var arms: Array = []      # {base, face, offset, mode, t, a, prev, ext}
 var carry: Array = []     # [bullet, from, to, t, feed]
 var crate: Array = []     # rounds sitting in the crate's wall
 var belts: Array = []     # [from, to]
@@ -46,7 +46,7 @@ func setup(room: int) -> void:
 	if room == 2:
 		for spec in [[Vector2(80, 540), Vector2.RIGHT, 0.0], [Vector2(1840, 380), Vector2.LEFT, 3.0], [Vector2(760, 1010), Vector2.UP, 6.0]]:
 			var face: Vector2 = spec[1]
-			arms.append({"base": spec[0], "face": face, "offset": spec[2], "mode": REST, "t": 0.0, "a": _rest(face), "prev": _rest(face)})
+			arms.append({"base": spec[0], "face": face, "offset": spec[2], "mode": REST, "t": 0.0, "a": _rest(face), "prev": _rest(face), "ext": 0.45})
 		belts.append([Vector2(250, 290), Vector2(760, 290)])
 		belts.append([Vector2(1640, 290), Vector2(1160, 290)])
 		belts.append([Vector2(560, 965), Vector2(1270, 965)])
@@ -59,8 +59,8 @@ func active() -> bool:
 
 
 func _rest(face: Vector2) -> float:
-	# folded flat along its wall
-	return face.angle() - PI / 2.0
+	# folded along its wall, tilted a little into the room
+	return face.angle() - PI / 2.0 + 0.14
 
 
 func step(dt: float) -> void:
@@ -75,6 +75,8 @@ func step(dt: float) -> void:
 		var a1: float = face.angle() + HALF
 		arm.prev = arm.a
 		arm.t += dt
+		# the arm unfolds to full reach to work and folds back to rest
+		arm.ext = move_toward(arm.ext, 0.45 if arm.mode == REST else 1.0, dt * 2.2)
 		match arm.mode:
 			REST:
 				arm.a = lerp_angle(arm.a, _rest(face), 1.0 - exp(-6.0 * dt))
@@ -231,7 +233,7 @@ func _feed() -> void:
 		return
 	var n := 0
 	for b in crate:
-		carry.append([b, b.pos, Vector2.ZERO, -0.12 * n, true])
+		carry.append([b, b.pos, Vector2.ZERO, -0.07 * n, true])
 		n += 1
 	crate.clear()
 	game.sfx.play("focus", 0.5, -2.0)
@@ -250,9 +252,25 @@ func _draw() -> void:
 		if c.size() > 5 and (c[5] as PackedVector2Array).size() >= 2:
 			var tr: PackedVector2Array = c[5]
 			draw_polyline(tr, Pal.ink(0.25 * dim, 1.4), 3.0)
-			draw_polyline(tr, Pal.ink(0.8 * dim, 2.0) if not c[4] else Pal.foe(0.9 * dim, 2.2), 1.5)
+			draw_polyline(tr, Pal.ink(0.85 * dim, 2.0 if not c[4] else 2.6), 1.5 if not c[4] else 2.5)
 	for arm in arms:
 		_draw_arm(arm, dim)
+	if _full_capacity():
+		_draw_beacons(dim)
+
+
+# Full capacity: a red rotating beacon in each corner of the floor, its
+# beam sweeping the walls.
+func _draw_beacons(dim: float) -> void:
+	var r := Arena.ROOM
+	var k := 0
+	for c: Vector2 in [r.position + Vector2(18, 18), Vector2(r.end.x - 18, r.position.y + 18), r.end - Vector2(18, 18), Vector2(r.position.x + 18, r.end.y - 18)]:
+		var a := t * 4.0 + k * PI * 0.5
+		var beam := PackedVector2Array([c, c + Vector2.from_angle(a - 0.22) * 260.0, c + Vector2.from_angle(a + 0.22) * 260.0])
+		draw_polygon(beam, PackedColorArray([Pal.red(0.18 * dim, 1.6), Pal.red(0.0, 1.0), Pal.red(0.0, 1.0)]))
+		draw_circle(c, 9.0, Pal.WALL)
+		draw_circle(c, 6.0, Pal.red(dim, 2.6))
+		k += 1
 
 
 # The belts: two rails, slats running along, ration boxes riding.
@@ -270,13 +288,14 @@ func _draw_belts(dim: float) -> void:
 		for side: float in [-1.0, 1.0]:
 			rails.append(a + n * 20.0 * side)
 			rails.append(b + n * 20.0 * side)
-		var s := fmod(t * 60.0, 18.0)
+		var spd := 200.0 if _full_capacity() else 60.0
+		var s := fmod(t * spd, 18.0)
 		while s < span:
 			slats.append(a + d * s + n * 17.0)
 			slats.append(a + d * s - n * 17.0)
 			s += 18.0
 		# ration boxes, all heading the one way
-		var bx := fmod(t * 60.0, 150.0)
+		var bx := fmod(t * spd, 150.0)
 		while bx < span - 20.0:
 			var c := a + d * (bx + 10.0)
 			draw_rect(Rect2(c - Vector2(11, 11), Vector2(22, 22)), Color(0.07, 0.07, 0.075))
@@ -332,8 +351,14 @@ func _draw_arm(arm: Dictionary, dim: float) -> void:
 		draw_circle(base + side * 30.0 * s + face * 10.0, 3.0, Pal.ink(0.4 * dim))
 	var dir := Vector2.from_angle(arm.a)
 	var sh := base + face * 14.0
-	var elbow := sh + dir * L * 0.52 + dir.orthogonal() * 16.0
-	var cl := base + dir * L
+	var ext: float = arm.ext
+	# folded, the forearm comes back on the upper arm; unfolded it reaches out
+	var up_len := L * 0.52
+	var elbow := sh + dir * up_len + dir.orthogonal() * 16.0
+	# folding always brings the forearm back over the floor, never into the wall
+	var fs := 1.0 if dir.rotated(2.4).dot(face) >= dir.rotated(-2.4).dot(face) else -1.0
+	var fore := dir.rotated(fs * lerpf(2.4, 0.0, (ext - 0.45) / 0.55))
+	var cl := elbow + fore * (L - up_len) if ext < 0.999 else base + dir * L
 	var live: bool = arm.mode == SWEEP
 	var col := Pal.foe(dim, 1.6) if live else Pal.ink(0.75 * dim)
 	# each segment a framed beam: dark body, two edges, a hydraulic line down it
