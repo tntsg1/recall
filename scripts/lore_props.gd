@@ -1426,25 +1426,44 @@ func _draw_memory() -> void:
 # a pressure gauge by the floor's corner; the plaque set in the floor.
 func _draw_deep(dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
-	for x: float in [470.0, 1450.0]:
-		var c := Vector2(x, 44.0)
-		draw_circle(c, 18.0, Color(0.02, 0.025, 0.03))
-		draw_arc(c, 18.0, 0.0, TAU, 28, Pal.ink(0.5 * dim), 2.5)
-		draw_arc(c, 22.0, 0.0, TAU, 28, Pal.ink(0.25 * dim), 1.5)
-		for b in 8:
-			var a := TAU * b / 8.0
-			draw_circle(c + Vector2.from_angle(a) * 20.5, 1.3, Pal.ink(0.45 * dim))
-		for j in 7:
-			var sx := fmod(j * 37.0 + t * (3.0 + j % 3), 32.0) - 16.0
-			var sy := fmod(j * 23.0 + t * (6.0 + j % 4), 32.0) - 16.0
+	# viewports in the floor onto the black water: marine snow rising past,
+	# now and then something large and slow crossing under the glass
+	for vp: Array in [[Vector2(470, 250), 58.0, 0.0], [Vector2(960, 700), 70.0, 7.0]]:
+		var c: Vector2 = vp[0]
+		var rr: float = vp[1]
+		draw_circle(c, rr, Color(0.012, 0.016, 0.02))
+		for j in 14:
+			var sx := fmod(j * 53.0 + sin(j * 1.7) * 9.0, rr * 2.0) - rr
+			var sy := rr - fmod(j * 41.0 + t * (5.0 + j % 4 * 2.0), rr * 2.0)
 			var q := c + Vector2(sx, sy)
-			if q.distance_to(c) < 15.0:
-				draw_circle(q, 0.9 + (j % 2) * 0.5, Pal.ink(0.3 * dim))
-		draw_arc(c, 12.0, PI * 1.1, PI * 1.45, 8, Pal.ink(0.35 * dim, 1.3), 1.5)
+			if q.distance_to(c) < rr - 5.0:
+				draw_circle(q, 1.1 + (j % 3) * 0.5, Pal.ink(0.32 * dim))
+		var cyc := fmod(t + float(vp[2]), 16.0)
+		if cyc < 7.0:
+			# a long shape gliding through, only its outline catching the light
+			var u := cyc / 7.0
+			var fc := c + Vector2(lerpf(-rr * 1.8, rr * 1.8, u), sin(u * 3.0) * rr * 0.2)
+			var body := PackedVector2Array()
+			for k in 13:
+				var a := TAU * k / 12.0
+				body.append(fc + Vector2(cos(a) * rr * 0.55, sin(a) * rr * 0.16))
+			var inside := PackedVector2Array()
+			for k in body.size() - 1:
+				if body[k].distance_to(c) < rr - 4.0 and body[k + 1].distance_to(c) < rr - 4.0:
+					inside.append(body[k])
+					inside.append(body[k + 1])
+			if inside.size() > 0:
+				draw_multiline(inside, Pal.ink(0.16 * dim), 1.5)
+		draw_arc(c, rr, 0.0, TAU, 48, Pal.ink(0.5 * dim), 3.0)
+		draw_arc(c, rr + 8.0, 0.0, TAU, 48, Pal.ink(0.22 * dim), 1.5)
+		for b in 12:
+			var a := TAU * b / 12.0
+			draw_circle(c + Vector2.from_angle(a) * (rr + 4.0), 1.8, Pal.ink(0.45 * dim))
+		draw_arc(c, rr * 0.72, PI * 1.12, PI * 1.42, 10, Pal.ink(0.2 * dim, 1.2), 2.0)
 	# the gauge
 	var g := Vector2(140.0, 950.0)
-	draw_circle(g, 26.0, Color(0.04, 0.04, 0.045))
-	draw_arc(g, 26.0, 0.0, TAU, 32, Pal.ink(0.55 * dim), 2.0)
+	draw_circle(g, 30.0, Color(0.04, 0.04, 0.045))
+	draw_arc(g, 30.0, 0.0, TAU, 32, Pal.ink(0.55 * dim), 2.0)
 	var ticks := PackedVector2Array()
 	for k in 9:
 		var a := PI * 0.75 + PI * 1.5 * k / 8.0
@@ -1454,7 +1473,7 @@ func _draw_deep(dim: float) -> void:
 	var na := PI * 0.75 + PI * 1.5 * (0.82 + 0.01 * sin(t * 1.3))
 	draw_line(g, g + Vector2.from_angle(na) * 18.0, Pal.red(0.85 * dim, 1.5), 2.0)
 	draw_circle(g, 3.0, Pal.ink(0.6 * dim))
-	draw_string(sf, Vector2(176.0, 956.0), Txt.t("depth_gauge"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.42 * dim))
+	draw_string(sf, Vector2(182.0, 957.0), Txt.t("depth_gauge"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.5 * dim))
 	# the plaque in the floor, before a sweep wakes its words
 	if shows.get("w8_plate", 0.0) <= 0.01:
 		var pr := Rect2(760.0, 950.0, 400.0, 34.0)

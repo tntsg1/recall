@@ -16,10 +16,10 @@ enum { IDLE, MARK, OPEN }
 
 const HP := 1300.0
 const HOME := Vector2(960, 290)
-const HALF := Vector2(150, 92)
+const HALF := Vector2(200, 124)
 const FACES := [Vector2(-1, 0), Vector2(1, 0), Vector2(0, 1)]
 const DRAWER_KEYS := ["arc_drawer_0", "arc_drawer_1", "arc_drawer_2"]
-const OUT := 110.0
+const OUT := 130.0
 const BAR_W := 36.0
 const BAR_WARN := 1.0
 const BAR_LIFE := [5.5, 5.0, 4.6]
@@ -27,8 +27,10 @@ const BAR_LEN := [900.0, 980.0, 1060.0]
 const BARS_N := [2, 3, 3]
 const IDLE_TIME := [1.6, 1.3, 1.1]
 const OPEN_TIME := [4.6, 4.2, 3.8]
-const KEEP := Rect2(680, 180, 560, 330)    # the cabinet and its drawers: no bar crosses it
-const PAGE := Rect2(1262, 104, 452, 296)
+const KEEP := Rect2(610, 150, 700, 410)    # the cabinet and its drawers: no bar crosses it
+const PAGE := Rect2(1330, 104, 452, 296)
+const RAIL_Y := 92.0                       # the gantry its pens and stamp hang from
+const REVEAL := 5.0                        # after it falls: R-0's page, restored, held centre stage
 const FILE_N := 6                          # R-0's page: a heading and five lines
 const LINE_EVERY := 3.4
 const STAMP_R := 72.0
@@ -62,11 +64,17 @@ var strike_t := 0.0
 var strikes: Array = []       # per line: 0..1 how far its bar has run
 var stamp_t := -1.0
 var dead_t := -1.0            # after it falls: the page's bars lift
+var page_node: Node2D
 
 
 func _ready() -> void:
 	z_index = 3
 	z_as_relative = false
+	page_node = Node2D.new()
+	page_node.z_as_relative = false
+	page_node.z_index = 2
+	page_node.draw.connect(_draw_page)
+	add_child(page_node)
 
 
 func max_hp() -> float:
@@ -124,6 +132,9 @@ func _fresh() -> void:
 	strike_t = 0.0
 	strikes = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 	stamp_t = -1.0
+	if page_node != null:
+		page_node.z_index = 2
+		page_node.transform = Transform2D.IDENTITY
 	if game != null:
 		game.arena.soft.clear()
 
@@ -148,10 +159,10 @@ func drawer(k: float = -1.0) -> Rect2:
 	var f: Vector2 = FACES[phase]
 	var out := OUT * k
 	if f.x < 0.0:
-		return Rect2(pos.x - HALF.x - out, pos.y - 44.0, out, 88.0)
+		return Rect2(pos.x - HALF.x - out, pos.y - 60.0, out, 120.0)
 	if f.x > 0.0:
-		return Rect2(pos.x + HALF.x, pos.y - 44.0, out, 88.0)
-	return Rect2(pos.x - 60.0, pos.y + HALF.y, 120.0, out)
+		return Rect2(pos.x + HALF.x, pos.y - 60.0, out, 120.0)
+	return Rect2(pos.x - 80.0, pos.y + HALF.y, 160.0, out)
 
 
 func core_pos() -> Vector2:
@@ -302,7 +313,8 @@ func _phase_break() -> void:
 func step(dt: float) -> void:
 	if dead_t >= 0.0:
 		dead_t += dt
-		queue_redraw()
+		_place_page()
+		page_node.queue_redraw()
 	if state == OFF or state == DEAD:
 		return
 	t += dt
@@ -376,15 +388,26 @@ func _pattern() -> float:
 			_mark(1, -0.3)
 			return 0.3
 		1:
+			_shelves_with(p)
 			_bar(true, p.y, p.x < 960.0, 0.0)
 			_bar(false, p.x, p.y < 540.0, 0.0)
 			_mark(1, -0.45)
 			return 0.45
+	_shelves_with(p)
 	var y0 := clampf(p.y + randf_range(-70.0, 70.0) - 180.0, room.position.y + 40.0, room.end.y - 40.0 - 360.0)
 	var lo := randf() < 0.5
 	for j in 4:
 		_bar(true, y0 + j * 120.0, lo, -0.12 * j)
 	return 0.36
+
+
+# From the second phase the bank nearer you shifts with the strike.
+func _shelves_with(p: Vector2) -> void:
+	if not game.shelves.active():
+		return
+	var bank := 0 if p.x < 960.0 else 1
+	if game.shelves.move_t[bank] < 0.0:
+		game.shelves.clock[bank] = Shelves.PERIOD
 
 
 # A bar marked out across the floor, through or near where you stand.
@@ -542,16 +565,31 @@ func _dying(dt: float) -> void:
 		game.fx.sparks(at, Vector2.from_angle(randf() * TAU), 6, Pal.foe(1.0, 1.8), 420.0, 0.3, 1.0)
 		game.fx.shard(at, Vector2(-6, -4), Vector2(6, 4), Vector2.from_angle(randf() * TAU) * randf_range(200, 500), randf_range(-8, 8), 0.9, Pal.ink(0.8, 1.2), 1.5)
 		game.sfx.play("cross", randf_range(0.7, 1.3), -6.0)
-	if dying_t >= 1.5:
-		state = DEAD
+	if dying_t >= 1.5 and dying_t - dt < 1.5:
 		game.arena.soft.clear()
+		bars.clear()
+		stamps.clear()
 		for k in 40:
 			var p0 := pos + Vector2(randf_range(-HALF.x, HALF.x), randf_range(-HALF.y, HALF.y))
 			game.fx.shard(p0, Vector2(-8, -5), Vector2(8, 5), (p0 - HOME).normalized() * randf_range(300, 700), randf_range(-12, 12), 1.4, Pal.ink(0.9, 1.4) if k % 3 else Pal.foe(1.0, 1.7), 2.0)
-		if file_t >= 0.0:
-			dead_t = 0.0
 		game.on_boss_dead(pos)
+		if file_t >= 0.0:
+			# R-0's page comes forward and is restored before the cards come up
+			dead_t = 0.0
+			page_node.z_index = 9
+			game.sfx.play("lit", 0.6, -4.0)
+	if dying_t >= 1.5 and (dead_t < 0.0 or dead_t >= REVEAL):
+		state = DEAD
 		queue_redraw()
+
+
+# The page's place: by the cabinet while it fights; centred and larger once
+# it has fallen.
+func _place_page() -> void:
+	var k := Pal.ease_io(clampf(dead_t / 0.6, 0.0, 1.0)) if dead_t >= 0.0 else 0.0
+	var s := 1.0 + 0.3 * k
+	var to := Vector2(960, 420) - PAGE.get_center() * s
+	page_node.transform = Transform2D(0.0, Vector2(s, s), 0.0, Vector2.ZERO.lerp(to, k))
 
 
 # ---------------------------------------------------------------- drawing
@@ -559,18 +597,16 @@ func _dying(dt: float) -> void:
 func _draw() -> void:
 	var f: float = game.focus
 	var dim := 1.0 - 0.45 * f
-	if dead_t >= 0.0 and dead_t < 11.0:
-		_draw_page(dim * (1.0 - clampf((dead_t - 10.0) / 1.0, 0.0, 1.0)))
-	if state == OFF or state == DEAD:
+	page_node.queue_redraw()
+	if state == OFF or state == DEAD or (state == DYING and dying_t >= 1.5):
 		return
 	var appear := Pal.ease_out(clampf(t / 1.2, 0.0, 1.0)) if state == ENTER else 1.0
 	for br in bars:
 		_draw_bar(br, dim)
 	for st in stamps:
 		_draw_stamp(st, dim)
+	_draw_gantry(dim, appear)
 	_draw_cabinet(dim, appear)
-	if file_t >= 0.0:
-		_draw_page(dim)
 
 
 # The cabinet from above: a card catalogue, rows of little drawers with label
@@ -594,8 +630,8 @@ func _draw_cabinet(dim: float, appear: float) -> void:
 			draw_rect(Rect2(d.position + Vector2(d.size.x * 0.25, 5.0), Vector2(d.size.x * 0.5, 6.0)), Pal.ink(0.18 * dim), false, 1.0)
 			draw_circle(d.get_center() + Vector2(0, 6.0), 2.0, Pal.foe(0.45 * dim))
 			if (i * 3 + j * 5) % 7 == 2:
-				# taped shut in red: revised
-				draw_line(d.position + Vector2(2, d.size.y - 4.0), d.end - Vector2(2, d.size.y - 4.0), Pal.red(0.55 * dim, 1.3), 3.0)
+				# taped shut: revised
+				draw_line(d.position + Vector2(2, d.size.y - 4.0), d.end - Vector2(2, d.size.y - 4.0), Pal.ink(0.42 * dim), 3.0)
 	_draw_drawer(dim * appear)
 
 
@@ -606,11 +642,11 @@ func _draw_drawer(dim: float) -> void:
 	# the face it comes out of: a heavy front with a lit pull
 	var front: Rect2
 	if f.x < 0.0:
-		front = Rect2(b.position.x - 6.0, pos.y - 48.0, 6.0, 96.0)
+		front = Rect2(b.position.x - 6.0, pos.y - 64.0, 6.0, 128.0)
 	elif f.x > 0.0:
-		front = Rect2(b.end.x, pos.y - 48.0, 6.0, 96.0)
+		front = Rect2(b.end.x, pos.y - 64.0, 6.0, 128.0)
 	else:
-		front = Rect2(pos.x - 64.0, b.end.y, 128.0, 6.0)
+		front = Rect2(pos.x - 84.0, b.end.y, 168.0, 6.0)
 	var open := core_open > 0.5
 	var dr := drawer()
 	if drawer_k > 0.01:
@@ -632,15 +668,18 @@ func _draw_drawer(dim: float) -> void:
 		draw_multiline(cards, Pal.ink(0.3 * dim), 1.0)
 		# the original: a lit folder in the middle, the soft spot
 		var cc := dr.get_center()
-		var fr := Rect2(cc - Vector2(22, 16), Vector2(44, 32))
+		var fr := Rect2(cc - Vector2(36, 26), Vector2(72, 52))
 		var pulse := 0.5 + 0.5 * sin(t * 7.0)
 		var cc_col := Pal.foe((0.6 + 0.4 * pulse) * dim, 2.2 + flash).lerp(Pal.red(dim, 2.6), red * 0.8)
 		draw_rect(fr, Color(0.02, 0.02, 0.025))
-		draw_rect(fr, cc_col, false, 2.5)
-		draw_line(fr.position + Vector2(6, 10), Vector2(fr.end.x - 6.0, fr.position.y + 10.0), cc_col, 1.5)
-		draw_line(fr.position + Vector2(6, 18), Vector2(fr.end.x - 14.0, fr.position.y + 18.0), cc_col, 1.5)
+		# the folder's tab, and its lines
+		draw_rect(Rect2(fr.position + Vector2(6, -8), Vector2(24, 8)), cc_col, false, 2.0)
+		draw_rect(fr, cc_col, false, 3.0)
+		for li in 3:
+			draw_line(fr.position + Vector2(10, 14 + li * 11), Vector2(fr.end.x - 10.0 - li * 9.0, fr.position.y + 14.0 + li * 11.0), cc_col, 2.0)
 		if open:
-			draw_rect(fr.grow(5.0 + 2.0 * pulse), Pal.red(0.6 * dim, 1.8), false, 1.5)
+			draw_rect(fr.grow(7.0 + 4.0 * pulse), Pal.foe((0.4 + 0.4 * pulse) * dim, 2.0), false, 2.0)
+			draw_rect(fr.grow(16.0 + 6.0 * pulse), Pal.foe(0.25 * (1.0 - pulse) * dim, 1.6), false, 1.5)
 	draw_rect(front, Pal.foe(0.9 * dim, 1.6), false, 2.0)
 	# its label: what this drawer holds, and whether it is open
 	var lab := Txt.t(DRAWER_KEYS[phase])
@@ -650,20 +689,20 @@ func _draw_drawer(dim: float) -> void:
 	var sw := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
 	var at: Vector2
 	# beside the face, above where the drawer comes out
-	var above := pos.y - 44.0 - 14.0 - (22.0 if open else 0.0)
+	var above := pos.y - 60.0 - 14.0 - (22.0 if open else 0.0)
 	if f.x < 0.0:
 		at = Vector2(b.position.x - 4.0 - maxf(lw, sw if open else 0.0), above)
 	elif f.x > 0.0:
 		at = Vector2(b.end.x + 12.0, above)
 	else:
-		at = Vector2(pos.x + 74.0, b.end.y + 34.0)
+		at = Vector2(pos.x + 96.0, b.end.y + 34.0)
 	var plate := Rect2(at + Vector2(-8, -18), Vector2(maxf(lw, sw if open else 0.0) + 16.0, 26.0 + (22.0 if open else 0.0)))
 	draw_rect(plate, Color(0.03, 0.03, 0.035, 0.9))
 	draw_rect(plate, Pal.foe(0.45 * dim), false, 1.0)
-	draw_string(font, at, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.foe(0.9 * dim, 1.4) if phase < 2 else Pal.red(0.95 * dim, 1.6))
+	draw_string(font, at, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.92 * dim, 1.4))
 	if open:
 		var blink := 1.0 if fmod(t * 3.0, 1.0) < 0.7 else 0.55
-		draw_string(font, at + Vector2(0, 22), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.red(blink * dim, 2.0))
+		draw_string(font, at + Vector2(0, 22), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.foe(blink * dim, 2.0))
 
 
 # A bar: first a red pen line runs its length with its outline flickering;
@@ -705,8 +744,8 @@ func _draw_bar(br: Dictionary, dim: float) -> void:
 	else:
 		rr = Rect2(r.get_center().x - r.size.x * 0.5 * slam * fade, r.position.y, r.size.x * slam * fade, r.size.y)
 	draw_rect(rr.grow(4.0), Color(0, 0, 0, 0.45 * fade))
-	draw_rect(rr, Color(0.008, 0.008, 0.01, 1.0))
-	draw_rect(rr, Pal.ink(0.3 * dim * fade), false, 1.0)
+	draw_rect(rr, Color(0.0, 0.0, 0.0, 1.0))
+	draw_rect(rr, Pal.ink(0.6 * dim * fade, 1.2), false, 2.0)
 	if age < 0.2:
 		draw_rect(rr.grow(6.0 * (1.0 - age / 0.2)), Pal.ink(0.7 * (1.0 - age / 0.2) * dim, 1.6), false, 2.0)
 	# "revised", along it
@@ -749,9 +788,11 @@ func _draw_stamp(st: Dictionary, dim: float) -> void:
 		var fl := 0.6 + 0.4 * sin(t * (18.0 + 20.0 * k))
 		draw_arc(c, STAMP_R, 0.0, TAU, 48, Pal.red((0.35 + 0.45 * k) * fl * dim, 1.4), 2.0)
 		draw_arc(c, STAMP_R + 40.0 * (1.0 - k), 0.0, TAU, 48, Pal.red(0.5 * k * dim, 1.3), 1.5)
-		draw_set_transform(c, -0.2, Vector2.ONE)
-		draw_string(font, Vector2(-lw * 0.5, fs * 0.36), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.red(0.35 * k * dim, 1.3))
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		var la := c + Vector2(-lw * 0.5, -STAMP_R - 14.0)
+		if la.y < Arena.ROOM.position.y + 24.0:
+			la.y = c.y + STAMP_R + 30.0
+		draw_rect(Rect2(la + Vector2(-6, -fs), Vector2(lw + 12, fs + 8)), Color(0.04, 0.0, 0.0, 0.75 * k))
+		draw_string(font, la, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.red((0.5 + 0.5 * k) * dim, 1.5))
 		return
 	var a: float = 1.0 - clampf((st.t - STAMP_WARN) / 0.7, 0.0, 1.0)
 	draw_circle(c, STAMP_R, Color(0.0, 0.0, 0.0, 0.35 * a))
@@ -762,10 +803,105 @@ func _draw_stamp(st: Dictionary, dim: float) -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
+# The machine's other half: a gantry along the top wall on two struts from
+# the cabinet. Its pens hang from carriages on it and draw each bar's red
+# line before the bar comes down; its stamp rides down on an arm.
+func _draw_gantry(dim: float, appear: float) -> void:
+	var y := RAIL_Y
+	var c := Pal.foe(0.55 * dim * appear)
+	var x0 := Arena.ROOM.position.x + 30.0
+	var x1 := Arena.ROOM.end.x - 30.0
+	draw_line(Vector2(x0, y - 5.0), Vector2(x1, y - 5.0), c, 2.0)
+	draw_line(Vector2(x0, y + 5.0), Vector2(x1, y + 5.0), c, 2.0)
+	var ties := PackedVector2Array()
+	var x := x0
+	while x <= x1:
+		ties.append(Vector2(x, y - 5.0))
+		ties.append(Vector2(x + 14.0, y + 5.0))
+		x += 60.0
+	draw_multiline(ties, Pal.foe(0.22 * dim * appear), 1.0)
+	var b := body()
+	for sx: float in [-1.0, 1.0]:
+		var bx := pos.x + sx * (HALF.x - 40.0)
+		draw_line(Vector2(bx - 6.0, y + 5.0), Vector2(bx - 6.0, b.position.y), c, 2.0)
+		draw_line(Vector2(bx + 6.0, y + 5.0), Vector2(bx + 6.0, b.position.y), c, 2.0)
+		var by := y + 20.0
+		while by < b.position.y - 10.0:
+			draw_line(Vector2(bx - 6.0, by), Vector2(bx + 6.0, by + 14.0), Pal.foe(0.25 * dim * appear), 1.0)
+			by += 18.0
+	var busy := false
+	for br in bars:
+		if br.t >= 0.0 and br.t < BAR_WARN:
+			_draw_pen(_pen_tip(br), br.horiz, dim)
+			busy = true
+	for st in stamps:
+		if st.t < STAMP_WARN + 0.25:
+			_draw_stamp_arm(st, dim)
+			busy = true
+	if not busy:
+		# parked pens by the struts
+		for sx: float in [-1.0, 1.0]:
+			_draw_carriage(pos.x + sx * (HALF.x + 30.0), dim)
+
+
+func _pen_tip(br: Dictionary) -> Vector2:
+	var r: Rect2 = br.r
+	var run := Pal.ease_out(clampf(br.t / BAR_WARN * 1.25, 0.0, 1.0))
+	if br.horiz:
+		var yy := r.get_center().y
+		var a := r.position.x if br.from_lo else r.end.x
+		return Vector2(lerpf(a, r.end.x if br.from_lo else r.position.x, run), yy)
+	var xx := r.get_center().x
+	var a2 := r.position.y if br.from_lo else r.end.y
+	return Vector2(xx, lerpf(a2, r.end.y if br.from_lo else r.position.y, run))
+
+
+func _draw_carriage(x: float, dim: float) -> void:
+	var cr := Rect2(x - 16.0, RAIL_Y - 10.0, 32.0, 20.0)
+	draw_rect(cr, Color(0.05, 0.05, 0.055))
+	draw_rect(cr, Pal.foe(0.7 * dim), false, 1.5)
+	draw_circle(Vector2(x - 8.0, RAIL_Y), 3.0, Pal.foe(0.5 * dim))
+	draw_circle(Vector2(x + 8.0, RAIL_Y), 3.0, Pal.foe(0.5 * dim))
+
+
+# A pen on its arm: the carriage over it on the rail, the arm down to the
+# nib, the nib red where it touches the floor.
+func _draw_pen(tip: Vector2, horiz: bool, dim: float) -> void:
+	_draw_carriage(tip.x, dim)
+	draw_line(Vector2(tip.x, RAIL_Y + 10.0), tip + Vector2(0, -18.0), Pal.foe(0.4 * dim), 2.0)
+	var d := Vector2(0, 1)
+	var n := d.orthogonal()
+	var nib := PackedVector2Array([tip, tip - d * 18.0 + n * 7.0, tip - d * 26.0 + n * 7.0, tip - d * 26.0 - n * 7.0, tip - d * 18.0 - n * 7.0, tip])
+	draw_polyline(nib, Pal.foe(0.9 * dim, 1.4), 2.0)
+	draw_line(tip, tip - d * 16.0, Pal.foe(0.6 * dim), 1.0)
+	draw_circle(tip, 3.0, Pal.red(0.95 * dim, 1.8))
+
+
+# The stamp comes down on its arm: the head shrinks as it drops.
+func _draw_stamp_arm(st: Dictionary, dim: float) -> void:
+	var c: Vector2 = st.c
+	var k: float = clampf(st.t / STAMP_WARN, 0.0, 1.0)
+	var lift := 1.0 - Pal.ease_in(k)
+	if st.t > STAMP_WARN:
+		lift = Pal.ease_out(clampf((st.t - STAMP_WARN) / 0.25, 0.0, 1.0)) * 0.6
+	_draw_carriage(c.x, dim)
+	var head := Rect2(c - Vector2(30, 22) * (1.0 + 0.5 * lift), Vector2(60, 44) * (1.0 + 0.5 * lift))
+	draw_line(Vector2(c.x, RAIL_Y + 10.0), Vector2(c.x, head.position.y), Pal.foe(0.45 * dim), 3.0)
+	draw_rect(head, Color(0.05, 0.05, 0.055, 0.9))
+	draw_rect(head, Pal.foe(0.85 * dim, 1.3), false, 2.0)
+	draw_line(head.position + Vector2(8, head.size.y * 0.5), head.end - Vector2(8, head.size.y * 0.5), Pal.foe(0.5 * dim), 1.5)
+
+
 # R-0's original file, on a page by the cabinet: the heading, five lines
 # typed in, struck out one by one; the stamp when it is done. After the
 # cabinet falls, the bars peel off again, one line after another.
-func _draw_page(dim: float) -> void:
+func _draw_page() -> void:
+	var ci: CanvasItem = page_node
+	var dim: float = 1.0 - 0.45 * game.focus
+	if dead_t >= 0.0:
+		dim = 1.0 - clampf((dead_t - REVEAL) / 0.6, 0.0, 1.0)
+	elif file_t < 0.0:
+		return
 	var font := Fonts.get_font("Regular")
 	var bold := Fonts.get_font("SemiBold")
 	var r := PAGE
@@ -773,9 +909,9 @@ func _draw_page(dim: float) -> void:
 	if show <= 0.0 or dim <= 0.0:
 		return
 	var pr := Rect2(r.position, Vector2(r.size.x, r.size.y * Pal.ease_out(show)))
-	draw_rect(pr.grow(6.0), Color(0, 0, 0, 0.5 * dim))
-	draw_rect(pr, Color(0.075, 0.075, 0.08, 1.0))
-	draw_rect(pr, Pal.ink(0.6 * dim), false, 1.5)
+	ci.draw_rect(pr.grow(6.0), Color(0, 0, 0, 0.5 * dim))
+	ci.draw_rect(pr, Color(0.075, 0.075, 0.08, 0.82 if dead_t < 0.0 else 1.0))
+	ci.draw_rect(pr, Pal.ink(0.6 * dim), false, 1.5)
 	if show < 1.0:
 		return
 	var y := r.position.y + 34.0
@@ -787,11 +923,11 @@ func _draw_page(dim: float) -> void:
 		var fs := 19 if j == 0 else 16
 		var fnt := bold if j == 0 else font
 		var c := Pal.ink(0.92 * dim, 1.3) if j > 0 else Pal.ink(0.95 * dim, 1.5)
-		draw_string(fnt, Vector2(r.position.x + 18.0, y), full.substr(0, n), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, c)
+		ci.draw_string(fnt, Vector2(r.position.x + 18.0, y), full.substr(0, n), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, c)
 		var tw := fnt.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		if j == FILE_N - 1 and typed >= 1.0:
 			# already blacked out in the original
-			draw_rect(Rect2(r.position.x + 18.0 + tw + 4.0, y - fs + 2.0, 110.0, fs + 2.0), Color(0, 0, 0, 1))
+			ci.draw_rect(Rect2(r.position.x + 18.0 + tw + 4.0, y - fs + 2.0, 110.0, fs + 2.0), Color(0, 0, 0, 1))
 			tw += 118.0
 		if j >= 1:
 			var k: float = strikes[j]
@@ -800,8 +936,8 @@ func _draw_page(dim: float) -> void:
 				k *= 1.0 - Pal.ease_io(clampf((dead_t - 0.8 - (j - 1) * 0.5) / 0.6, 0.0, 1.0))
 			if k > 0.0:
 				var bar := Rect2(r.position.x + 12.0, y - fs - 1.0, (tw + 12.0) * k, fs + 8.0)
-				draw_rect(bar, Color(0.006, 0.006, 0.008, 1.0))
-				draw_line(Vector2(bar.end.x, bar.position.y), Vector2(bar.end.x, bar.end.y), Pal.red(0.8 * dim, 2.0), 2.0)
+				ci.draw_rect(bar, Color(0.006, 0.006, 0.008, 1.0))
+				ci.draw_line(Vector2(bar.end.x, bar.position.y), Vector2(bar.end.x, bar.end.y), Pal.red(0.8 * dim, 2.0), 2.0)
 		y += 42.0 if j == 0 else 36.0
 	# the stamp
 	var sk: float = clampf(stamp_t / 0.18, 0.0, 1.0) if stamp_t >= 0.0 else 0.0
@@ -813,7 +949,7 @@ func _draw_page(dim: float) -> void:
 		var stw := bold.get_string_size(st, HORIZONTAL_ALIGNMENT_LEFT, -1, ss).x
 		var sc := Vector2(r.end.x - stw * 0.5 - 30.0, r.end.y - 22.0)
 		var scale := 1.0 + 0.6 * (1.0 - Pal.ease_out(sk))
-		draw_set_transform(sc, -0.08, Vector2(scale, scale))
-		draw_rect(Rect2(-stw * 0.5 - 10.0, -ss - 2.0, stw + 20.0, ss + 14.0), Pal.red(0.85 * sk * dim, 1.8), false, 2.5)
-		draw_string(bold, Vector2(-stw * 0.5, 4.0), st, HORIZONTAL_ALIGNMENT_LEFT, -1, ss, Pal.red(0.95 * sk * dim, 2.0))
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		ci.draw_set_transform(sc, -0.08, Vector2(scale, scale))
+		ci.draw_rect(Rect2(-stw * 0.5 - 10.0, -ss - 2.0, stw + 20.0, ss + 14.0), Pal.red(0.85 * sk * dim, 1.8), false, 2.5)
+		ci.draw_string(bold, Vector2(-stw * 0.5, 4.0), st, HORIZONTAL_ALIGNMENT_LEFT, -1, ss, Pal.red(0.95 * sk * dim, 2.0))
+		ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

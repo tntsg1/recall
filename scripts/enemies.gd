@@ -17,7 +17,7 @@ const SPEC := {
 	PULSE: {"hp": 70.0, "r": 19.0, "sides": 6, "speed": 0.0},
 	ECHO: {"hp": 40.0, "r": 13.0, "sides": 8, "speed": 0.0},
 	INSPECTOR: {"hp": 55.0, "r": 23.0, "sides": 4, "speed": 110.0},
-	PROOFREADER: {"hp": 50.0, "r": 20.0, "sides": 5, "speed": 125.0},
+	PROOFREADER: {"hp": 50.0, "r": 27.0, "sides": 5, "speed": 125.0},
 }
 const WARN_TIME := 0.55
 const SPAWN_TIME := 0.6
@@ -598,7 +598,7 @@ func _inspector(e: E, pl: Vector2, dt: float) -> void:
 # The proofreader: walks to the nearest of your rounds it has not corrected,
 # writes over it a moment, then moves it to another wall — farther from you.
 # The line home is no longer the line you laid; what it corrects stays put.
-const FIX_R := 70.0
+const FIX_R := 80.0
 const FIX_WRITE := 0.7
 const FIX_SLIDE := 0.35
 const FIX_SHOW := 1.8
@@ -664,7 +664,7 @@ func _correct(e: E, b) -> void:
 			continue
 		var q: Vector2 = h.point
 		var moved := q.distance_to(b.pos)
-		if moved < 220.0 or moved > 760.0:
+		if moved < 220.0 or moved > 760.0 or _near_corner(q):
 			continue
 		var score := q.distance_to(game.player.pos) + randf() * 120.0
 		if score > bs:
@@ -675,9 +675,24 @@ func _correct(e: E, b) -> void:
 	if best == Vector2.INF:
 		return
 	b.shelf = game.shelves.shelf_of(best_rect) if game.shelves.active() else -1
-	fixes.append([b, b.pos, best, 0.0])
+	# it carries the round over in a red arc that bows in toward the room
+	var mid: Vector2 = (b.pos + best) * 0.5
+	var ctrl: Vector2 = mid + (Arena.ROOM.get_center() - mid).normalized() * 120.0
+	fixes.append([b, b.pos, best, 0.0, ctrl])
 	game.fx.flash(b.pos, 20.0, 0.12, Pal.red(0.5, 1.8))
 	game.sfx.play("tick", 0.8, -8.0)
+
+
+func _near_corner(q: Vector2) -> bool:
+	var r := Arena.ROOM
+	for c: Vector2 in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
+		if q.distance_to(c) < 90.0:
+			return true
+	return false
+
+
+static func _arc(a: Vector2, c: Vector2, b: Vector2, u: float) -> Vector2:
+	return a.lerp(c, u).lerp(c.lerp(b, u), u)
 
 
 func _step_fixes(dt: float) -> void:
@@ -689,7 +704,7 @@ func _step_fixes(dt: float) -> void:
 		var b = fx_[0]
 		if was < FIX_SLIDE and b.state == Bullets.EMBED:
 			var k: float = Pal.ease_io(clampf(fx_[3] / FIX_SLIDE, 0.0, 1.0))
-			b.pos = (fx_[1] as Vector2).lerp(fx_[2], k)
+			b.pos = _arc(fx_[1], fx_[4], fx_[2], k)
 			b.set_head(b.pos)
 			game.bullets.faint_dirty = true
 			if fx_[3] >= FIX_SLIDE:
@@ -1018,34 +1033,46 @@ func _draw_fixes(dim: float) -> void:
 		var k: float = fx_[3]
 		var a := 1.0 - clampf((k - FIX_SHOW + 0.5) / 0.5, 0.0, 1.0)
 		var from: Vector2 = fx_[1]
-		var to: Vector2 = b.pos if b.state == Bullets.EMBED else fx_[2]
-		var d := to - from
-		if d.length() > 4.0:
-			var n := d.normalized()
-			var segs := PackedVector2Array()
-			var s0 := 0.0
-			while s0 < d.length() - 12.0:
-				segs.append(from + n * s0)
-				segs.append(from + n * minf(s0 + 14.0, d.length() - 12.0))
-				s0 += 22.0
-			if segs.size() > 0:
-				draw_multiline(segs, Pal.red(0.7 * a * dim, 1.8), 2.0)
-			draw_line(to - n * 4.0, to - n * 16.0 + n.orthogonal() * 7.0, Pal.red(0.8 * a * dim, 1.8), 2.0)
-			draw_line(to - n * 4.0, to - n * 16.0 - n.orthogonal() * 7.0, Pal.red(0.8 * a * dim, 1.8), 2.0)
-			# the old spot, struck through
-			draw_line(from + Vector2(-7, -7), from + Vector2(7, 7), Pal.red(0.6 * a * dim, 1.6), 2.0)
-		if k >= FIX_SLIDE:
+		var to: Vector2 = fx_[2]
+		var ctrl: Vector2 = fx_[4]
+		var run := clampf(k / FIX_SLIDE, 0.0, 1.0)
+		var u_end := Pal.ease_io(run)
+		# the red arc, dashed, drawn as far as the round has got
+		var segs := PackedVector2Array()
+		var n_seg := 24
+		for j in n_seg:
+			var u0 := float(j) / n_seg
+			var u1 := float(j + 1) / n_seg
+			if j % 2 == 1 or u0 >= u_end:
+				continue
+			segs.append(_arc(from, ctrl, to, u0))
+			segs.append(_arc(from, ctrl, to, minf(u1, u_end)))
+		if segs.size() > 0:
+			draw_multiline(segs, Pal.red(0.75 * a * dim, 1.8), 2.5)
+		var head := _arc(from, ctrl, to, u_end)
+		var tan := (head - _arc(from, ctrl, to, maxf(0.0, u_end - 0.06))).normalized()
+		if tan != Vector2.ZERO:
+			draw_line(head - tan * 4.0, head - tan * 18.0 + tan.orthogonal() * 8.0, Pal.red(0.85 * a * dim, 1.8), 2.5)
+			draw_line(head - tan * 4.0, head - tan * 18.0 - tan.orthogonal() * 8.0, Pal.red(0.85 * a * dim, 1.8), 2.5)
+		# the old spot, struck through
+		draw_line(from + Vector2(-8, -8), from + Vector2(8, 8), Pal.red(0.7 * a * dim, 1.6), 2.5)
+		draw_line(from + Vector2(-8, 8), from + Vector2(8, -8), Pal.red(0.7 * a * dim, 1.6), 2.5)
+		if k >= FIX_SLIDE * 0.5:
+			# "corrected", on a dark plate at the arc's middle
 			var lab := Txt.t("corrected")
-			var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
-			var at := to + Vector2(-lw * 0.5, -18.0)
-			at.x = clampf(at.x, Arena.ROOM.position.x + 6.0, Arena.ROOM.end.x - lw - 6.0)
-			at.y = maxf(at.y, Arena.ROOM.position.y + 18.0)
-			draw_rect(Rect2(at + Vector2(-5, -14), Vector2(lw + 10, 19)), Color(0.05, 0.0, 0.0, 0.8 * a))
-			draw_string(font, at, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.red(0.95 * a * dim, 1.8))
+			var fs := 18
+			var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			var mid := _arc(from, ctrl, to, 0.5)
+			var at := mid + Vector2(-lw * 0.5, 6.0)
+			at.x = clampf(at.x, Arena.ROOM.position.x + 12.0, Arena.ROOM.end.x - lw - 12.0)
+			at.y = clampf(at.y, Arena.ROOM.position.y + 30.0, Arena.ROOM.end.y - 12.0)
+			draw_rect(Rect2(at + Vector2(-8, -fs - 2.0), Vector2(lw + 16, fs + 10)), Color(0.06, 0.0, 0.0, 0.85 * a))
+			draw_rect(Rect2(at + Vector2(-8, -fs - 2.0), Vector2(lw + 16, fs + 10)), Pal.red(0.5 * a * dim, 1.4), false, 1.0)
+			draw_string(font, at, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.red(0.95 * a * dim, 1.8))
 	for b in game.bullets.list:
 		if b.corrected and b.state == Bullets.EMBED:
-			var p: Vector2 = b.pos + Vector2(9, -9)
-			draw_polyline(PackedVector2Array([p + Vector2(-4, 0), p + Vector2(-1, 3), p + Vector2(5, -4)]), Pal.red(0.85 * dim, 1.6), 1.5)
+			var p: Vector2 = b.pos + Vector2(12, -12)
+			draw_polyline(PackedVector2Array([p + Vector2(-7, 0), p + Vector2(-2, 5), p + Vector2(8, -7)]), Pal.red(0.9 * dim, 1.6), 2.5)
 
 
 func _core(e: E, tr: Transform2D, k: float, col: Color) -> void:
