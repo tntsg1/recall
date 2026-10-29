@@ -360,8 +360,8 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
 	draw_string(font, r.position + Vector2(15, 54), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * dim, 1.2))
 	var on_top := (w[2] as Vector2).y > 0.5
-	var sc := Vector2(r.end.x - 26.0, r.position.y + 24.0)
-	var sr := 17.0
+	var sc := Vector2(r.end.x - 24.0, r.position.y + 18.0)
+	var sr := 14.0
 	draw_arc(sc, sr, 0.0, TAU, 28, Pal.red(0.75 * k * dim, 1.4), 2.5 if on_top else 1.5, false)
 	draw_set_transform(sc, -0.3, Vector2.ONE)
 	var sw := Txt.t("notice_stamp")
@@ -910,6 +910,14 @@ func _draw_chairs(dim: float) -> void:
 			var a := TAU * k / 6.0
 			draw_circle(hm + Vector2.from_angle(a) * 11.0, 1.8, Pal.ink(0.5 * dim))
 		draw_circle(hm, 4.0, Pal.foe((0.3 + 0.7 * beat_k) * dim, 1.4 + 1.6 * beat_k))
+		if n == 2 or n == 3:
+			# someone in it: shoulders, arms on the rests, the helmet down on
+			# the head, and below its rim the fixed smile
+			var body := PackedVector2Array([c + Vector2(-26, 26), c + Vector2(-24, 6), c + Vector2(-12, -2), c + Vector2(12, -2), c + Vector2(24, 6), c + Vector2(26, 26)])
+			draw_polyline(body, Pal.ink(0.75 * dim, 1.2), 2.0)
+			draw_line(c + Vector2(-24, 8), c + Vector2(-44, 20), Pal.ink(0.6 * dim), 2.0)
+			draw_line(c + Vector2(24, 8), c + Vector2(44, 20), Pal.ink(0.6 * dim), 2.0)
+			draw_arc(hm + Vector2(0, 6), 8.0, PI * 0.2, PI * 0.8, 8, Pal.foe((0.6 + 0.4 * beat_k) * dim, 1.6), 2.0)
 		draw_string(sf, seat.position + Vector2(5, 14), "NI-%02d" % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.55 * dim))
 
 
@@ -939,7 +947,7 @@ func _draw_lightboards(dim: float) -> void:
 	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.3, 0.0, 1.0)
 	# the slogan board; woken by a recall it runs the slogan in full
 	var wake: float = shows.get("w7_slogan", 0.0)
-	var r := Rect2(230, 120, 240, 46 + 26.0 * Pal.ease_out(wake))
+	var r := Rect2(400, 180, 240, 46 + 26.0 * Pal.ease_out(wake))
 	draw_rect(r, Color(0.03, 0.03, 0.035))
 	draw_rect(r, Pal.foe(0.5 * dim), false, 1.5)
 	var tx := Txt.t("slogan_happy")

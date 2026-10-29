@@ -81,8 +81,7 @@ func cross(a: Vector2, b: Vector2, bullet) -> bool:
 			bullet.hit["joy"] = true
 			bullet.dmg *= 2.0
 			flash[i] = maxf(flash[i], 0.8)
-			game.fx.flash(a, 28.0, 0.14, Pal.foe(0.7, 2.2))
-			game.fx.ring(a, 6.0, 30.0, 0.25, Pal.foe(0.9, 2.2), 2.0)
+			game.fx.ring(a, 6.0, 26.0, 0.25, Pal.ink(0.8, 1.6), 1.5)
 			game.sfx.play("lit", 1.5, -10.0)
 			return true
 	return false
@@ -97,9 +96,10 @@ func _draw() -> void:
 	for b in game.bullets.list:
 		if b.hit.has("joy") and (b.state == Bullets.FLY or b.state == Bullets.RETURN):
 			var p: Vector2 = b.pos
-			draw_circle(p, 11.0, Pal.foe(0.12 * dim, 1.6))
-			draw_arc(p, 11.0, 0.0, TAU, 14, Pal.foe(0.9 * dim, 2.2), 1.5)
-			draw_arc(p + Vector2(0, 1), 5.0, PI * 0.15, PI * 0.85, 6, Pal.foe(dim, 2.4), 1.5)
+			draw_arc(p, 13.0, 0.0, TAU, 16, Pal.ink(0.7 * dim, 1.3), 1.5)
+			draw_circle(p + Vector2(-4, -3), 1.5, Pal.ink(0.9 * dim, 1.3))
+			draw_circle(p + Vector2(4, -3), 1.5, Pal.ink(0.9 * dim, 1.3))
+			draw_arc(p + Vector2(0, 1), 6.0, PI * 0.15, PI * 0.85, 6, Pal.ink(0.9 * dim, 1.3), 1.5)
 	var frac: float = game.sfx.beat_frac()
 	var nb := last_beat + 1
 	for i in 4:

@@ -14,10 +14,10 @@ extends Node2D
 enum { OFF, ENTER, RUN, DYING, DEAD }
 
 const HP := 860.0
-const PIVOT := Vector2(960, 150)
-const PIVOT2 := Vector2(960, 990)
+const PIVOT := Vector2(960, 162)
+const PIVOT2 := Vector2(960, 928)
 const LEN := 700.0
-const LEN2 := 600.0
+const LEN2 := 520.0
 const BOB_R := 70.0
 const AMP := 1.0
 const ARM_W := 9.0
@@ -321,6 +321,11 @@ func _draw() -> void:
 				draw_line(p - n * 1.6, p + n * 1.6, Pal.foe(0.25 * dim), 1.0)
 	if arm2_k > 0.05:
 		var b2 := _bob_of(PIVOT2, LEN2 * arm2_k, theta2, -1.0)
+		var mp2 := Rect2(PIVOT2 + Vector2(-46, -12), Vector2(92, 26))
+		draw_rect(mp2, Color(0.06, 0.06, 0.065))
+		draw_rect(mp2, Pal.foe(0.6 * dim * arm2_k), false, 1.5)
+		draw_circle(PIVOT2, 14.0, Pal.WALL)
+		draw_arc(PIVOT2, 14.0, 0.0, TAU, 20, Pal.foe(0.8 * dim * arm2_k), 2.0)
 		draw_circle(b2, 46.0, Color(0.05, 0.05, 0.055))
 		draw_arc(b2, 46.0, 0.0, TAU, 32, Pal.foe(0.85 * dim), 2.5, false)
 		draw_circle(b2, 13.0, Pal.foe(0.6 * dim, 1.4))
@@ -330,7 +335,7 @@ func _draw() -> void:
 	draw_circle(bob, BOB_R, Color(0.05, 0.05, 0.055))
 	draw_arc(bob, BOB_R, 0.0, TAU, 40, col, 2.5, false)
 	var core := 0.45 + 0.35 * beat_k if open else 0.3
-	draw_circle(bob, BOB_R * core, Pal.foe(dim, 1.2 + 1.6 * beat_k * (1.0 if open else 0.0)).lerp(Pal.red(dim, 2.2), red * 0.8))
+	draw_circle(bob + Vector2(0, BOB_R * 0.18), BOB_R * core * 0.7, Pal.foe(dim, 1.2 + 1.6 * beat_k * (1.0 if open else 0.0)).lerp(Pal.red(dim, 2.2), red * 0.8))
 	for k in 4:
 		var a := theta + TAU * k / 4.0 + PI / 4.0
 		var gap := BOB_R * (0.35 + 0.25 * beat_k * (1.0 if open else 0.0))
@@ -359,7 +364,7 @@ func _smile(c: Vector2, r: float, dim: float) -> void:
 # The national happiness index, over the pivot: it only goes up.
 func _draw_index(dim: float) -> void:
 	var font := Fonts.get_font("SemiBold")
-	var r := Rect2(Vector2(1130, 128), Vector2(290, 64))
+	var r := Rect2(Vector2(1130, 110), Vector2(290, 60))
 	draw_rect(r, Color(0.02, 0.025, 0.03))
 	draw_rect(r, Pal.foe(0.55 * dim), false, 1.5)
 	var fast := phase >= 2 and state == RUN

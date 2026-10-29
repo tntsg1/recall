@@ -102,7 +102,7 @@ const WALL := {
 	],
 	7: [
 		["monitor", Vector2(80, 560), Vector2(1, 0), "screen", "本区快乐达标率 99.3% · 未达标者已安排加时聆听", "HAPPINESS COMPLIANCE 99.3% · NON-COMPLIANT CITIZENS BOOKED FOR EXTRA LISTENING"],
-		["chair", Vector2(980, 1010), Vector2(0, -1), "notice", "请放松。抵抗会降低同步效率。", "PLEASE RELAX. RESISTANCE LOWERS SYNCHRONISATION EFFICIENCY."],
+		["chair", Vector2(760, 870), Vector2(0, -1), "notice", "请放松。抵抗会降低同步效率。", "PLEASE RELAX. RESISTANCE LOWERS SYNCHRONISATION EFFICIENCY."],
 		["slogan", Vector2(350, 70), Vector2(0, 1), "sign", "请保持愉快 · 愉快是公民的义务", "STAY HAPPY · HAPPINESS IS A CIVIC DUTY"],
 		["scrawl", Vector2(1840, 380), Vector2(-1, 0), "scrawl", "我的心跳，不是你们的节拍。", "MY HEARTBEAT IS NOT YOUR TEMPO."],
 	],

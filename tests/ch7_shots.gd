@@ -58,6 +58,20 @@ func _run() -> void:
 		game.bullets.fire(game.player.pos, Vector2.from_angle(PI + (k - 2.5) * 0.08))
 	await frames(9)
 	await shot("2_rings")
+	# stand in a ring that is about to light, and take the scan
+	game.dev_god = false
+	game.cracks = 9
+	var nb: int = game.scan_rings.last_beat + 1
+	var ri := 0 if game.scan_rings.lit_on(0, nb) else 1
+	game.player.pos = ScanRings.SPOTS[ri] + Vector2(20, 10)
+	game.player.invuln = 0.0
+	while game.scan_rings.last_beat < nb:
+		game.player.pos = ScanRings.SPOTS[ri] + Vector2(20, 10)
+		game.player.vel = Vector2.ZERO
+		await process_frame
+	await frames(2)
+	await shot("2b_scanned")
+	game.dev_god = true
 	for w in Lore.walls(7):
 		game.lore.hold["w7_%s" % w[0]] = 9.0
 	await frames(40)
