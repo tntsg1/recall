@@ -379,7 +379,7 @@ func _draw_view() -> void:
 	if hk > 0.01:
 		_draw_host(vp, base, hk)
 	# pierce counter
-	if game.tutorial == null and combo > 0 and (combo_live or combo_t >= 0.0):
+	if game.tutorial == null and combo > 0 and (combo_live or combo_t >= 0.0) and final_t < 0.0:
 		var a := 1.0
 		var rise := 0.0
 		if combo_t >= 0.0:
@@ -583,7 +583,7 @@ func _draw_final(vp: Vector2) -> void:
 		return
 	var t := final_t
 	var a := Pal.ease_out(t / 0.6)
-	view.draw_rect(Rect2(Vector2.ZERO, vp), Color(0, 0, 0, 0.82 * a))
+	view.draw_rect(Rect2(Vector2.ZERO, vp), Color(0, 0, 0, 0.93 * a))
 	var cx := vp.x / 2.0
 	var y := vp.y * 0.26
 	_text_stagger(font_xl, Txt.t("done"), Vector2(cx, y), 44, Pal.ink(1.0, 1.1), t - 0.1, -1.0, 0.06)
@@ -658,6 +658,7 @@ var over_t := -1.0
 var over_line := ""
 var radio_text := ""
 var radio_t := -1.0
+var radio_who := "radio_tag"
 # a new fragment for the archive: a small note under the timer
 var found_t := -1.0
 var intro_t := -1.0
@@ -736,9 +737,10 @@ func game_over() -> void:
 	over_line = Lore.death_line(int(Meta.load_data().runs))
 
 
-func radio(text: String) -> void:
+func radio(text: String, who: String = "radio_tag") -> void:
 	radio_text = text
 	radio_t = 0.0
+	radio_who = who
 
 
 func lore_found() -> void:
@@ -763,7 +765,7 @@ func _draw_radio(vp: Vector2) -> void:
 				var on := int(radio_t * 6.0 + j) % 3 != 0
 				if on:
 					view.draw_arc(sp + Vector2(8, 0), 6.0 + j * 5.0, -0.7, 0.7, 8, Pal.ink(0.6 * a), 1.5, false)
-		view.draw_string(font_b, Vector2(x, y - 14.0), Txt.t("radio_tag"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.55 * a))
+		view.draw_string(font_b, Vector2(x, y - 14.0), Txt.t(radio_who), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.55 * a) if radio_who == "radio_tag" else Pal.red(0.85 * a, 1.6))
 		view.draw_string(font_s, Vector2(x, y + 10.0), radio_text.substr(0, n), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.88 * a))
 	if found_t >= 0.0:
 		var fa := clampf(found_t / 0.2, 0.0, 1.0) * (1.0 - clampf((found_t - 1.8) / 0.6, 0.0, 1.0))

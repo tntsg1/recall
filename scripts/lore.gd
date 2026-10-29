@@ -101,6 +101,16 @@ const SEIZE := {
 		Enemies.ECHO: [["我被复制过三次。他们说，每一份都是我。", "I HAVE BEEN COPIED THREE TIMES. THEY SAY EVERY COPY IS ME."]],
 		Enemies.PHASE: [["我一半在这里。另一半在排队等审批。", "HALF OF ME IS HERE. THE OTHER HALF IS WAITING FOR APPROVAL."]],
 	},
+	12: {
+		Enemies.CHASER: [["董事会警卫 0001。编号是第一个，权限是最后一个。", "BOARD GUARD 0001. FIRST BY NUMBER, LAST BY CLEARANCE."],
+			["我守了他两百年。他一次也没看过我。", "I GUARDED HIM FOR TWO HUNDRED YEARS. HE NEVER ONCE LOOKED AT ME."]],
+		Enemies.GUARD: [["董事会全票通过。董事会只有一个人。", "THE BOARD VOTED UNANIMOUSLY. THE BOARD IS ONE MAN."]],
+		Enemies.CHARGER: [["核心里的空调，比第十三街的暖气还暖。", "THE CORE'S AIR CONDITIONING IS WARMER THAN 13TH STREET'S HEATING."]],
+		Enemies.PRISM: [["我把他的脸投在全国的屏幕上。两百年，一个表情。", "I CAST HIS FACE ON EVERY SCREEN. TWO HUNDRED YEARS, ONE EXPRESSION."]],
+		Enemies.LEECH: [["我抽走股东们的一点意识，存在这里，以防万一。", "I DRAW A LITTLE MIND FROM EACH SHAREHOLDER AND KEEP IT HERE. JUST IN CASE."]],
+		Enemies.PULSE: [["这里的心跳，就是全国的心跳。我负责它不乱。", "THE HEARTBEAT HERE IS THE NATION'S. I KEEP IT STEADY."]],
+		Enemies.ECHO: [["他换过十一具身体。每一具的脸，我都记得。", "HE HAS WORN ELEVEN BODIES. I REMEMBER EVERY FACE."]],
+	},
 }
 
 # remnants: [id, wall point, inward normal, kind of mark, zh, en]
@@ -171,6 +181,12 @@ const WALL := {
 		["observe", Vector2(1840, 470), Vector2(-1, 0), "notice", "实验进行中请勿观测。观测者将被列入实验对象。", "EXPERIMENT IN PROGRESS. DO NOT OBSERVE. OBSERVERS WILL BE ADDED TO THE SUBJECTS."],
 		["scrawl", Vector2(1840, 690), Vector2(-1, 0), "scrawl", "他们想永远活着。我们只想活到月底。", "THEY WANT TO LIVE FOREVER. WE JUST WANT TO MAKE IT TO MONTH'S END."],
 	],
+	12: [
+		["board", Vector2(80, 560), Vector2(1, 0), "screen", "董事会成员：1 人 · 出席率 100% · 全票通过 100%", "BOARD MEMBERS: 1 · ATTENDANCE 100% · UNANIMOUS 100%"],
+		["protocol", Vector2(1300, 1010), Vector2(0, -1), "floor", "意识转移协议 · 原始版本 · 作者：零号机设计组", "CONSCIOUSNESS TRANSFER PROTOCOL · ORIGINAL · BY THE UNIT ZERO TEAM"],
+		["quiet", Vector2(1840, 470), Vector2(-1, 0), "notice", "请保持安静。董事长正在思考全体股东的未来。", "QUIET PLEASE. THE CHAIRMAN IS THINKING ABOUT EVERY SHAREHOLDER'S FUTURE."],
+		["scrawl", Vector2(1840, 700), Vector2(-1, 0), "scrawl", "我们不需要董事长。我们需要电。", "WE DON'T NEED A CHAIRMAN. WE NEED POWER."],
+	],
 }
 
 const RADIO := {
@@ -228,6 +244,11 @@ const RADIO := {
 		"wave": [["中央异常物理研究所宣布：本年度发现异常 0 起。", "THE CENTRAL INSTITUTE OF ANOMALOUS PHYSICS REPORTS: 0 ANOMALIES FOUND THIS YEAR."],
 			["近日出现的不明设备不属于异常。它不存在。", "THE UNKNOWN DEVICE SEEN RECENTLY IS NOT AN ANOMALY. IT DOES NOT EXIST."]],
 		"boss": [["观测实验提前结束。实验对象已确认不存在。", "THE OBSERVATION ENDED EARLY. THE SUBJECT IS CONFIRMED NOT TO EXIST."]],
+	},
+	12: {
+		"wave": [["全民董事会核心运行正常。董事长身体健康，已连续执政 231 年。", "THE BOARD'S CORE RUNS NORMALLY. THE CHAIRMAN IS IN GOOD HEALTH, 231 YEARS IN OFFICE."],
+			["近日有一台旧设备接近核心。请市民放心：它没有权限。", "AN OLD DEVICE HAS APPROACHED THE CORE. CITIZENS NEED NOT WORRY: IT HAS NO CLEARANCE."]],
+		"boss": [["核心……运行……正……常。", "THE CORE ... IS RUNNING ... NOR ... MALLY."]],
 	},
 }
 

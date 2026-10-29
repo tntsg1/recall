@@ -469,7 +469,7 @@ func recall(from: Vector2) -> int:
 		b.hit.clear()
 		b.via_done = false
 		b.dmg = RET_DMG * (0.6 if b.child and not b.foe else 1.0)
-		b.home_zero = b.foe
+		b.home_zero = b.foe and game.boss.alive()
 		b.zero_pass = false
 		b.first_bonus = game.has("zero_point")
 		b.dmg *= game.gun_dmg()
@@ -765,6 +765,8 @@ func _fly(b: B, dt: float) -> void:
 			b.plate = game.plates.plate_of(int(h.get("rect", -1))) if game.plates.active() else -1
 			game.on_embed(b, h.normal)
 			game.plates.on_embed(b)
+			if game.nodes.active():
+				game.nodes.on_embed(b, int(h.get("rect", -1)))
 			if b.shelf < 0 and b.plate < 0:
 				scars.append([h.point, h.normal, 0.0])
 			if scars.size() > 160:
@@ -1072,7 +1074,7 @@ func _draw() -> void:
 				var s2 := b.s
 				# the head carries the light; the tail behind it stays a quiet line,
 				# so a flock coming home never buries you or what it is cutting
-				var tc := (Pal.red(1.0, 2.6) if game.boss is Observed else Pal.you(0.9, 2.4)) if b.zero_pass else (Pal.you(0.35, 1.2) if b.shadow else Pal.red(0.55, 1.7))
+				var tc := (Pal.red(1.0, 2.6) if game.boss is Observed or game.nodes.active() else Pal.you(0.9, 2.4)) if b.zero_pass else (Pal.you(0.35, 1.2) if b.shadow else Pal.red(0.55, 1.7))
 				_trail(1, b.sub(s2, minf(b.total(), s2 + 160.0)), tc)
 			HOME, ORBIT:
 				if b.hist.size() > 1:
@@ -1186,8 +1188,8 @@ func _draw_paths() -> void:
 		_cw.append(Pal.you(0.2 * a))
 	for b in list:
 		if b.state == EMBED and b.foe and b.zlight > 0.0:
-			if game.boss is Observed:
-				# the subject is about to call it: red dashes marching home along its line
+			if game.boss is Observed or game.nodes.active():
+				# the subject (or the board) is about to call it: red dashes marching home along its line
 				var tot2 := b.total()
 				var at2 := tot2 - fmod(game.real_time * 160.0, 26.0)
 				while at2 > 0.0:

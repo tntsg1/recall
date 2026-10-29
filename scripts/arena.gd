@@ -45,6 +45,8 @@ func setup(ch: int) -> void:
 			# Zero: almost nothing to hide behind
 			for c in [Vector2(390, 232), Vector2(1530, 232), Vector2(390, 848), Vector2(1530, 848)]:
 				inner.append(Rect2(c - Vector2(90, 12), Vector2(180, 24)))
+			# and the board's server columns, the control nodes
+			inner.append_array(ControlNodes.rects())
 		3:
 			# the Beat: four corner pillars, the middle swept by the arm
 			for c in [Vector2(320, 260), Vector2(1600, 260), Vector2(320, 820), Vector2(1600, 820)]:

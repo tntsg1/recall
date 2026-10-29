@@ -22,7 +22,7 @@ const BOSS := 6
 const COST := {C: 1, G: 5, H: 4, P: 3, L: 3, U: 4, E: 3, I: 3, W: 3, X: 2, F: 3}
 const BUDGET := [16, 22, 28, 32, 40, 48]
 # the waves' own notes, by enemy pool (the boss wave's note comes from Chapters)
-const NOTES := [{2: "note_guard", 3: "note_charger"}, {0: "note_mirror", 1: "note_prism"}, {0: "note_arms", 1: "note_leech"}, {0: "note_rings", 1: "note_pulse"}, {}, {0: "note_rails"}, {0: "note_lasers", 1: "note_echo"}, {0: "note_arcs", 1: "note_inspector"}, {0: "note_shelves", 1: "note_proofreader"}, {0: "note_vents"}, {0: "note_plates", 1: "note_escort"}, {0: "note_stasis", 1: "note_phase"}]
+const NOTES := [{2: "note_guard", 3: "note_charger"}, {0: "note_mirror", 1: "note_prism"}, {0: "note_arms", 1: "note_leech"}, {0: "note_rings", 1: "note_pulse"}, {0: "note_nodes"}, {0: "note_rails"}, {0: "note_lasers", 1: "note_echo"}, {0: "note_arcs", 1: "note_inspector"}, {0: "note_shelves", 1: "note_proofreader"}, {0: "note_vents"}, {0: "note_plates", 1: "note_escort"}, {0: "note_stasis", 1: "note_phase"}]
 const SIDES := ["T", "B", "L", "R"]
 
 var game
@@ -138,7 +138,8 @@ func _build_plan() -> void:
 				elif pool == 11:
 					mix = [G, H, P, L, U, E, I, W, X, F, F, F]
 				elif pool == 4:
-					mix = [G, H, P, L, U, E, E]
+					# the last chapter: everything you have met
+					mix = [G, H, P, L, U, E, I, W, X, F]
 				for k in specials:
 					var kind: int = mix[randi() % mix.size()]
 					if left - COST[kind] >= 8:
@@ -245,6 +246,11 @@ func step(dt: float) -> void:
 			if pick_state == 1:
 				return
 			if t >= 2.4 and (last or t >= pick_done_t + 0.7):
+				if last and Chapters.story(chapter) == 12 and not game.ending.finished():
+					# the true ending plays out first
+					if not game.ending.running():
+						game.ending.start(game.boss.core_pos())
+					return
 				if last:
 					phase = DONE
 					t = 0.0

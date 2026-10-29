@@ -222,6 +222,11 @@ func think(game) -> void:
 			var sd2: float = st.pos.distance_to(p)
 			if sd2 < 220.0:
 				move += (p - st.pos) / maxf(sd2, 1.0) * (220.0 - sd2) / 70.0
+	# the Chairman loose: keep away from the signal coming for you
+	if bs is Zero and bs.state == Zero.RUN and bs.stage == 1 and bs.mode == Zero.OUT:
+		var zd: float = bs.sig.distance_to(p)
+		if zd < 260.0:
+			move += (p - bs.sig) / maxf(zd, 1.0) * (260.0 - zd) / 50.0
 	# airlocks: keep away from a door that is marked or open
 	if game.vents.active() and game.vents.door >= 0:
 		var dp: Vector2 = game.vents.door_pos(game.vents.door)

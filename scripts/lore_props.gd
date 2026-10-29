@@ -218,6 +218,11 @@ func _draw() -> void:
 		_draw_terminal(Vector2(80, 560), dim, "w10_schedule")
 		if shows.get("w10_tether", 0.0) <= 0.01:
 			_draw_wall_notice(Vector2(1840, 530), dim)
+	elif story == 12:
+		_draw_core(dim)
+		_draw_terminal(Vector2(80, 560), dim, "w12_board")
+		if shows.get("w12_quiet", 0.0) <= 0.01:
+			_draw_wall_notice(Vector2(1840, 470), dim)
 	elif story == 11:
 		_draw_lab(dim)
 		_draw_terminal(Vector2(80, 560), dim, "w11_eliminated")
@@ -516,8 +521,8 @@ func _draw_scan(o: Vector2, dim: float) -> void:
 # A registration terminal on the left wall: a kiosk with a screen that
 # shows its remnant when a recall sweeps it, "REGISTERING..." otherwise.
 func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
-	var wide := 40.0 if story == 9 or story == 10 or story == 11 else 0.0
-	var tall := 24.0 if story == 10 or story == 11 else 0.0
+	var wide := 40.0 if story >= 9 else 0.0
+	var tall := 24.0 if story >= 10 else 0.0
 	var body := Rect2(c.x + 4.0, c.y - 80.0 - tall, 130.0 + wide, 160.0 + tall)
 	draw_rect(body, Color(0.05, 0.05, 0.055, 1.0))
 	draw_rect(body, Pal.ink(0.55 * dim), false, 2.0)
@@ -556,6 +561,12 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 			# the lift's altimeter, climbing
 			draw_string(font, scr.position + Vector2(8, 26), Txt.t("term_altitude"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.4 * dim))
 			draw_string(Fonts.get_font("SemiBold"), scr.position + Vector2(8, 56), Txt.t("altitude") % _alt_str(), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.75 * dim, 1.2))
+			return
+		if story == 12:
+			# the board's vote: one member, every time
+			draw_string(font, scr.position + Vector2(8, 26), Txt.t("term_board"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.4 * dim))
+			draw_string(Fonts.get_font("SemiBold"), scr.position + Vector2(8, 70), "1 : 0", HORIZONTAL_ALIGNMENT_LEFT, -1, 34, Pal.ink(0.75 * dim, 1.2))
+			draw_string(font, scr.position + Vector2(8, 96), Txt.t("term_board_2"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.35 * dim))
 			return
 		if story == 11:
 			# the anomaly count: nought, as it has been for 87 years
@@ -1763,3 +1774,75 @@ func _draw_lab(dim: float) -> void:
 	draw_rect(Rect2(bc - Vector2(lw * 0.5 + 12.0, 12.0), Vector2(lw + 24.0, 24.0)), Color(0.05, 0.05, 0.055))
 	draw_rect(Rect2(bc - Vector2(lw * 0.5 + 12.0, 12.0), Vector2(lw + 24.0, 24.0)), Pal.ink(0.4 * dim), false, 1.0)
 	draw_string(sf, bc + Vector2(-lw * 0.5, 5.0), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.6 * dim))
+
+
+# The board's core: the hall's seal set in the floor round the centre, ticked
+# like a dial; cable runs from each server column in to it, pulsing when that
+# column powers; racks of servers along the top and bottom walls, their lights
+# ticking over; the board's motto stencilled across the seal.
+func _draw_core(dim: float) -> void:
+	var c := Vector2(960, 540)
+	draw_arc(c, 250.0, 0.0, TAU, 128, Pal.ink(0.1 * dim), 2.0)
+	draw_arc(c, 236.0, 0.0, TAU, 128, Pal.ink(0.05 * dim), 1.0)
+	var ticks := PackedVector2Array()
+	var lit_ticks := PackedVector2Array()
+	# as the war body is worn down, the seal's ticks light one by one; once it
+	# is broken, the seal is cracked across
+	var bs = game.boss
+	var worn := 0.0
+	var cracked := false
+	if bs is Zero and bs.alive():
+		worn = 1.0 - bs.hp / Zero.HP if bs.stage == 0 else 1.0
+		cracked = bs.stage == 1 or bs.phase >= 2
+	for k in 72:
+		var d := Vector2.from_angle(TAU * k / 72.0 - PI * 0.5)
+		var into := lit_ticks if float(k) / 72.0 < worn else ticks
+		into.append(c + d * (236.0 if k % 6 == 0 else 242.0))
+		into.append(c + d * 250.0)
+	draw_multiline(ticks, Pal.ink(0.12 * dim), 1.0)
+	if lit_ticks.size() > 0:
+		draw_multiline(lit_ticks, Pal.red(0.6 * dim, 1.6), 2.0)
+	if cracked:
+		for k in 5:
+			var a0 := k * 1.257 + 0.3
+			var p0 := c + Vector2.from_angle(a0) * 40.0
+			var p1 := c + Vector2.from_angle(a0 + 0.15) * 150.0
+			var p2 := c + Vector2.from_angle(a0 - 0.1) * 248.0
+			draw_polyline(PackedVector2Array([p0, p1, p2]), Pal.ink(0.22 * dim), 1.5)
+	var sf := Fonts.get_font("SemiBold")
+	var motto := Txt.t("core_motto")
+	var mw := sf.get_string_size(motto, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	draw_string(sf, c + Vector2(-mw * 0.5, 284.0), motto, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.22 * dim))
+	# the cable runs in from the columns
+	var nodes = game.nodes
+	for k in ControlNodes.NODES.size():
+		var p: Vector2 = ControlNodes.NODES[k]
+		var hot: bool = nodes.active() and (nodes.live == k or nodes.second == k)
+		var a := p + (c - p).normalized() * (ControlNodes.HALF + 8.0)
+		var b := c + (p - c).normalized() * 252.0
+		draw_line(a, b, Pal.ink(0.12 * dim), 4.0)
+		draw_line(a, b, Color(0.03, 0.03, 0.035), 2.0)
+		if hot:
+			var u := (b - a)
+			var l := u.length()
+			var s0 := fmod(t * 260.0, 40.0)
+			while s0 < l:
+				draw_line(a + u / l * s0, a + u / l * minf(s0 + 14.0, l), Pal.red(0.7 * dim, 1.8), 2.0)
+				s0 += 40.0
+	# the standby bars: stencilled
+	var sp := Txt.t("spare_power")
+	var spw := sf.get_string_size(sp, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	for bc: Vector2 in [Vector2(390, 232), Vector2(1530, 232), Vector2(390, 848), Vector2(1530, 848)]:
+		draw_string(sf, bc + Vector2(-spw * 0.5, 4.0), sp, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.45 * dim))
+	# server racks along the top wall
+	for y: float in [96.0]:
+		var x := 180.0
+		while x < 1760.0:
+			if absf(x - 560.0) > 70.0 and absf(x - 1360.0) > 70.0 and absf(x - 960.0) > 90.0:
+				var r := Rect2(x - 22.0, y - 9.0, 44.0, 18.0)
+				draw_rect(r, Color(0.045, 0.045, 0.05))
+				draw_rect(r, Pal.ink(0.22 * dim), false, 1.0)
+				for j in 4:
+					var on := int(t * 5.0 + x * 0.37 + j * 3.0) % 4 != 0
+					draw_rect(Rect2(r.position + Vector2(5 + j * 9, 7), Vector2(4, 3)), Pal.ink((0.45 if on else 0.12) * dim), true)
+			x += 64.0

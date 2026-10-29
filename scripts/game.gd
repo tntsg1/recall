@@ -28,6 +28,8 @@ var shelves: Shelves        # the deep archive's mobile shelving (chapter 8)
 var vents: Vents            # the lift car's airlock doors (chapter 9)
 var plates: Plates          # the shipyard's hull plates adrift (chapter 10)
 var stasis: Stasis          # the institute's stasis fields (chapter 11)
+var nodes: ControlNodes     # the board's control nodes (chapter 12)
+var ending: Ending          # the true ending, after the last boss
 var radio_n := 0
 var wave_ctl: Waves
 var fx: Fx
@@ -207,6 +209,12 @@ func _ready() -> void:
 	stasis = Stasis.new()
 	stasis.game = self
 	add_child(stasis)
+	nodes = ControlNodes.new()
+	nodes.game = self
+	add_child(nodes)
+	ending = Ending.new()
+	ending.game = self
+	add_child(ending)
 	player = Player.new()
 	player.game = self
 	add_child(player)
@@ -1022,6 +1030,9 @@ func _run_frame(dt: float) -> void:
 	vents.step(sdt)
 	plates.step(sdt)
 	stasis.step(sdt)
+	nodes.step(sdt)
+	ending.step(dt)
+	hud.visible = not ending.running()
 	if prof_on:
 		_lap("player+possess")
 	trail.append([sim_time, player.pos])
@@ -1789,6 +1800,7 @@ func next_chapter() -> void:
 	vents.setup(Chapters.story(chapter))
 	plates.setup(Chapters.story(chapter))
 	stasis.setup(Chapters.story(chapter))
+	nodes.setup(Chapters.story(chapter))
 	lore.start_chapter(chapter)
 	sfx.start_chapter(Chapters.music(chapter))
 	sfx.play("chapter", 1.0, -2.0)
