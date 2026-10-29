@@ -947,12 +947,12 @@ func _draw_lightboards(dim: float) -> void:
 	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.3, 0.0, 1.0)
 	# the slogan board; woken by a recall it runs the slogan in full
 	var wake: float = shows.get("w7_slogan", 0.0)
-	var r := Rect2(400, 180, 240, 46 + 26.0 * Pal.ease_out(wake))
+	var r := Rect2(378, 180, 240, 46 + 26.0 * Pal.ease_out(wake))
 	draw_rect(r, Color(0.03, 0.03, 0.035))
 	draw_rect(r, Pal.foe(0.5 * dim), false, 1.5)
 	var tx := Txt.t("slogan_happy")
 	var tw := sf.get_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
-	draw_string(sf, Vector2(r.get_center().x - tw / 2.0, r.position.y + 31.0), tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Pal.foe((0.65 + 0.35 * beat_k) * dim, 1.4 + 1.0 * beat_k))
+	draw_string(sf, Vector2(r.get_center().x - tw / 2.0, r.position.y + 31.0), tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Pal.foe((0.65 + 0.35 * beat_k) * dim, 1.2 + 0.5 * beat_k))
 	if wake > 0.01:
 		var full := ""
 		for w in Lore.walls(7):

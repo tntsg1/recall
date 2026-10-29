@@ -15,7 +15,7 @@ enum { OFF, ENTER, RUN, DYING, DEAD }
 
 const HP := 860.0
 const PIVOT := Vector2(960, 162)
-const PIVOT2 := Vector2(960, 928)
+const PIVOT2 := Vector2(960, 952)
 const LEN := 700.0
 const LEN2 := 520.0
 const BOB_R := 70.0
@@ -335,14 +335,16 @@ func _draw() -> void:
 	draw_circle(bob, BOB_R, Color(0.05, 0.05, 0.055))
 	draw_arc(bob, BOB_R, 0.0, TAU, 40, col, 2.5, false)
 	var core := 0.45 + 0.35 * beat_k if open else 0.3
-	draw_circle(bob + Vector2(0, BOB_R * 0.18), BOB_R * core * 0.7, Pal.foe(dim, 1.2 + 1.6 * beat_k * (1.0 if open else 0.0)).lerp(Pal.red(dim, 2.2), red * 0.8))
+	draw_circle(bob + Vector2(0, BOB_R * 0.3), 12.0 + 6.0 * core, Pal.foe(dim, 1.2 + 1.6 * beat_k * (1.0 if open else 0.0)).lerp(Pal.red(dim, 2.2), red * 0.8))
 	for k in 4:
 		var a := theta + TAU * k / 4.0 + PI / 4.0
 		var gap := BOB_R * (0.35 + 0.25 * beat_k * (1.0 if open else 0.0))
 		draw_arc(bob + Vector2.from_angle(a) * (gap - BOB_R * 0.35), BOB_R * 0.8, a - 0.55, a + 0.55, 10, Pal.foe(0.75 * dim), 3.0, false)
 	for r in rings:
 		var e := Pal.ease_out(r[1] / 0.9)
-		draw_arc(r[0], e * 300.0, 0.0, TAU, 96, Pal.foe(0.9 * (1.0 - e) * dim, 1.4), 3.0, false)
+		# a shock ring strikes: red leading edge over a dark band
+		draw_arc(r[0], e * 300.0 - 8.0, 0.0, TAU, 96, Color(0, 0, 0, 0.35 * (1.0 - e)), 12.0, false)
+		draw_arc(r[0], e * 300.0, 0.0, TAU, 96, Pal.red((1.0 - e) * dim, 2.2), 3.0, false)
 	# its face: the shell smiles, upright, whatever the arm does
 	if state != DYING:
 		_smile(bob, BOB_R, dim)
@@ -350,8 +352,8 @@ func _draw() -> void:
 
 
 func _smile(c: Vector2, r: float, dim: float) -> void:
-	var fc := c + Vector2(0, -r * 0.62)
-	var s := r / 70.0
+	var fc := c + Vector2(0, -r * 0.42)
+	var s := r / 52.0
 	draw_circle(fc + Vector2(-14, -2) * s, 4.0 * s, Pal.foe(dim, 2.2))
 	draw_circle(fc + Vector2(14, -2) * s, 4.0 * s, Pal.foe(dim, 2.2))
 	var sm := PackedVector2Array()
@@ -364,16 +366,16 @@ func _smile(c: Vector2, r: float, dim: float) -> void:
 # The national happiness index, over the pivot: it only goes up.
 func _draw_index(dim: float) -> void:
 	var font := Fonts.get_font("SemiBold")
-	var r := Rect2(Vector2(1130, 110), Vector2(290, 60))
+	var r := Rect2(Vector2(1255, 98), Vector2(190, 56))
 	draw_rect(r, Color(0.02, 0.025, 0.03))
 	draw_rect(r, Pal.foe(0.55 * dim), false, 1.5)
 	var fast := phase >= 2 and state == RUN
 	var head: String = Txt.t("sync_index")
-	draw_string(font, r.position + Vector2(12, 24), head, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.foe(0.7 * dim))
+	draw_string(font, r.position + Vector2(10, 20), head, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.foe(0.7 * dim))
 	var val := "%.1f%%" % joy
 	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.25, 0.0, 1.0)
 	var vc := Pal.red(dim, 2.2) if joy > 100.0 else Pal.foe(dim, 1.4 + 0.8 * beat_k)
-	draw_string(font, r.position + Vector2(12, 54), val, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, vc)
+	draw_string(font, r.position + Vector2(10, 48), val, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, vc)
 	var bpm_t := "%d BPM" % int(round(game.sfx.bpm() * game.sfx.tempo))
-	var bw := font.get_string_size(bpm_t, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-	draw_string(font, Vector2(r.end.x - bw - 12.0, r.position.y + 52.0), bpm_t, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.red(dim, 2.0) if fast else Pal.foe(0.6 * dim))
+	var bw := font.get_string_size(bpm_t, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	draw_string(font, Vector2(r.end.x - bw - 10.0, r.position.y + 46.0), bpm_t, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.red(dim, 2.0) if fast else Pal.foe(0.6 * dim))
