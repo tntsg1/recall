@@ -589,6 +589,47 @@ func _draw() -> void:
 	_draw_cursor()
 
 
+# A surveillance camera bolted to the top of the A, turning slowly to keep
+# you (the cursor) in view: a red light blinks, a faint cone shows its eye.
+var cam_a := PI * 0.6
+
+
+func _draw_camera(par: Vector2, a: float) -> void:
+	var word_w := (9 * 6 - 2) * UNIT
+	var ax := 960.0 - word_w / 2.0 + 6 * 6 * UNIT + 2.0 * UNIT
+	var mount := Vector2(ax, 190.0) + par
+	var pivot := mount + Vector2(40.0, -46.0)
+	var cur: Vector2 = cur_p.x
+	var want := (cur - pivot).angle()
+	# it can only look down and about: between the word's right and below-left
+	want = clampf(wrapf(want, -PI * 0.5, PI * 1.5), PI * 0.12, PI * 0.95)
+	cam_a = lerp_angle(cam_a, want, 0.035)
+	var d := Vector2.from_angle(cam_a)
+	var n := d.orthogonal()
+	# its eye: a faint cone where it is looking
+	var lens := pivot + d * 30.0
+	var cone := PackedVector2Array([lens, lens + d.rotated(-0.22) * 300.0, lens + d.rotated(0.22) * 300.0])
+	draw_polygon(cone, PackedColorArray([Color(1, 1, 1, 0.05 * a), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
+	# the bracket: up from the apex, across to the pivot
+	draw_line(mount, mount + Vector2(0, -46.0), Pal.ink(0.6 * a), 3.0)
+	draw_line(mount + Vector2(0, -46.0), pivot, Pal.ink(0.6 * a), 3.0)
+	draw_rect(Rect2(mount + Vector2(-7, -4), Vector2(14, 6)), Pal.ink(0.6 * a), false, 1.5)
+	# the body: a box with a hood over the lens
+	var body := PackedVector2Array([pivot - d * 24.0 - n * 12.0, pivot + d * 22.0 - n * 12.0, pivot + d * 22.0 + n * 12.0, pivot - d * 24.0 + n * 12.0])
+	draw_colored_polygon(body, Color(0.05, 0.05, 0.055, a))
+	body.append(body[0])
+	draw_polyline(body, Pal.ink(0.85 * a, 1.2), 2.0)
+	draw_line(pivot + d * 14.0 - n * 16.0, pivot + d * 32.0 - n * 16.0, Pal.ink(0.7 * a), 2.0)
+	draw_circle(pivot, 3.0, Pal.ink(0.6 * a))
+	draw_circle(lens, 7.0, Color(0.02, 0.02, 0.025, a))
+	draw_arc(lens, 7.0, 0.0, TAU, 14, Pal.ink(0.9 * a, 1.4), 1.5)
+	draw_circle(lens, 2.5, Pal.ink(0.5 * a, 1.6))
+	# recording
+	var rec := pivot - d * 14.0 - n * 5.0
+	if fmod(t, 1.2) < 0.6:
+		draw_circle(rec, 3.2, Pal.red(a, 3.0))
+
+
 # A searchlight from somewhere above the city sweeps slowly behind the menu.
 func _draw_searchlight(vp: Vector2, on: float) -> void:
 	var o := Vector2(vp.x * 0.12, -60.0)
@@ -655,6 +696,8 @@ func _draw_word(vp: Vector2) -> void:
 					draw_circle(p2, 5.0, Pal.red(1.0, 3.0))
 					break
 				acc += l
+	if whole > 0.0:
+		_draw_camera(par, whole)
 	_text_c(font_s, "霓虹行者", Vector2(vp.x / 2.0, 395), 22, Pal.ink(0.55 * whole))
 	# where and when: the world in one line, lit a beat after the word
 	var era := clampf((t - 3.0) / 0.8, 0.0, 1.0)

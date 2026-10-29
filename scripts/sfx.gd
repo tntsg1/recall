@@ -109,6 +109,8 @@ func play(name: String, pitch: float = 1.0, db: float = 0.0) -> void:
 func _mood() -> Dictionary:
 	var m := {"base": 1.0, "pulse": 0.0, "glass": 0.0, "boss": 0.0}
 	if game == null:
+		# the title: the low drone sits well back (about -8 dB)
+		m.base = 0.4
 		return m
 	var w = game.wave_ctl
 	if game.lost or w.phase == Waves.DONE:
