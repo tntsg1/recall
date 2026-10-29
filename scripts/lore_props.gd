@@ -217,7 +217,7 @@ func _draw() -> void:
 		_draw_yard(dim)
 		_draw_terminal(Vector2(80, 560), dim, "w10_schedule")
 		if shows.get("w10_tether", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 560), dim)
+			_draw_wall_notice(Vector2(1840, 530), dim)
 	elif story == 9:
 		_draw_lift(dim)
 		_draw_terminal(Vector2(80, 545), dim, "w9_altitude")
@@ -511,11 +511,12 @@ func _draw_scan(o: Vector2, dim: float) -> void:
 # A registration terminal on the left wall: a kiosk with a screen that
 # shows its remnant when a recall sweeps it, "REGISTERING..." otherwise.
 func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
-	var wide := 40.0 if story == 9 else 0.0
-	var body := Rect2(c.x + 4.0, c.y - 80.0, 130.0 + wide, 160.0)
+	var wide := 40.0 if story == 9 or story == 10 else 0.0
+	var tall := 24.0 if story == 10 else 0.0
+	var body := Rect2(c.x + 4.0, c.y - 80.0 - tall, 130.0 + wide, 160.0 + tall)
 	draw_rect(body, Color(0.05, 0.05, 0.055, 1.0))
 	draw_rect(body, Pal.ink(0.55 * dim), false, 2.0)
-	var scr := Rect2(body.position + Vector2(10, 12), Vector2(110 + wide, 86))
+	var scr := Rect2(body.position + Vector2(10, 12), Vector2(110 + wide, 86 + tall))
 	# the screen's glow on the wall around it
 	draw_texture_rect(Fx.make_glow_texture(), scr.grow(40.0), false, Color(1, 1, 1, 0.07 * dim))
 	draw_rect(scr, Color(0.03, 0.03, 0.035, 1.0))
@@ -1644,7 +1645,24 @@ func _draw_yard(dim: float) -> void:
 		draw_line(Vector2(ins.end.x, ins.position.y), Vector2(ins.position.x, ins.end.y), Pal.ink(0.2 * dim), 1.0)
 		for j in 3:
 			draw_line(Vector2(cr.position.x + 10.0 + j * 46.0, cr.position.y + 4.0), Vector2(cr.position.x + 30.0 + j * 46.0, cr.position.y + 4.0), Pal.ink(0.5 * dim), 3.0)
-	# weld scars on the deck
-	for k in 7:
-		var wp := Vector2(260.0 + fmod(k * 263.0, 1400.0), 560.0 + fmod(k * 131.0, 380.0))
-		draw_arc(wp, 9.0 + (k % 3) * 3.0, 0.0, TAU, 14, Pal.ink(0.06 * dim), 2.0)
+	# before the ship is laid down: its keel line and frame marked out on the
+	# slip, faint, where it will be built
+	if not (game.boss is Peace and game.boss.alive()):
+		var kr := Rect2(Peace.X0 - 70.0, Peace.Y0, Peace.SEC_W * Peace.N + 160.0, Peace.H)
+		var dl := PackedVector2Array()
+		var x2 := kr.position.x
+		while x2 < kr.end.x:
+			dl.append(Vector2(x2, kr.position.y))
+			dl.append(Vector2(minf(x2 + 16.0, kr.end.x), kr.position.y))
+			dl.append(Vector2(x2, kr.end.y))
+			dl.append(Vector2(minf(x2 + 16.0, kr.end.x), kr.end.y))
+			x2 += 28.0
+		draw_multiline(dl, Pal.ink(0.12 * dim), 1.5)
+		draw_line(Vector2(kr.position.x, kr.get_center().y), Vector2(kr.end.x, kr.get_center().y), Pal.ink(0.1 * dim), 3.0)
+		for k in Peace.N + 1:
+			var rx := Peace.X0 + Peace.SEC_W * k
+			draw_line(Vector2(rx, kr.position.y + 8.0), Vector2(rx, kr.end.y - 8.0), Pal.ink(0.07 * dim), 1.5)
+		# the slip's cradles
+		for k in 4:
+			var cx := Peace.X0 + 60.0 + k * 170.0
+			draw_rect(Rect2(cx - 22.0, kr.end.y + 6.0, 44.0, 14.0), Pal.ink(0.14 * dim), false, 1.5)

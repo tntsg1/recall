@@ -151,8 +151,8 @@ const WALL := {
 	10: [
 		["schedule", Vector2(80, 560), Vector2(1, 0), "screen", "本月下水：和平级 3 艘 · 守护级 2 艘 · 第十三街供暖：暂停", "LAUNCHED THIS MONTH: 3 PEACE CLASS · 2 GUARDIAN CLASS · 13TH STREET HEATING: SUSPENDED"],
 		["steel", Vector2(245, 880), Vector2(0, -1), "crate", "装甲钢 · 原料：民用口粮转产", "ARMOUR STEEL · FEEDSTOCK: CIVILIAN RATIONS, REPURPOSED"],
-		["tether", Vector2(1840, 560), Vector2(-1, 0), "notice", "失重区作业请系好安全绳。安全绳从工资中扣除。", "WEAR YOUR TETHER IN ZERO-G ZONES. TETHERS ARE DEDUCTED FROM YOUR PAY."],
-		["scrawl", Vector2(1840, 790), Vector2(-1, 0), "scrawl", "他们说是为了保护我们。炮口对着我们。", "THEY SAY IT IS TO PROTECT US. THE GUNS POINT AT US."],
+		["tether", Vector2(1840, 530), Vector2(-1, 0), "notice", "失重区作业请系好安全绳。安全绳从工资中扣除。", "WEAR YOUR TETHER IN ZERO-G ZONES. TETHERS ARE DEDUCTED FROM YOUR PAY."],
+		["scrawl", Vector2(1840, 740), Vector2(-1, 0), "scrawl", "他们说是为了保护我们。炮口对着我们。", "THEY SAY IT IS TO PROTECT US. THE GUNS POINT AT US."],
 	],
 }
 

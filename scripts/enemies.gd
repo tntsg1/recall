@@ -1082,9 +1082,23 @@ func _draw() -> void:
 			# its little shield, turned toward you, and a tether to what it guards
 			var sa: float = (game.player.pos - e.pos).angle()
 			var ready: bool = e.cool <= 0.0
-			draw_arc(e.pos, e.r + 7.0, sa - 1.0, sa + 1.0, 12, Pal.foe((0.85 if ready else 0.25) * dim, 1.0 + 1.2 * e.shield_flash), 2.5)
+			# its rotor ring, spinning
+			draw_arc(e.pos, e.r + 3.0, e.t * 9.0, e.t * 9.0 + PI * 1.5, 16, Pal.foe(0.45 * dim), 1.2)
+			var shc := Pal.foe((0.9 if ready else 0.25) * dim, 1.2).lerp(Pal.ink(dim, 2.6), e.shield_flash)
+			draw_arc(e.pos, e.r + 9.0, sa - 1.1, sa + 1.1, 14, shc, 3.0 + 2.0 * e.shield_flash)
 			if e.anchor != null and e.anchor is E and e.anchor.state == ALIVE:
-				draw_line(e.pos, e.anchor.pos, Pal.foe(0.14 * dim), 1.0)
+				# a dashed tether to what it guards
+				var td: Vector2 = e.anchor.pos - e.pos
+				var tl := td.length()
+				var tn := td / maxf(tl, 0.001)
+				var dl := PackedVector2Array()
+				var s0 := e.r + 6.0
+				while s0 < tl - e.anchor.r - 4.0:
+					dl.append(e.pos + tn * s0)
+					dl.append(e.pos + tn * minf(s0 + 7.0, tl - e.anchor.r - 4.0))
+					s0 += 13.0
+				if dl.size() > 0:
+					draw_multiline(dl, Pal.foe(0.35 * dim), 1.2)
 		if e.kind == PROOFREADER:
 			# the nib's slit and breather hole, red ink on its tip
 			var fwd := Vector2.from_angle(e.rot)

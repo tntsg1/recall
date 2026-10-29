@@ -7,7 +7,7 @@ extends Node2D
 # hits, so you can throw your cover into the enemies.
 
 const SIZES := [Vector2(170, 38), Vector2(170, 38), Vector2(38, 160), Vector2(38, 160), Vector2(150, 38)]
-const STARTS := [Vector2(380, 580), Vector2(1540, 580), Vector2(700, 820), Vector2(1220, 820), Vector2(960, 640)]
+const STARTS := [Vector2(380, 650), Vector2(1540, 660), Vector2(700, 830), Vector2(1220, 830), Vector2(960, 650)]
 const SHOVE := 70.0          # px/s a striking round gives
 const YANK := 230.0          # px/s a recalled round gives, toward its way home
 const DRAG := 0.35           # per second: almost nothing slows it
@@ -221,10 +221,10 @@ func _draw_plate(k: int, dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
 	var lab := "H-%02d" % (k * 7 + 11)
 	if long_x:
-		draw_string(sf, r.get_center() + Vector2(-16, 5), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.4 * dim))
+		draw_string(sf, r.get_center() + Vector2(-16, 5), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.6 * dim))
 	else:
 		draw_set_transform(r.get_center() + Vector2(4, -16), PI * 0.5, Vector2.ONE)
-		draw_string(sf, Vector2.ZERO, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.4 * dim))
+		draw_string(sf, Vector2.ZERO, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.6 * dim))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# a tether ring at one end, its cut line drifting
 	var tq := r.position + (Vector2(6, r.size.y * 0.5) if long_x else Vector2(r.size.x * 0.5, 6))

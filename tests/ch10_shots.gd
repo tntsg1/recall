@@ -82,7 +82,14 @@ func _run() -> void:
 	await frames(30)
 	game.player.pos = Vector2(1000, 760)
 	game.bullets.recall(game.player.pos)
-	await frames(10)
+	var wt := 0
+	var flashed := false
+	while wt < 90 and not flashed:
+		wt += 1
+		await process_frame
+		for e in game.enemies.list:
+			if e.kind == Enemies.ESCORT and e.shield_flash > 0.6:
+				flashed = true
 	await shot("4_escort")
 	for e in game.enemies.list:
 		if e != anchor:

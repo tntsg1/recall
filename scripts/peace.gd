@@ -22,7 +22,7 @@ const H := 140.0
 const PLATE_HP := 34.0
 const ARMS_N := [2, 2, 3]
 const WELD_TIME := [2.8, 2.5, 2.3]
-const ARM_Y := 150.0                    # the gantry the arms run on
+const ARM_Y := 172.0                    # the gantry the arms run on
 const SPARK_LEN := 150.0
 const SPARK_HALF := 0.33
 const TURRETS := [1, 6, 3, 4]           # the sections that carry turrets, in the order they arm
@@ -526,7 +526,10 @@ func _draw_hull(dim: float) -> void:
 				ribs.append(Vector2(x, r.position.y + 4.0))
 				ribs.append(Vector2(x, r.end.y - 4.0))
 			draw_multiline(ribs, Pal.foe(0.55 * dim), 2.0)
-			draw_line(Vector2(r.position.x + 4.0, r.get_center().y), Vector2(r.end.x - 4.0, r.get_center().y), Pal.foe((0.6 + 0.4 * pulse) * dim, 2.2), 3.0)
+			draw_line(Vector2(r.position.x + 4.0, r.get_center().y), Vector2(r.end.x - 4.0, r.get_center().y), Pal.foe((0.5 + 0.3 * pulse) * dim, 1.5), 3.0)
+			# the core showing through: a bright pulse ring, the place to hit
+			draw_circle(r.get_center(), 8.0, Pal.foe((0.6 + 0.3 * pulse) * dim, 1.5))
+			draw_arc(r.get_center(), 16.0 + 6.0 * pulse, 0.0, TAU, 24, Pal.foe((0.8 - 0.4 * pulse) * dim, 1.4), 2.5)
 			draw_rect(r, Pal.foe(0.5 * dim), false, 1.0)
 		else:
 			var pk: float = plate[k] / PLATE_HP
@@ -604,9 +607,11 @@ func _draw_weapons(dim: float) -> void:
 			continue
 		var tp := turret_pos(j)
 		var aim: Vector2 = (game.player.pos - tp).normalized()
-		draw_circle(tp, 13.0, Color(0.05, 0.05, 0.055))
-		draw_arc(tp, 13.0, 0.0, TAU, 20, Pal.foe(0.85 * dim, 1.3), 2.0)
-		draw_line(tp, tp + aim * 24.0, Pal.foe(0.9 * dim, 1.4), 4.0)
+		draw_circle(tp, 24.0, Color(0.05, 0.05, 0.055))
+		draw_arc(tp, 24.0, 0.0, TAU, 28, Pal.foe(0.9 * dim, 1.3), 2.5)
+		draw_arc(tp, 15.0, 0.0, TAU, 20, Pal.foe(0.5 * dim), 1.5)
+		draw_line(tp + aim.orthogonal() * 5.0, tp + aim.orthogonal() * 5.0 + aim * 40.0, Pal.foe(0.95 * dim, 1.5), 5.0)
+		draw_line(tp - aim.orthogonal() * 5.0, tp - aim.orthogonal() * 5.0 + aim * 40.0, Pal.foe(0.95 * dim, 1.5), 5.0)
 		if turret_aim[j] >= 0.0:
 			var k: float = turret_aim[j] / SHOT_WARN
 			var fl := 0.6 + 0.4 * sin(t * 30.0)
@@ -630,9 +635,11 @@ func _draw_weapons(dim: float) -> void:
 			draw_line(BOW - d2.orthogonal() * 26.0, far - d2.orthogonal() * 26.0, Pal.red(0.25 * k2 * dim), 1.0)
 		else:
 			var k3 := 1.0 - (gun_t - GUN_WARN) / GUN_FIRE
-			draw_line(BOW, far, Pal.red(0.25 * k3 * dim, 1.4), 52.0)
-			draw_line(BOW, far, Pal.red(k3 * dim, 3.0), 10.0)
-			draw_line(BOW, far, Pal.ink(k3 * dim, 2.6), 3.0)
+			draw_line(BOW, far, Color(0, 0, 0, 0.5 * k3), 90.0)
+			draw_line(BOW, far, Pal.red(0.3 * k3 * dim, 1.4), 64.0)
+			draw_line(BOW, far, Pal.red(k3 * dim, 2.6), 26.0)
+			draw_line(BOW, far, Pal.ink(k3 * dim, 2.6), 6.0)
+			draw_circle(BOW, 40.0 * k3, Pal.ink(0.8 * k3 * dim, 2.4))
 
 
 # The progress board on the gantry: the stage, the percentage, a bar.
