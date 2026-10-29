@@ -79,6 +79,17 @@ const SEIZE := {
 		Enemies.PULSE: [["气压每降一格，我报一次平安。", "EACH TIME THE PRESSURE DROPS A NOTCH, I REPORT ALL IS WELL."]],
 		Enemies.ECHO: [["每个上去的人我都记得。没有一个下来过。", "I REMEMBER EVERYONE WHO WENT UP. NOT ONE HAS COME DOWN."]],
 	},
+	10: {
+		Enemies.CHASER: [["焊工 6620。我焊的装甲，比我家的墙厚四十倍。", "WELDER 6620. THE ARMOUR I WELD IS FORTY TIMES THICKER THAN MY OWN WALLS."],
+			["第十三街的口粮配额，今年换成了钢板。", "THIS YEAR 13TH STREET'S RATION QUOTA WAS CHANGED INTO STEEL PLATE."]],
+		Enemies.GUARD: [["这艘船叫“友谊号”。它的炮口朝着地面。", "THIS SHIP IS CALLED FRIENDSHIP. ITS GUNS POINT AT THE GROUND."]],
+		Enemies.CHARGER: [["下水仪式上，董事们说：和平需要实力。", "AT THE LAUNCH THE DIRECTORS SAID: PEACE REQUIRES STRENGTH."]],
+		Enemies.PRISM: [["我给舰身打光，让新闻里的它看起来是白色的。", "I LIGHT THE HULL SO IT LOOKS WHITE ON THE NEWS."]],
+		Enemies.LEECH: [["我收集焊渣。焊渣也能再炼成炮弹。", "I COLLECT THE WELDING SLAG. SLAG CAN BE SMELTED INTO SHELLS TOO."]],
+		Enemies.PULSE: [["每一声铆钉，都是一份订单。", "EVERY RIVET STRUCK IS AN ORDER FILLED."]],
+		Enemies.ECHO: [["每一艘的名字我都记得：和平一号到和平九十号。", "I REMEMBER EVERY NAME: PEACE ONE TO PEACE NINETY."]],
+		Enemies.ESCORT: [["我护着重要的东西。我自己不重要。", "I GUARD WHAT MATTERS. I DO NOT MATTER."]],
+	},
 }
 
 # remnants: [id, wall point, inward normal, kind of mark, zh, en]
@@ -137,6 +148,12 @@ const WALL := {
 		["rail", Vector2(1840, 545), Vector2(-1, 0), "notice", "舱门开启时请抓紧扶手。扶手按分钟计费。", "HOLD THE HANDRAIL WHEN THE DOORS OPEN. HANDRAILS ARE BILLED BY THE MINUTE."],
 		["scrawl", Vector2(1840, 756), Vector2(-1, 0), "scrawl", "我们把它修到了天上。他们不让我们上去。", "WE BUILT IT TO THE SKY. THEY WON'T LET US UP."],
 	],
+	10: [
+		["schedule", Vector2(80, 560), Vector2(1, 0), "screen", "本月下水：和平级 3 艘 · 守护级 2 艘 · 第十三街供暖：暂停", "LAUNCHED THIS MONTH: 3 PEACE CLASS · 2 GUARDIAN CLASS · 13TH STREET HEATING: SUSPENDED"],
+		["steel", Vector2(245, 880), Vector2(0, -1), "crate", "装甲钢 · 原料：民用口粮转产", "ARMOUR STEEL · FEEDSTOCK: CIVILIAN RATIONS, REPURPOSED"],
+		["tether", Vector2(1840, 560), Vector2(-1, 0), "notice", "失重区作业请系好安全绳。安全绳从工资中扣除。", "WEAR YOUR TETHER IN ZERO-G ZONES. TETHERS ARE DEDUCTED FROM YOUR PAY."],
+		["scrawl", Vector2(1840, 790), Vector2(-1, 0), "scrawl", "他们说是为了保护我们。炮口对着我们。", "THEY SAY IT IS TO PROTECT US. THE GUNS POINT AT US."],
+	],
 }
 
 const RADIO := {
@@ -184,6 +201,11 @@ const RADIO := {
 		"wave": [["天穹轨道电梯今日运送董事 12 人、货物 3000 吨，一切正常。", "THE SKY LIFT CARRIED 12 DIRECTORS AND 3,000 TONNES OF CARGO TODAY. ALL NORMAL."],
 			["观景层每年开放一天。请珍惜。", "THE VIEWING DECK OPENS ONE DAY A YEAR. PLEASE CHERISH IT."]],
 		"boss": [["配重系统进入检修。电梯暂停在当前高度，请保持冷静。", "THE COUNTERWEIGHT IS UNDER REPAIR. THE LIFT HOLDS AT ITS PRESENT HEIGHT. PLEASE STAY CALM."]],
+	},
+	10: {
+		"wave": [["近地轨道船坞今日焊接装甲 4800 平方米，和平力量持续增强。", "THE ORBITAL YARD WELDED 4,800 M² OF ARMOUR TODAY. THE FORCES OF PEACE GROW STRONGER."],
+			["和平九十一号即将下水。请市民收看直播并保持感动。", "PEACE NINETY-ONE LAUNCHES SOON. CITIZENS, WATCH THE BROADCAST AND REMAIN MOVED."]],
+		"boss": [["和平号建造暂停。所有已完成部分均属和平用途。", "WORK ON THE PEACE IS SUSPENDED. ALL COMPLETED PARTS ARE FOR PEACEFUL USE."]],
 	},
 }
 

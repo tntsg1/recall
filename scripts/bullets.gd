@@ -70,6 +70,7 @@ class B:
 	var shelf := -1             # the archive shelf it is embedded in (it rides along)
 	var corrected := false      # a proofreader moved it; it stays where it was put
 	var curve_acc := 0.0        # turning in an airlock's draught since its last path point
+	var plate := -1             # the hull plate it is embedded in (it rides, and yanks it when recalled)
 
 	func total() -> float:
 		return cum[cum.size() - 1]
@@ -754,8 +755,10 @@ func _fly(b: B, dt: float) -> void:
 			b.life = 0.0
 			b.hit.clear()
 			b.shelf = game.shelves.shelf_of(int(h.get("rect", -1))) if game.shelves.active() else -1
+			b.plate = game.plates.plate_of(int(h.get("rect", -1))) if game.plates.active() else -1
 			game.on_embed(b, h.normal)
-			if b.shelf < 0:
+			game.plates.on_embed(b)
+			if b.shelf < 0 and b.plate < 0:
 				scars.append([h.point, h.normal, 0.0])
 			if scars.size() > 160:
 				scars.remove_at(0)
@@ -821,6 +824,14 @@ func _return(b: B, dt: float) -> void:
 	for k in pts.size() - 1:
 		if game.scan_rings.active():
 			game.scan_rings.cross(pts[k], pts[k + 1], b)
+		var es: Dictionary = game.enemies.escort_hit(pts[k], pts[k + 1])
+		if es:
+			# an escort drone throws itself across the line: the round comes home from there
+			game.enemies.sweep(pts[k], es.point, b, true)
+			game.enemies.on_escort(es.e, es.point, b.dir)
+			b.pos = es.point
+			_go_home(b)
+			return
 		var sh: Dictionary = {} if b.piercer else game.enemies.shield_hit(pts[k], pts[k + 1])
 		if sh:
 			# blocked on the way back: the round still comes home, from here

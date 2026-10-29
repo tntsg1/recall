@@ -181,6 +181,28 @@ func think(game) -> void:
 			var ad2: float = q5.distance_to(p)
 			if ad2 < 40.0:
 				move += (p - q5) / maxf(ad2, 1.0) * 1.5
+	# the Peace: out from under welding sparks, off the shells and the bow gun
+	if bs is Peace and bs.state == Peace.RUN:
+		if p.y < Peace.Y0 + Peace.H + 200.0:
+			move += Vector2(0, 1.4)
+		for ai in Peace.ARMS_N[bs.phase]:
+			var arm: Dictionary = bs.arms[ai]
+			if arm.mode == Peace.WELD and absf(p.x - arm.x) < 110.0 and p.y < Peace.Y0 + Peace.H + Peace.SPARK_LEN + 40.0:
+				move += Vector2(signf(p.x - arm.x) if p.x != arm.x else 1.0, 0.4) * 2.0
+		for sh2 in bs.shells:
+			var sv: Vector2 = sh2[1]
+			var sq := Geometry2D.get_closest_point_to_segment(p, sh2[0], (sh2[0] as Vector2) + sv * 0.5)
+			if sq.distance_to(p) < 40.0:
+				move += sv.normalized().orthogonal() * (1.0 if (p - sq).dot(sv.normalized().orthogonal()) >= 0.0 else -1.0) * 2.0
+				if sq.distance_to(p) < 20.0:
+					bot.dash = true
+		if bs.gun_t >= 0.0:
+			var gd := Vector2.from_angle(bs.gun_a)
+			var gq := Geometry2D.get_closest_point_to_segment(p, Peace.BOW, Peace.BOW + gd * 2400.0)
+			if gq.distance_to(p) < 80.0:
+				move += (p - gq).normalized() * 2.4
+				if bs.gun_t > Peace.GUN_WARN - 0.15 and gq.distance_to(p) < 30.0:
+					bot.dash = true
 	# airlocks: keep away from a door that is marked or open
 	if game.vents.active() and game.vents.door >= 0:
 		var dp: Vector2 = game.vents.door_pos(game.vents.door)
@@ -273,6 +295,18 @@ func think(game) -> void:
 				break
 		nearest = {"pos": gt, "vel": Vector2.ZERO}
 		nd = gt.distance_to(p)
+	elif bs is Peace and bs.state == Peace.RUN:
+		# open frame if there is any; else knock at the nearest plate
+		var pcp: Vector2 = bs.core_pos()
+		if bs.core_open <= 0.5:
+			var pbd := INF
+			for k in Peace.N:
+				var sc: Vector2 = bs.sec_rect(k).get_center()
+				if sc.distance_to(p) < pbd:
+					pbd = sc.distance_to(p)
+					pcp = sc
+		nearest = {"pos": pcp, "vel": Vector2.ZERO}
+		nd = pcp.distance_to(p)
 	elif bs is Counterweight and bs.state == Counterweight.RUN and bs.core_open > 0.5:
 		var cwp: Vector2 = bs.core_pos()
 		nearest = {"pos": cwp, "vel": Vector2.ZERO}

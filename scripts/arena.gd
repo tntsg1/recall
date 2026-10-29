@@ -67,6 +67,10 @@ func setup(ch: int) -> void:
 		7:
 			# the deep archive: nothing fixed to hide behind but the shelving
 			pass
+		9:
+			# the shipyard: a crate of armour steel; the rest is the plates adrift
+			inner.append(Rect2(170, 880, 150, 70))
+			inner.append(Rect2(1600, 880, 150, 70))
 		8:
 			# the lift car: two rows of bolted seats, a pillar either side
 			inner.append(Rect2(560, 600, 180, 44))
@@ -93,6 +97,7 @@ func setup(ch: int) -> void:
 	rects.append_array(inner)
 	mover_from = rects.size()
 	movers = Shelves.initial(ch)
+	movers.append_array(Plates.initial(ch))
 	rects.append_array(movers)
 	mirror_from = rects.size()
 	rects.append_array(mirrors)

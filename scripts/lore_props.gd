@@ -213,6 +213,11 @@ func _draw() -> void:
 		_draw_chairs(dim)
 		_draw_lightboards(dim)
 		_draw_terminal(Vector2(80, 560), dim, "w7_monitor")
+	elif story == 10:
+		_draw_yard(dim)
+		_draw_terminal(Vector2(80, 560), dim, "w10_schedule")
+		if shows.get("w10_tether", 0.0) <= 0.01:
+			_draw_wall_notice(Vector2(1840, 560), dim)
 	elif story == 9:
 		_draw_lift(dim)
 		_draw_terminal(Vector2(80, 545), dim, "w9_altitude")
@@ -546,7 +551,7 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 			draw_string(font, scr.position + Vector2(8, 26), Txt.t("term_altitude"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.4 * dim))
 			draw_string(Fonts.get_font("SemiBold"), scr.position + Vector2(8, 56), Txt.t("altitude") % _alt_str(), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.75 * dim, 1.2))
 			return
-		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output", 5: "term_timetable", 6: "term_power", 7: "term_mood", 8: "term_archive"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
+		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output", 5: "term_timetable", 6: "term_power", 7: "term_mood", 8: "term_archive", 10: "term_schedule"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
 
 
 # The queue: posts with a rope slung between them, and the waiting line.
@@ -1601,3 +1606,45 @@ func _draw_lift(dim: float) -> void:
 		draw_line(Vector2(dx, 940.0), Vector2(dx + 30.0, 940.0), Pal.ink(0.14 * dim), 4.0)
 		draw_line(Vector2(dx + 10.0, 924.0), Vector2(dx + 22.0, 916.0), Pal.ink(0.08 * dim), 3.0)
 		dx += 52.0
+
+
+# ---------------------------------------------------------------- the orbital yard
+
+# The dock open to space: stars where the floor plating stops at the edges,
+# tether anchors along the walls with their lines, the two crates of armour
+# steel, weld scars and hazard marks on the deck.
+func _draw_yard(dim: float) -> void:
+	# deck plating seams
+	var seams := PackedVector2Array()
+	var x := 160.0
+	while x < 1800.0:
+		seams.append(Vector2(x, 480.0))
+		seams.append(Vector2(x, 1000.0))
+		x += 160.0
+	var y := 520.0
+	while y < 1000.0:
+		seams.append(Vector2(90.0, y))
+		seams.append(Vector2(1830.0, y))
+		y += 160.0
+	draw_multiline(seams, Pal.ink(0.05 * dim), 1.0)
+	# tether anchors on the side walls, a slack line from each
+	for side: float in [92.0, 1828.0]:
+		for ay: float in [180.0, 420.0, 700.0, 940.0]:
+			var a := Vector2(side, ay)
+			draw_circle(a, 5.0, Color(0.06, 0.06, 0.065))
+			draw_arc(a, 5.0, 0.0, TAU, 12, Pal.ink(0.5 * dim), 1.5)
+			var sw := sin(t * 0.7 + ay * 0.01) * 14.0
+			var dirx := 1.0 if side < 960.0 else -1.0
+			draw_polyline(PackedVector2Array([a, a + Vector2(26.0 * dirx, 18.0 + sw * 0.4), a + Vector2(48.0 * dirx, 30.0 + sw)]), Pal.ink(0.22 * dim), 1.0)
+	# the crates of armour steel
+	for c in [Rect2(170, 880, 150, 70), Rect2(1600, 880, 150, 70)]:
+		var cr: Rect2 = c
+		var ins := cr.grow(-8.0)
+		draw_line(ins.position, ins.end, Pal.ink(0.2 * dim), 1.0)
+		draw_line(Vector2(ins.end.x, ins.position.y), Vector2(ins.position.x, ins.end.y), Pal.ink(0.2 * dim), 1.0)
+		for j in 3:
+			draw_line(Vector2(cr.position.x + 10.0 + j * 46.0, cr.position.y + 4.0), Vector2(cr.position.x + 30.0 + j * 46.0, cr.position.y + 4.0), Pal.ink(0.5 * dim), 3.0)
+	# weld scars on the deck
+	for k in 7:
+		var wp := Vector2(260.0 + fmod(k * 263.0, 1400.0), 560.0 + fmod(k * 131.0, 380.0))
+		draw_arc(wp, 9.0 + (k % 3) * 3.0, 0.0, TAU, 14, Pal.ink(0.06 * dim), 2.0)

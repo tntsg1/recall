@@ -5,7 +5,7 @@ extends Node2D
 # its armour goes; it shatters into those edges when it dies.
 
 enum { WARN, SPAWN, ALIVE, DEAD, HOST }   # HOST: seized by you (Possess drives it)
-enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO, INSPECTOR, PROOFREADER }
+enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO, INSPECTOR, PROOFREADER, ESCORT }
 enum { APPROACH, WINDUP, DASH, STUN, RECOVER }
 
 const SPEC := {
@@ -18,6 +18,7 @@ const SPEC := {
 	ECHO: {"hp": 40.0, "r": 13.0, "sides": 8, "speed": 0.0},
 	INSPECTOR: {"hp": 55.0, "r": 23.0, "sides": 4, "speed": 110.0},
 	PROOFREADER: {"hp": 50.0, "r": 27.0, "sides": 5, "speed": 125.0},
+	ESCORT: {"hp": 26.0, "r": 12.0, "sides": 3, "speed": 520.0},
 }
 const WARN_TIME := 0.55
 const SPAWN_TIME := 0.6
@@ -141,6 +142,31 @@ func shield_hit(a: Vector2, b: Vector2) -> Dictionary:
 				bd = l
 				best = {"point": x, "normal": e.face, "e": e}
 	return best
+
+
+# An escort drone across a returning round's line: it takes the round.
+func escort_hit(a: Vector2, b: Vector2) -> Dictionary:
+	var best := {}
+	var bd := INF
+	for e in list:
+		if e.kind != ESCORT or e.state != ALIVE or e.cool > 0.0:
+			continue
+		var q := Geometry2D.get_closest_point_to_segment(e.pos, a, b)
+		if q.distance_to(e.pos) <= e.r + 8.0:
+			var d := a.distance_to(q)
+			if d < bd:
+				bd = d
+				best = {"point": q, "e": e}
+	return best
+
+
+func on_escort(e: E, at: Vector2, dir: Vector2) -> void:
+	e.cool = 1.4
+	e.shield_flash = 1.0
+	e.knock += dir * 260.0
+	game.fx.sparks(at, -dir, 8, Pal.foe(1.0, 2.0), 420.0, 0.22, 0.9)
+	game.fx.ring(at, 6.0, 30.0, 0.25, Pal.foe(0.9, 1.8), 2.0)
+	game.sfx.play("shield", randf_range(1.2, 1.35), -6.0)
 
 
 # Prisms bend outbound rounds by a fixed 60 degrees (each prism has its own hand).
@@ -347,6 +373,8 @@ func _die(e: E, dir: Vector2) -> void:
 		game.lore.on_inspector_down(e.pos)
 	if e.kind == PROOFREADER:
 		game.lore.on_kind_down(PROOFREADER, e.pos)
+	if e.kind == ESCORT:
+		game.lore.on_kind_down(ESCORT, e.pos)
 	if e.grip != null:
 		if game.bullets.held_by(e.grip).size() >= 4:
 			game.ach("leech4")
@@ -438,6 +466,8 @@ func step(dt: float) -> void:
 						_inspector(e, pl, dt)
 					PROOFREADER:
 						_proofreader(e, pl, dt)
+					ESCORT:
+						_escort(e, pl, dt)
 					PULSE:
 						_pulse(e, pl, dt)
 					ECHO:
@@ -643,6 +673,54 @@ func _proofreader(e: E, pl: Vector2, dt: float) -> void:
 	e.vel = Pal.damp2(e.vel, _steer(e, want) * e.speed, 3.0, dt)
 	if e.vel.length() > 5.0:
 		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-6.0 * dt))
+
+
+# The escort drone: it keeps close round another enemy (or the ship) and,
+# when one of your rounds is coming home at its ward, puts itself in the way.
+# Having taken one it tumbles off for a moment before it can guard again.
+const ESCORT_R := 58.0
+
+
+func _escort(e: E, pl: Vector2, dt: float) -> void:
+	e.cool = maxf(0.0, e.cool - dt)
+	var ward = e.anchor
+	if ward != null and (not (ward is E) or ward.state != ALIVE):
+		ward = null
+	if ward == null:
+		var bd := INF
+		for o in list:
+			if o != e and o.kind != ESCORT and o.state == ALIVE:
+				var d: float = o.pos.distance_to(e.pos)
+				if d < bd:
+					bd = d
+					ward = o
+		e.anchor = ward
+	var wp: Vector2
+	var wr := 20.0
+	if ward != null:
+		wp = ward.pos
+		wr = ward.r
+	elif game.boss.alive():
+		wp = game.boss.core_pos()
+		wr = 40.0
+	else:
+		wp = pl + Vector2.from_angle(e.seed) * 300.0
+	e.orbit_a += 2.4 * dt
+	var want: Vector2 = wp + Vector2.from_angle(e.orbit_a) * (ESCORT_R + wr)
+	if e.cool <= 0.0:
+		# a round coming home toward the ward: get between
+		for b in game.bullets.list:
+			if b.state != Bullets.RETURN or b.foe:
+				continue
+			var ahead: Vector2 = b.pos + b.dir * 420.0
+			var q := Geometry2D.get_closest_point_to_segment(wp, b.pos, ahead)
+			if q.distance_to(wp) < wr + 40.0 and b.pos.distance_to(wp) > wr + 30.0:
+				want = wp + (b.pos - wp).normalized() * (wr + 26.0)
+				break
+	var to := want - e.pos
+	e.vel = to.limit_length(e.speed if e.cool <= 0.0 else 160.0) if to.length() > 2.0 else Vector2.ZERO
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-10.0 * dt))
 
 
 func _claimed(b, me: E) -> bool:
@@ -908,6 +986,9 @@ func _poly(e: E) -> Array[Vector2]:
 		INSPECTOR:
 			# a clipboard-shaped body, longer than it is wide
 			pts = [Vector2(e.r * 1.1, -e.r * 0.75), Vector2(e.r * 1.1, e.r * 0.75), Vector2(-e.r * 1.1, e.r * 0.75), Vector2(-e.r * 1.1, -e.r * 0.75)]
+		ESCORT:
+			# a small dart
+			pts = [Vector2(e.r * 1.3, 0), Vector2(-e.r * 0.8, e.r * 0.8), Vector2(-e.r * 0.8, -e.r * 0.8)]
 		PROOFREADER:
 			# a pen nib, pointing the way it walks
 			pts = [Vector2(e.r * 1.35, 0), Vector2(e.r * 0.15, e.r * 0.72), Vector2(-e.r * 0.95, e.r * 0.55), Vector2(-e.r * 0.95, -e.r * 0.55), Vector2(e.r * 0.15, -e.r * 0.72)]
@@ -997,6 +1078,13 @@ func _draw() -> void:
 			draw_rect(Rect2(bp + Vector2(-4, 6), Vector2(8, 5)), Pal.foe(0.7 * dim), false, 1.2)
 			draw_line(bp + Vector2(-10, -10), bp + Vector2(10, 12), Pal.red(0.85 * dim, 1.4), 2.0)
 			draw_arc(e.pos, DIM_R, 0.0, TAU, 40, Pal.foe(0.28 * dim), 1.5)
+		if e.kind == ESCORT:
+			# its little shield, turned toward you, and a tether to what it guards
+			var sa: float = (game.player.pos - e.pos).angle()
+			var ready: bool = e.cool <= 0.0
+			draw_arc(e.pos, e.r + 7.0, sa - 1.0, sa + 1.0, 12, Pal.foe((0.85 if ready else 0.25) * dim, 1.0 + 1.2 * e.shield_flash), 2.5)
+			if e.anchor != null and e.anchor is E and e.anchor.state == ALIVE:
+				draw_line(e.pos, e.anchor.pos, Pal.foe(0.14 * dim), 1.0)
 		if e.kind == PROOFREADER:
 			# the nib's slit and breather hole, red ink on its tip
 			var fwd := Vector2.from_angle(e.rot)
