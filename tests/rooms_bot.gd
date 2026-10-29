@@ -69,6 +69,9 @@ func _process(_dt: float) -> bool:
 			for e in game.enemies.list:
 				if e.state != Enemies.DEAD:
 					print("    enemy kind=%d state=%d pos=%s free=%s" % [e.kind, e.state, str(e.pos), str(game.arena.is_free(e.pos, e.r))])
+					for r: Rect2 in game.arena.inner + game.arena.movers + game.arena.soft:
+						if r.grow(e.r).has_point(e.pos):
+							print("      inside %s (r %.0f)" % [str(r), e.r])
 	if w.index >= Waves.BOSS or game.lost or frame > 60 * 60 * 15 or stall > 60 * 30 or (w.phase == Waves.FIGHT and w.t > 140.0):
 		var line := "RUN %d %s:" % [run, "LOST" if game.lost else ("OK" if w.index >= Waves.BOSS else "TIMEOUT")]
 		for i in w.results.size():

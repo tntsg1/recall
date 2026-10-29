@@ -162,6 +162,81 @@ func _run() -> void:
 			game.lore.hold["w%d_%s" % [story, w[0]]] = 9.0
 		await frames(50)
 		await shot("08_remnants")
+	# the lift's airlock at work: a door marked, then open, the air rushing to it
+	if story == 9 and game.vents.active():
+		game.rooms.cseed = 91000
+		game.rooms.build(3, "L", false)
+		game.wave_ctl.phase = Waves.FIGHT
+		var dv: Array = game.vents.doors[0]
+		var at9: Vector2 = (dv[0] as Vector2) + (dv[1] as Vector2) * 330.0
+		game.player.pos = at9 + Vector2(0, 140)
+		for j9 in 3:
+			var fe = game.enemies.spawn(Enemies.CHASER, at9 + Vector2(-60 + j9 * 60, -40))
+			fe.state = Enemies.ALIVE
+			fe.t = 1.0
+		for j9 in 3:
+			game.bullets.fire(game.player.pos, Vector2.from_angle(-PI * 0.5 + (j9 - 1) * 0.3))
+		game.vents.clock = 0.0
+		game.vents.door = 0
+		game.vents.door_t = Vents.WARN * 0.6
+		await frames(2)
+		await shot("08_vent_warn")
+		game.vents.door_t = Vents.WARN + 0.2
+		await frames(40)
+		await shot("08_vent_open")
+	# the archive's shelving at work: an aisle marked to close with you in it, then shut
+	if story == 8 and game.shelves.active():
+		game.rooms.cseed = 81000
+		game.rooms.build(3, "L", false)
+		game.wave_ctl.phase = Waves.FIGHT
+		game.dev_god = false
+		game.player.invuln = 0.0
+		game.fx.numbers.clear()
+		var g8: int = game.shelves.aisle[0]
+		if g8 <= 0 or g8 >= Shelves.N:
+			game.shelves.set_banks(game.shelves.banks)
+			g8 = game.shelves.aisle[0]
+		var lo8: float = game.shelves.xs[g8 - 1] + Shelves.W
+		var hi8: float = game.shelves.xs[g8]
+		var in_aisle := Vector2((lo8 + hi8) * 0.5, game.shelves.top_of(0) + Shelves.H * 0.4)
+		var foe8 = game.enemies.spawn(Enemies.GUARD, in_aisle + Vector2(0, 110))
+		foe8.state = Enemies.ALIVE
+		foe8.t = 1.0
+		game.shelves.clock[0] = Shelves.PERIOD - 0.02
+		var c8: int = game.cracks
+		var warned := false
+		for k8 in 400:
+			game.player.pos = in_aisle
+			await frames(1)
+			if not warned and game.shelves.move_t[0] >= Shelves.WARN * 0.6:
+				warned = true
+				await shot("08_shelf_warn")
+			if game.cracks < c8:
+				break
+		await frames(10)
+		await shot("08_shelf_crush")
+		# and an enemy caught in an aisle as it shuts, you standing clear
+		game.player.pos = Vector2(game.shelves.xs[0] - 160.0, game.shelves.top_of(0) - 120.0)
+		var g9: int = game.shelves.aisle[0]
+		if g9 <= 0 or g9 >= Shelves.N:
+			game.shelves.set_banks(game.shelves.banks)
+			g9 = game.shelves.aisle[0]
+		var mid9 := Vector2((game.shelves.xs[g9 - 1] + Shelves.W + game.shelves.xs[g9]) * 0.5, game.shelves.top_of(0) + Shelves.H * 0.5)
+		var foe9 = game.enemies.spawn(Enemies.GUARD, mid9)
+		foe9.state = Enemies.ALIVE
+		foe9.t = 1.0
+		game.shelves.clock[0] = Shelves.PERIOD - 0.02
+		var hp9: float = foe9.hp
+		for k9 in 400:
+			if foe9.hp >= hp9:
+				foe9.pos = mid9
+			game.player.pos = Vector2(game.shelves.xs[0] - 160.0, game.shelves.top_of(0) - 120.0)
+			await frames(1)
+			if foe9.hp < hp9:
+				break
+		await frames(4)
+		await shot("08_shelf_crush_foe")
+		game.dev_god = true
 	# the bureau of thought's rings at work: standing in one as it lights
 	if story == 7 and game.scan_rings.active():
 		game.rooms.cseed = 71000

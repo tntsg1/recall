@@ -318,10 +318,20 @@ func _draw() -> void:
 		if shows.get("w11_observe", 0.0) <= 0.01:
 			_draw_wall_notice(Vector2(1840, 470), dim)
 	elif story == 9:
-		_draw_lift(dim)
-		_draw_terminal(Vector2(80, 545), dim, "w9_altitude")
-		if shows.get("w9_rail", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 545), dim)
+		var gen9: bool = game.arena.generated
+		if gen9:
+			_draw_lift_gen(dim)
+		else:
+			_draw_lift(dim)
+		var alt_at = game.rooms.spot("altitude", Vector2(80, 545))
+		if alt_at != null:
+			_draw_terminal(alt_at, dim, "w9_altitude")
+		var rail_at = game.rooms.spot("rail", Vector2(1840, 545))
+		if rail_at != null and shows.get("w9_rail", 0.0) <= 0.01:
+			_draw_wall_notice(rail_at, dim)
+		var sc9 = game.rooms.spot("scrawl", Vector2(1840, 756))
+		if gen9 and sc9 != null:
+			_draw_scrawl(sc9, dim)
 	elif story == 8:
 		var gen8: bool = game.arena.generated
 		if gen8:
@@ -1515,7 +1525,8 @@ func _remnant_plaque(w: Array, shown: String, k: float, dim: float) -> void:
 
 # Painted on the floor by the queue, worn, in big flat letters.
 func _remnant_floor(w: Array, shown: String, full: String, k: float, dim: float) -> void:
-	var at: Vector2 = (w[1] as Vector2) + Vector2(0, -36.0)
+	# (a generated room's: higher off the wall, clear of the HUD's bottom bar)
+	var at: Vector2 = (w[1] as Vector2) + Vector2(0, -64.0 if game.arena.generated else -36.0)
 	var sf := Fonts.get_font("SemiBold")
 	var tw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
 	draw_string(sf, Vector2(at.x - tw / 2.0, at.y), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Pal.ink(0.8 * k * dim, 1.2))
@@ -2594,7 +2605,9 @@ func _draw_deep(dim: float, gen := false) -> void:
 			var q := c + Vector2(sx, sy)
 			if q.distance_to(c) < rr - 5.0:
 				draw_circle(q, 1.1 + (j % 3) * 0.5, Pal.ink(0.32 * dim))
-		var cyc := fmod(t + float(vp[2]), 16.0)
+		# (a generated room's one window: it passes more often, and nearer the glass)
+		var cyc := fmod(t + float(vp[2]), 9.0 if gen else 16.0)
+		var big := 1.35 if gen else 1.0
 		if cyc < 7.0:
 			# a long shape gliding through, only its outline catching the light
 			var u := cyc / 7.0
@@ -2602,14 +2615,14 @@ func _draw_deep(dim: float, gen := false) -> void:
 			var body := PackedVector2Array()
 			for k in 13:
 				var a := TAU * k / 12.0
-				body.append(fc + Vector2(cos(a) * rr * 0.55, sin(a) * rr * 0.16))
+				body.append(fc + Vector2(cos(a) * rr * 0.55 * big, sin(a) * rr * 0.16 * big))
 			var inside := PackedVector2Array()
 			for k in body.size() - 1:
 				if body[k].distance_to(c) < rr - 4.0 and body[k + 1].distance_to(c) < rr - 4.0:
 					inside.append(body[k])
 					inside.append(body[k + 1])
 			if inside.size() > 0:
-				draw_multiline(inside, Pal.ink(0.16 * dim), 1.5)
+				draw_multiline(inside, Pal.ink((0.3 if gen else 0.16) * dim), 1.5 if not gen else 2.0)
 		draw_arc(c, rr, 0.0, TAU, 48, Pal.ink(0.32 * dim), 2.5)
 		draw_arc(c, rr + 8.0, 0.0, TAU, 48, Pal.ink(0.14 * dim), 1.5)
 		for b in 12:
@@ -2649,7 +2662,7 @@ func _draw_gauge(g: Vector2, sf: Font, dim: float) -> void:
 func _draw_plate(dim: float) -> void:
 	var plate_at = game.rooms.spot("plate", Vector2(960, 1010))
 	if plate_at != null and shows.get("w8_plate", 0.0) <= 0.01 and not _archivist_up():
-		var pr := Rect2((plate_at as Vector2) + Vector2(-200.0, -60.0), Vector2(400.0, 34.0))
+		var pr := Rect2((plate_at as Vector2) + Vector2(-200.0, -88.0 if game.arena.generated else -60.0), Vector2(400.0, 34.0))
 		draw_rect(pr, Color(0.05, 0.05, 0.055))
 		draw_rect(pr, Pal.ink(0.3 * dim), false, 1.5)
 		for k in 4:
@@ -2685,54 +2698,145 @@ func _alt_str() -> String:
 const LIFT_WINDOWS := [Rect2(330, 160, 380, 200), Rect2(1210, 160, 380, 200)]
 
 
+# A generated room of the car: its windows where the room put them, its
+# furniture by kind (rows of bolted seats with their belts, pillars with
+# their numbers, luggage racks strapped down, the kiosk that bills the
+# handrails by the minute), the handrails between the doors, and the deck's
+# limit before its plaque.
+func _draw_lift_gen(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var climb := clampf((_alt() - 28000.0) / 16000.0, 0.0, 1.0)
+	var wins: Array = lay.get("windows", [])
+	for wi in wins.size():
+		_draw_lift_window(wins[wi], wi, climb, dim)
+	var sf := Fonts.get_font("SemiBold")
+	var kinds: Array = lay.get("kinds", [])
+	var cover: Array = lay.get("cover", [])
+	var pillar_n := 17
+	for i in cover.size():
+		var r: Rect2 = cover[i]
+		var kind: String = kinds[i] if i < kinds.size() else "seats"
+		var long_x := r.size.x >= r.size.y
+		var ins := r.grow(-6.0)
+		match kind:
+			"seats":
+				# a row of bolted seats: backs, belts across them
+				var span := r.size.x if long_x else r.size.y
+				var ns := maxi(int(span / 44.0), 1)
+				var step := (span - 12.0) / ns
+				for k in ns:
+					var sr := Rect2(ins.position + Vector2(k * step, 0.0), Vector2(step - 5.0, ins.size.y)) if long_x else Rect2(ins.position + Vector2(0.0, k * step), Vector2(ins.size.x, step - 5.0))
+					draw_rect(sr, Pal.ink(0.35 * dim), false, 1.5)
+					if long_x:
+						draw_line(Vector2(sr.position.x + 3.0, sr.position.y + 5.0), Vector2(sr.end.x - 3.0, sr.position.y + 5.0), Pal.ink(0.5 * dim), 3.0)
+					else:
+						draw_line(Vector2(sr.position.x + 5.0, sr.position.y + 3.0), Vector2(sr.position.x + 5.0, sr.end.y - 3.0), Pal.ink(0.5 * dim), 3.0)
+					draw_line(sr.position + Vector2(6, 8), sr.end - Vector2(6, 4), Pal.ink(0.22 * dim), 1.5)
+			"pillar9":
+				# a pillar: its bolts, its number
+				for q: Vector2 in [ins.position, Vector2(ins.end.x, ins.position.y), ins.end, Vector2(ins.position.x, ins.end.y)]:
+					draw_circle(q + (ins.get_center() - q).normalized() * 5.0, 2.0, Pal.ink(0.45 * dim))
+				var num := "%02d" % pillar_n
+				pillar_n += 1
+				var nw := sf.get_string_size(num, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+				draw_string(sf, r.get_center() + Vector2(-nw / 2.0, 6.0), num, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.5 * dim))
+			"luggage":
+				# a luggage rack: the cases strapped down under two belts
+				var nc := 3 if long_x else 2
+				for k in nc:
+					var cr := Rect2(ins.position + (Vector2(ins.size.x / nc * k, 0.0) if long_x else Vector2(0.0, ins.size.y / nc * k)), (Vector2(ins.size.x / nc, ins.size.y) if long_x else Vector2(ins.size.x, ins.size.y / nc))).grow(-3.0)
+					draw_rect(cr, Pal.ink(0.28 * dim), false, 1.5)
+				for k in 2:
+					var u := (k + 1) / 3.0
+					if long_x:
+						draw_line(Vector2(lerpf(r.position.x, r.end.x, u), r.position.y), Vector2(lerpf(r.position.x, r.end.x, u), r.end.y), Pal.ink(0.5 * dim), 2.5)
+					else:
+						draw_line(Vector2(r.position.x, lerpf(r.position.y, r.end.y, u)), Vector2(r.end.x, lerpf(r.position.y, r.end.y, u)), Pal.ink(0.5 * dim), 2.5)
+			"kiosk":
+				# the handrail kiosk: a meter running on its screen, a card slot
+				var scr := Rect2(ins.position + Vector2(4, 4), Vector2(ins.size.x - 8.0, minf(36.0, ins.size.y * 0.4)))
+				draw_rect(scr, Color(0.02, 0.025, 0.03))
+				draw_rect(scr, Pal.ink(0.45 * dim), false, 1.0)
+				var secs := int(t) % 60
+				var meter := "0:%02d" % secs
+				var mw := sf.get_string_size(meter, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+				draw_string(sf, scr.get_center() + Vector2(-mw / 2.0, 5.0), meter, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.red(0.85 * dim, 1.4))
+				draw_string(sf, Vector2(r.position.x, r.position.y - 6.0), "RAIL 0.30/MIN", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+				draw_line(Vector2(ins.get_center().x - 12.0, ins.end.y - 12.0), Vector2(ins.get_center().x + 12.0, ins.end.y - 12.0), Pal.ink(0.55 * dim), 3.0)
+	# the handrails, broken at the doors
+	for hr: Array in lay.get("handrails", []):
+		var a: Vector2 = hr[0]
+		var b: Vector2 = hr[1]
+		draw_line(a, b, Pal.ink(0.4 * dim), 3.0)
+		var inward := 12.0 if a.x < 960.0 else -12.0
+		var y := a.y
+		while y <= b.y:
+			draw_line(Vector2(a.x, y), Vector2(a.x + inward, y), Pal.ink(0.3 * dim), 2.0)
+			y += 70.0
+	# the viewing deck's limit before its plaque
+	var deck_at = game.rooms.spot("deck", Vector2(700, 1010))
+	if deck_at != null:
+		var dy: float = (deck_at as Vector2).y - 110.0
+		var dx: float = (deck_at as Vector2).x - 260.0
+		while dx < (deck_at as Vector2).x + 260.0:
+			draw_line(Vector2(dx, dy), Vector2(dx + 30.0, dy), Pal.ink(0.14 * dim), 4.0)
+			draw_line(Vector2(dx + 10.0, dy - 16.0), Vector2(dx + 22.0, dy - 24.0), Pal.ink(0.08 * dim), 3.0)
+			dx += 52.0
+
+
+# A window of the car: the stars, the earth's rim curving below, its city
+# lights (13th Street's three dim ones, far from the rest, in the first).
+func _draw_lift_window(r: Rect2, wi: int, climb: float, dim: float) -> void:
+	draw_rect(r.grow(10.0), Color(0.05, 0.05, 0.055))
+	draw_rect(r, Color(0.006, 0.008, 0.014))
+	# stars over the rim
+	for j in 18:
+		var sp := r.position + Vector2(fmod(j * 83.0 + wi * 37.0, r.size.x - 8.0) + 4.0, fmod(j * 29.0, r.size.y * 0.45) + 4.0)
+		draw_circle(sp, 0.8 + (j % 3) * 0.4, Pal.ink(0.22 * dim))
+	# the earth: a great circle below, curving more as we rise
+	var rr := lerpf(2600.0, 760.0, climb)
+	var cc := Vector2(r.get_center().x + (wi * 2 - 1) * 120.0, r.position.y + r.size.y * 0.42 + rr)
+	var rim := PackedVector2Array()
+	var ground := PackedVector2Array()
+	for j in 41:
+		var x := r.position.x + r.size.x * j / 40.0
+		var dy := rr - sqrt(maxf(0.0, rr * rr - pow(x - cc.x, 2.0)))
+		var y := clampf(cc.y - rr + dy, r.position.y, r.end.y)
+		rim.append(Vector2(x, y))
+		ground.append(Vector2(x, y))
+	ground.append(r.end)
+	ground.append(Vector2(r.position.x, r.end.y))
+	draw_colored_polygon(ground, Color(0.03, 0.04, 0.055))
+	draw_polyline(rim, Pal.ink(0.12 * dim, 1.2), 9.0)
+	draw_polyline(rim, Pal.ink(0.55 * dim, 1.3), 2.0)
+	# city lights: clusters on the night side
+	for k in 5:
+		var cx := r.position.x + 40.0 + fmod(k * 97.0 + wi * 53.0, r.size.x - 80.0)
+		var dy2 := rr - sqrt(maxf(0.0, rr * rr - pow(cx - cc.x, 2.0)))
+		var cy := cc.y - rr + dy2 + 26.0 + fmod(k * 31.0, 60.0)
+		for m in 7:
+			var q := Vector2(cx + sin(m * 2.1 + k) * 14.0, cy + cos(m * 1.7 + k) * 8.0)
+			if r.has_point(q):
+				draw_circle(q, 1.1, Pal.ink(0.5 * dim, 1.4))
+	if wi == 0:
+		# 13th Street: three dim lights, far from the rest
+		var tq := Vector2(r.position.x + 52.0, r.end.y - 30.0)
+		for m in 3:
+			draw_circle(tq + Vector2(m * 5.0, (m % 2) * 3.0), 0.9, Pal.ink(0.22 * dim))
+	# the frame, its bolts and the glass's glint
+	draw_rect(r, Pal.ink(0.45 * dim), false, 2.5)
+	draw_rect(r.grow(10.0), Pal.ink(0.2 * dim), false, 1.5)
+	for k in 6:
+		var bx := r.position.x + r.size.x * k / 5.0
+		draw_circle(Vector2(bx, r.position.y - 5.0), 1.6, Pal.ink(0.35 * dim))
+		draw_circle(Vector2(bx, r.end.y + 5.0), 1.6, Pal.ink(0.35 * dim))
+	draw_line(r.position + Vector2(18, 14), r.position + Vector2(70, 14), Pal.ink(0.12 * dim, 1.2), 2.0)
+
+
 func _draw_lift(dim: float) -> void:
 	var climb := clampf((_alt() - 28000.0) / 16000.0, 0.0, 1.0)
 	for wi in 2:
-		var r: Rect2 = LIFT_WINDOWS[wi]
-		draw_rect(r.grow(10.0), Color(0.05, 0.05, 0.055))
-		draw_rect(r, Color(0.006, 0.008, 0.014))
-		# stars over the rim
-		for j in 18:
-			var sp := r.position + Vector2(fmod(j * 83.0 + wi * 37.0, r.size.x - 8.0) + 4.0, fmod(j * 29.0, r.size.y * 0.45) + 4.0)
-			draw_circle(sp, 0.8 + (j % 3) * 0.4, Pal.ink(0.22 * dim))
-		# the earth: a great circle below, curving more as we rise
-		var rr := lerpf(2600.0, 760.0, climb)
-		var cc := Vector2(r.get_center().x + (wi * 2 - 1) * 120.0, r.position.y + r.size.y * 0.42 + rr)
-		var rim := PackedVector2Array()
-		var ground := PackedVector2Array()
-		for j in 41:
-			var x := r.position.x + r.size.x * j / 40.0
-			var dy := rr - sqrt(maxf(0.0, rr * rr - pow(x - cc.x, 2.0)))
-			var y := clampf(cc.y - rr + dy, r.position.y, r.end.y)
-			rim.append(Vector2(x, y))
-			ground.append(Vector2(x, y))
-		ground.append(r.end)
-		ground.append(Vector2(r.position.x, r.end.y))
-		draw_colored_polygon(ground, Color(0.03, 0.04, 0.055))
-		draw_polyline(rim, Pal.ink(0.12 * dim, 1.2), 9.0)
-		draw_polyline(rim, Pal.ink(0.55 * dim, 1.3), 2.0)
-		# city lights: clusters on the night side
-		for k in 5:
-			var cx := r.position.x + 40.0 + fmod(k * 97.0 + wi * 53.0, r.size.x - 80.0)
-			var dy2 := rr - sqrt(maxf(0.0, rr * rr - pow(cx - cc.x, 2.0)))
-			var cy := cc.y - rr + dy2 + 26.0 + fmod(k * 31.0, 60.0)
-			for m in 7:
-				var q := Vector2(cx + sin(m * 2.1 + k) * 14.0, cy + cos(m * 1.7 + k) * 8.0)
-				if r.has_point(q):
-					draw_circle(q, 1.1, Pal.ink(0.5 * dim, 1.4))
-		if wi == 0:
-			# 13th Street: three dim lights, far from the rest
-			var tq := Vector2(r.position.x + 52.0, r.end.y - 30.0)
-			for m in 3:
-				draw_circle(tq + Vector2(m * 5.0, (m % 2) * 3.0), 0.9, Pal.ink(0.22 * dim))
-		# the frame, its bolts and the glass's glint
-		draw_rect(r, Pal.ink(0.45 * dim), false, 2.5)
-		draw_rect(r.grow(10.0), Pal.ink(0.2 * dim), false, 1.5)
-		for k in 6:
-			var bx := r.position.x + r.size.x * k / 5.0
-			draw_circle(Vector2(bx, r.position.y - 5.0), 1.6, Pal.ink(0.35 * dim))
-			draw_circle(Vector2(bx, r.end.y + 5.0), 1.6, Pal.ink(0.35 * dim))
-		draw_line(r.position + Vector2(18, 14), r.position + Vector2(70, 14), Pal.ink(0.12 * dim, 1.2), 2.0)
+		_draw_lift_window(LIFT_WINDOWS[wi], wi, climb, dim)
 	# the seats on their two benches: backs, arms, belts
 	for b in [Rect2(560, 600, 180, 44), Rect2(1180, 600, 180, 44)]:
 		var br: Rect2 = b

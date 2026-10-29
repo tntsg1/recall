@@ -26,7 +26,7 @@ const EXIT_APART := 480.0                     # two ways on: this far apart, the
 const FROM_ENTRY := 700.0                     # a way on this far from the way in: the room is crossed
 
 # The chapters that walk room to room; the rest keep their one hand-made room.
-const ON := [1, 2, 3, 4, 5, 6, 7]
+const ON := [1, 2, 3, 4, 5, 6, 7, 8]
 const ARM_W := 200.0       # an arm's footing on its wall
 const RING_R := 92.0       # a mood-scan ring's radius (ScanRings.R)
 const RING_WARN := 66.0    # how far past it the red warning closes in from
@@ -229,6 +229,29 @@ const STYLE := {
 		"themes": [["catalog"], ["desk8", "trolley"]],
 		"props": {"index": [220.0, 180.0], "plate": [440.0, 90.0], "rules": [160.0, 150.0], "scrawl": [220.0, 150.0]},
 	},
+	9: {
+		# the orbital lift's car: rows of bolted seats, pillars, luggage racks,
+		# the kiosks that bill the handrails by the minute; the chapter's own are
+		# its airlock doors in the side walls, two in the first room and four by
+		# the last
+		"shapes": {"hall": 4, "twin": 2, "corner": 2, "bays": 1},
+		"pieces": [
+			[3, [Rect2(0, 0, 180, 44)], "seats"],
+			[2, [Rect2(0, 0, 136, 44)], "seats"],
+			[2, [Rect2(0, 0, 56, 56)], "pillar9"],
+			[2, [Rect2(0, 0, 96, 60)], "luggage"],
+			[1, [Rect2(0, 0, 70, 90)], "kiosk"],
+		],
+		"landmarks": [
+			[3, [Rect2(0, 0, 180, 44), Rect2(0, 44, 180, 44)], "seats"],   # two rows back to back
+			[2, [Rect2(0, 0, 90, 120)], "kiosk"],                           # the handrail kiosk
+		],
+		"vents": [2, 2, 3, 3, 4, 4],
+		# the hand-made car: two benches and two pillars
+		"count": 4, "area": 22000.0,
+		"themes": [["seats"], ["pillar9", "luggage", "kiosk"]],
+		"props": {"altitude": [220.0, 180.0], "deck": [440.0, 90.0], "rail": [160.0, 150.0], "scrawl": [220.0, 150.0]},
+	},
 }
 
 
@@ -364,6 +387,73 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 	if not _remnants(lay, st, story, index, e, remnants, taken, rng, spare, false):
 		last_why = "t6"
 		return {}
+	# the lift's airlock doors: in the side walls, the floor before each kept
+	# clear, none by the way in
+	lay["vents"] = []
+	if st.has("vents"):
+		var want_v: int = (st.vents as Array)[mini(index, (st.vents as Array).size() - 1)]
+		for k in want_v:
+			var done := false
+			for tries in 12:
+				var vn: Vector2 = [Vector2(1, 0), Vector2(-1, 0)][(k + tries) % 2]
+				var need_v := [Vents.HALF * 2.0 + 36.0, 170.0]
+				var sp := _spot_for(vn, need_v, lay, taken, rng, true)
+				if sp.is_empty() or (sp[0] as Vector2).distance_to(lay.start) < 320.0:
+					continue
+				lay.vents.append([sp[0], sp[1]])
+				var front := Rect2(sp[0] - Vector2(0, need_v[0] / 2.0), Vector2.ZERO).expand(sp[0] + Vector2(0, need_v[0] / 2.0) + (sp[1] as Vector2) * need_v[1]).abs()
+				taken.append({"pos": sp[0], "n": sp[1], "w": need_v[0], "front": front})
+				done = true
+				break
+			# (late tries: two doors will do)
+			if not done and spare and k >= 2:
+				break
+			if not done:
+				last_why = "vents"
+				return {}
+	# the archive's shelving: on the low half of the room, clear of the wave's
+	# title, so the middle stays open floor (placed before the cover, which goes round it)
+	lay["banks"] = []
+	if st.has("banks"):
+		var want_b: int = (st.banks as Array)[mini(index, (st.banks as Array).size() - 1)]
+		var foot_w := Shelves.span() + 24.0
+		for k in want_b:
+			var done := false
+			for tries in 60:
+				var x0 := rng.randf_range(ROOM.position.x + 72.0, ROOM.end.x - 72.0 - foot_w + 24.0)
+				var foot := Rect2(x0 - 12.0, rng.randf_range(BANNER.end.y + 44.0, ROOM.end.y - 90.0 - Shelves.H - 48.0), foot_w, Shelves.H + 48.0)
+				var ok := ROOM.grow(-60.0).encloses(foot)
+				for r: Rect2 in lay.walls:
+					if r.grow(GAP).intersects(foot):
+						ok = false
+				for d: Dictionary in taken:
+					if _dist(foot, d.pos) < 120.0:
+						ok = false
+					var fr: Rect2 = d.get("front", Rect2())
+					if fr.size.x > 0.0 and fr.intersects(foot):
+						ok = false
+				if _dist(foot, lay.start) < 200.0:
+					ok = false
+				for o: Rect2 in lay.get("bank_feet", []):
+					if o.grow(140.0).intersects(foot):
+						ok = false
+				for z: Rect2 in [HUD_FOOT, HUD_LORE, BANNER]:
+					if z.intersects(foot):
+						ok = false
+				for d: Dictionary in lay.exits:
+					if (d.label as Rect2).grow(20.0).intersects(foot):
+						ok = false
+				if ok:
+					lay.banks.append([x0, foot.position.y + 24.0])
+					lay["bank_feet"] = lay.get("bank_feet", []) + [foot]
+					done = true
+					break
+			# (late tries: a room with one bank fewer will do)
+			if not done and spare and k > 0:
+				break
+			if not done:
+				last_why = "banks"
+				return {}
 	# cover, piece by piece
 	var lo_n := 3 if sparse else int(ceil(st.count * 0.75))
 	var hi_n := 5 if sparse else int(floor(st.count * 1.25))
@@ -444,41 +534,6 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 			if not done:
 				last_why = "rings"
 				return {}
-	lay["banks"] = []
-	if st.has("banks"):
-		var want_b: int = (st.banks as Array)[mini(index, (st.banks as Array).size() - 1)]
-		var foot_w := Shelves.span() + 24.0
-		for k in want_b:
-			var done := false
-			for tries in 80:
-				var x0 := rng.randf_range(ROOM.position.x + 110.0, ROOM.end.x - 110.0 - foot_w)
-				var top := rng.randf_range(ROOM.position.y + 120.0, ROOM.end.y - 120.0 - Shelves.H)
-				var foot := Rect2(x0 - 12.0, top - 24.0, foot_w, Shelves.H + 48.0)
-				var ok := ROOM.grow(-60.0).encloses(foot)
-				for r: Rect2 in lay.walls + lay.cover:
-					if r.grow(GAP).intersects(foot):
-						ok = false
-				for d: Dictionary in taken:
-					if _dist(foot, d.pos) < 170.0:
-						ok = false
-				if _dist(foot, lay.start) < 200.0:
-					ok = false
-				for o: Rect2 in lay.get("bank_feet", []):
-					if o.grow(140.0).intersects(foot):
-						ok = false
-				if HUD_TOP.intersects(foot):
-					ok = false
-				for d: Dictionary in lay.exits:
-					if (d.label as Rect2).intersects(foot):
-						ok = false
-				if ok:
-					lay.banks.append([x0, top])
-					lay["bank_feet"] = lay.get("bank_feet", []) + [foot]
-					done = true
-					break
-			if not done:
-				last_why = "banks"
-				return {}
 	lay["maglev"] = []
 	if st.has("maglev"):
 		var want_m: int = (st.maglev as Array)[mini(index, (st.maglev as Array).size() - 1)]
@@ -543,6 +598,8 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		_paint_bureau(lay, taken, rng)
 	elif story == 8:
 		_paint_archive(lay, taken, rng)
+	elif story == 9:
+		_paint_lift(lay, taken, rng)
 	elif story == 1:
 		_paint(lay, taken, rng)
 	else:
@@ -622,6 +679,69 @@ static func _paint_bureau(lay: Dictionary, taken: Array, rng: RandomNumberGenera
 			break
 
 
+# The car's walls and floor: its windows onto the earth along the top wall
+# where it is clear, the handrails down the side walls broken at every door
+# in them.
+static func _paint_lift(lay: Dictionary, taken: Array, rng: RandomNumberGenerator) -> void:
+	lay["quiet"] = _quiet(lay)
+	lay["windows"] = []
+	for k in 2:
+		for tries in 30:
+			var sz := Vector2(rng.randf_range(300.0, 380.0), rng.randf_range(150.0, 190.0))
+			var wr := Rect2(Vector2(rng.randf_range(ROOM.position.x + 60.0, ROOM.end.x - 60.0 - sz.x), ROOM.position.y + rng.randf_range(70.0, 110.0)), sz)
+			var ok := not wr.grow(20.0).intersects(HUD_STRIP) and not wr.grow(20.0).intersects(HUD_TOP)
+			for r: Rect2 in lay.walls + lay.cover:
+				if r.grow(40.0).intersects(wr):
+					ok = false
+			for d: Dictionary in taken:
+				if _dist(wr, d.pos) < 130.0:
+					ok = false
+				var fr: Rect2 = d.get("front", Rect2())
+				if fr.size.x > 0.0 and fr.intersects(wr.grow(20.0)):
+					ok = false
+			for d: Dictionary in lay.exits:
+				if (d.label as Rect2).grow(30.0).intersects(wr):
+					ok = false
+			for o: Rect2 in lay.windows:
+				if o.grow(80.0).intersects(wr):
+					ok = false
+			if ok:
+				lay.windows.append(wr)
+				break
+	# the handrails: what is left of each side wall between its doors and blocks
+	lay["handrails"] = []
+	for side in 2:
+		var x: float = ROOM.position.x + 16.0 if side == 0 else ROOM.end.x - 16.0
+		var cuts: Array = []
+		for d: Dictionary in taken:
+			var p: Vector2 = d.pos
+			if absf(p.x - (ROOM.position.x if side == 0 else ROOM.end.x)) < 4.0:
+				var half: float = float(d.get("w", DOOR_W)) / 2.0 + 40.0
+				cuts.append([p.y - half, p.y + half])
+		for r: Rect2 in lay.walls:
+			if r.grow(4.0).has_point(Vector2(x, r.get_center().y)) or (side == 0 and r.position.x <= ROOM.position.x + 20.0) or (side == 1 and r.end.x >= ROOM.end.x - 20.0):
+				cuts.append([r.position.y - 30.0, r.end.y + 30.0])
+		var y := ROOM.position.y + 40.0
+		var stops: Array = []
+		while y < ROOM.end.y - 40.0:
+			var free := true
+			for c: Array in cuts:
+				if y >= float(c[0]) and y <= float(c[1]):
+					free = false
+			stops.append(free)
+			y += 10.0
+		var run_from := -1.0
+		for k2 in stops.size() + 1:
+			var yy := ROOM.position.y + 40.0 + k2 * 10.0
+			var free2: bool = stops[k2] if k2 < stops.size() else false
+			if free2 and run_from < 0.0:
+				run_from = yy
+			elif not free2 and run_from >= 0.0:
+				if yy - run_from >= 90.0:
+					lay.handrails.append([Vector2(x, run_from), Vector2(x, yy - 10.0)])
+				run_from = -1.0
+
+
 # The archive's floor: a viewport onto the black water in open floor, the
 # depth gauge by a wall.
 static func _paint_archive(lay: Dictionary, taken: Array, rng: RandomNumberGenerator) -> void:
@@ -640,15 +760,22 @@ static func _paint_archive(lay: Dictionary, taken: Array, rng: RandomNumberGener
 		for d: Dictionary in taken:
 			if (d.pos as Vector2).distance_to(c) < 160.0:
 				ok = false
+			var fr: Rect2 = d.get("front", Rect2())
+			if fr.size.x > 0.0 and _dist(fr, c) < 130.0:
+				ok = false
 		if ok:
 			lay.viewport = c
 			taken.append({"pos": c, "n": Vector2.ZERO, "w": 160.0})
 			break
 	lay["gauge"] = []
-	var sp := _spot_for(Vector2(0, -1), [300.0, 80.0], lay, taken, rng, true)
-	if not sp.is_empty():
+	for tries in 6:
+		var sp := _spot_for(Vector2(0, -1), [300.0, 80.0], lay, taken, rng, true)
+		# (its dial and reading sit just off the wall: clear of the magazine count)
+		if sp.is_empty() or Rect2((sp[0] as Vector2) + Vector2(-170, -90), Vector2(380, 90)).intersects(HUD_FOOT):
+			continue
 		lay.gauge = sp
 		taken.append({"pos": sp[0], "n": sp[1], "w": 300.0})
+		break
 
 
 # The concourse floor: painted way-arrows for the line, the tactile strip by

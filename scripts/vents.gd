@@ -19,6 +19,7 @@ const MOUTH := 44.0
 
 var on := false
 var game
+var doors: Array = DOORS.duplicate(true)   # [centre on the wall, normal into the room]
 var t := 0.0
 var clock := 0.0
 var door := -1               # the door marked or open, -1 none
@@ -34,7 +35,13 @@ func _init() -> void:
 
 func setup(story: int) -> void:
 	on = story == 9
-	visible = on
+	set_doors(DOORS)
+
+
+# The airlock doors this room has (the hand-made car: four, at DOORS).
+func set_doors(list: Array) -> void:
+	doors = list.duplicate(true)
+	visible = on and not doors.is_empty()
 	t = 0.0
 	clock = 2.0
 	door = -1
@@ -56,7 +63,7 @@ func open_k() -> float:
 
 
 func door_pos(i: int) -> Vector2:
-	return DOORS[i][0]
+	return doors[i][0]
 
 
 # The draught at a point, as a velocity toward the open door.
@@ -92,7 +99,7 @@ func pull_round(b, dt: float) -> void:
 
 
 func step(dt: float) -> void:
-	if not on:
+	if not on or doors.is_empty():
 		return
 	t += dt
 	var fighting: bool = game.wave_ctl.phase == Waves.FIGHT and game.hud.intro_t < 0.0
@@ -102,10 +109,10 @@ func step(dt: float) -> void:
 		if clock >= PERIOD:
 			clock = 0.0
 			# the doors take turns, but never the one you stand by
-			door = turn % DOORS.size()
+			door = turn % doors.size()
 			turn += 1
 			if door_pos(door).distance_to(game.player.pos) < 260.0:
-				door = turn % DOORS.size()
+				door = turn % doors.size()
 				turn += 1
 			door_t = 0.0
 			game.sfx.play("windup", 0.45, -6.0)
@@ -136,7 +143,7 @@ func step(dt: float) -> void:
 
 func _draught(dt: float, k: float) -> void:
 	var dp: Vector2 = door_pos(door)
-	var n: Vector2 = DOORS[door][1]
+	var n: Vector2 = doors[door][1]
 	# you lean against it
 	var pl: Vector2 = game.player.pos
 	if not game.possess.hosting():
@@ -195,7 +202,7 @@ func _draw() -> void:
 	var dim := 1.0 - 0.45 * f
 	if game.hud.intro_t >= 0.0:
 		dim *= clampf((game.hud.intro_t - 2.2) / 0.6, 0.25, 1.0)
-	for i in DOORS.size():
+	for i in doors.size():
 		_draw_door(i, dim)
 	# air rushing to the door
 	var seg := PackedVector2Array()
@@ -240,8 +247,8 @@ func _arrow(out: PackedVector2Array, p: Vector2, f: Vector2) -> void:
 
 
 func _draw_door(i: int, dim: float) -> void:
-	var c: Vector2 = DOORS[i][0]
-	var n: Vector2 = DOORS[i][1]
+	var c: Vector2 = doors[i][0]
+	var n: Vector2 = doors[i][1]
 	var along := Vector2(absf(n.y), absf(n.x))
 	var marked := door == i
 	var warn_k := clampf(door_t / WARN, 0.0, 1.0) if marked else 0.0

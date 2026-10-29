@@ -134,11 +134,17 @@ func setup(ch: int, lay := {}) -> void:
 	rects.append_array(movers)
 	mirror_from = rects.size()
 	rects.append_array(mirrors)
-	_build_nav()
+	# the way round a bank of shelving is round the whole of its track: its
+	# aisle opens and shuts too often to be a way through
+	var tracks: Array[Rect2] = []
+	if generated:
+		for b: Array in lay.get("banks", []):
+			tracks.append(Rect2(b[0], b[1], Shelves.span(), Shelves.H))
+	_build_nav(tracks)
 	queue_redraw()
 
 
-func _build_nav() -> void:
+func _build_nav(tracks: Array[Rect2] = []) -> void:
 	nav_cache.clear()
 	nav_order.clear()
 	nav_nx = int(ROOM.size.x / NAV)
@@ -150,7 +156,7 @@ func _build_nav() -> void:
 	for j in nav_ny:
 		for i in nav_nx:
 			var c := ROOM.position + Vector2(i + 0.5, j + 0.5) * NAV
-			for r: Rect2 in walls + inner + mirrors:
+			for r: Rect2 in walls + inner + mirrors + tracks:
 				if r.grow(18.0).has_point(c):
 					nav_block[j * nav_nx + i] = 1
 					break

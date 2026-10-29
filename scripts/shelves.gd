@@ -251,7 +251,7 @@ func _draw_rails(bank: int, dim: float) -> void:
 	# the aisle's floor: worn where people walk
 	var a := _xs_for(bank, aisle[bank])
 	var gap: int = aisle[bank]
-	if gap > 0 and gap < N and not moving(bank):
+	if gap > 0 and gap < N and not moving(bank) and not game.arena.generated:
 		var lo: float = a[gap - 1] + W
 		var hi: float = a[gap]
 		var y := TOP + 20.0
@@ -346,11 +346,17 @@ func _draw_shelf(i: int, dim: float) -> void:
 	if bank > 0:
 		var ends := vol.split("–")
 		vol = "%03d–%03d" % [int(ends[0]) + 214 * bank, int(ends[1]) + 214 * bank]
+	# (its "revised" in red, as if stamped after)
 	var lab := Txt.t("shelf_tag") % vol
-	var fs := 12
+	var parts := lab.split(" · ")
+	var head := parts[0] + " · "
+	var tail := parts[1] if parts.size() > 1 else ""
+	var fs := 14
 	var sf := Fonts.get_font("SemiBold")
-	var lw := sf.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	draw_set_transform(Vector2(r.get_center().x + 4.0, r.get_center().y - lw * 0.5), PI * 0.5, Vector2.ONE)
-	draw_rect(Rect2(-4.0, -fs, lw + 8.0, fs + 4.0), Color(0.04, 0.04, 0.045))
-	draw_string(sf, Vector2.ZERO, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.45 * dim))
+	var hw := sf.get_string_size(head, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var lw := hw + sf.get_string_size(tail, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	draw_set_transform(Vector2(r.get_center().x + 5.0, r.get_center().y - lw * 0.5), PI * 0.5, Vector2.ONE)
+	draw_rect(Rect2(-4.0, -fs, lw + 8.0, fs + 5.0), Color(0.04, 0.04, 0.045))
+	draw_string(sf, Vector2.ZERO, head, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.62 * dim))
+	draw_string(sf, Vector2(hw, 0.0), tail, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.red(0.85 * dim, 1.3))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

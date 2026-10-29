@@ -275,14 +275,15 @@ func think(game) -> void:
 				bot.dash = true
 	# archive shelving: leave an aisle that is about to close by its nearer end
 	if game.shelves.active():
-		for bank in 2:
+		for bank in game.shelves.banks.size():
 			var g: int = game.shelves.closing(bank)
 			if g <= 0 or g >= Shelves.N:
 				continue
+			var top: float = game.shelves.top_of(bank)
 			var lo: float = game.shelves.xs[bank * Shelves.N + g - 1] + Shelves.W
 			var hi: float = game.shelves.xs[bank * Shelves.N + g]
-			if p.x > lo - 20.0 and p.x < hi + 20.0 and p.y > Shelves.TOP - 30.0 and p.y < Shelves.TOP + Shelves.H + 30.0:
-				move += Vector2(0, -2.5 if p.y < Shelves.TOP + Shelves.H * 0.5 else 2.5)
+			if p.x > lo - 20.0 and p.x < hi + 20.0 and p.y > top - 30.0 and p.y < top + Shelves.H + 30.0:
+				move += Vector2(0, -2.5 if p.y < top + Shelves.H * 0.5 else 2.5)
 	# the archivist: out from under a bar being marked; keep off the cabinet
 	if bs is Archivist and bs.state == Archivist.RUN:
 		for br in bs.bars:
