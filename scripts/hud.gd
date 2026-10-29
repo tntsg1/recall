@@ -1629,6 +1629,8 @@ func _draw_boss_bar(vp: Vector2, cx: float, y: float, appear: float) -> void:
 	if b.state == Boss.OFF or b.state == Boss.DEAD:
 		return
 	var a := appear * (Pal.ease_out(b.t / 0.5) if b.state == Boss.ENTER else 1.0)
+	if b is Archivist and b.dead_t >= 0.0:
+		a *= 1.0 - clampf(b.dead_t / 0.4, 0.0, 1.0)
 	var open := Pal.ease_io(clampf(b.t / 0.9, 0.0, 1.0)) if b.state == Boss.ENTER else 1.0
 	var w := 560.0 * open
 	var by := y + 46.0

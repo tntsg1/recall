@@ -217,7 +217,7 @@ func _draw() -> void:
 		_draw_deep(dim)
 		_draw_terminal(Vector2(80, 300), dim, "w8_index")
 		if shows.get("w8_rules", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 470), dim)
+			_draw_wall_notice(Vector2(1840, 476), dim)
 	elif story == 4:
 		_draw_stations(dim)
 		_draw_presses(dim)
@@ -228,10 +228,14 @@ func _draw() -> void:
 		_draw_floor_wear(dim)
 		_draw_quota(dim)
 		_draw_scrawl(Vector2(1840, 820), dim)
+	var quiet := story == 8 and _archivist_up()
 	for w in Lore.walls(story):
 		var id := "w%d_%s" % [story, w[0]]
 		var k: float = shows.get(id, 0.0)
 		if k <= 0.01:
+			continue
+		if quiet and (w[0] == "plate" or w[0] == "scrawl"):
+			# the floor along the bottom wall is the archivist's to strike
 			continue
 		_draw_remnant(w, Pal.ease_out(k), dim)
 
@@ -1428,7 +1432,7 @@ func _draw_deep(dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
 	# viewports in the floor onto the black water: marine snow rising past,
 	# now and then something large and slow crossing under the glass
-	for vp: Array in [[Vector2(470, 250), 58.0, 0.0], [Vector2(960, 700), 70.0, 7.0]]:
+	for vp: Array in [[Vector2(470, 250), 62.0, 0.0]]:
 		var c: Vector2 = vp[0]
 		var rr: float = vp[1]
 		draw_circle(c, rr, Color(0.012, 0.016, 0.02))
@@ -1454,12 +1458,11 @@ func _draw_deep(dim: float) -> void:
 					inside.append(body[k + 1])
 			if inside.size() > 0:
 				draw_multiline(inside, Pal.ink(0.16 * dim), 1.5)
-		draw_arc(c, rr, 0.0, TAU, 48, Pal.ink(0.5 * dim), 3.0)
-		draw_arc(c, rr + 8.0, 0.0, TAU, 48, Pal.ink(0.22 * dim), 1.5)
+		draw_arc(c, rr, 0.0, TAU, 48, Pal.ink(0.32 * dim), 2.5)
+		draw_arc(c, rr + 8.0, 0.0, TAU, 48, Pal.ink(0.14 * dim), 1.5)
 		for b in 12:
 			var a := TAU * b / 12.0
-			draw_circle(c + Vector2.from_angle(a) * (rr + 4.0), 1.8, Pal.ink(0.45 * dim))
-		draw_arc(c, rr * 0.72, PI * 1.12, PI * 1.42, 10, Pal.ink(0.2 * dim, 1.2), 2.0)
+			draw_circle(c + Vector2.from_angle(a) * (rr + 4.0), 1.6, Pal.ink(0.3 * dim))
 	# the gauge
 	var g := Vector2(140.0, 950.0)
 	draw_circle(g, 30.0, Color(0.04, 0.04, 0.045))
@@ -1475,7 +1478,7 @@ func _draw_deep(dim: float) -> void:
 	draw_circle(g, 3.0, Pal.ink(0.6 * dim))
 	draw_string(sf, Vector2(182.0, 957.0), Txt.t("depth_gauge"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.5 * dim))
 	# the plaque in the floor, before a sweep wakes its words
-	if shows.get("w8_plate", 0.0) <= 0.01:
+	if shows.get("w8_plate", 0.0) <= 0.01 and not _archivist_up():
 		var pr := Rect2(760.0, 950.0, 400.0, 34.0)
 		draw_rect(pr, Color(0.05, 0.05, 0.055))
 		draw_rect(pr, Pal.ink(0.3 * dim), false, 1.5)
@@ -1488,3 +1491,7 @@ func _draw_deep(dim: float) -> void:
 			bars.append(Vector2(minf(x + 36.0, pr.end.x - 30.0), pr.get_center().y))
 			x += 48.0
 		draw_multiline(bars, Pal.ink(0.18 * dim), 6.0)
+
+
+func _archivist_up() -> bool:
+	return game.boss is Archivist and game.boss.alive()

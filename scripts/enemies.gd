@@ -1054,9 +1054,10 @@ func _draw_fixes(dim: float) -> void:
 		if tan != Vector2.ZERO:
 			draw_line(head - tan * 4.0, head - tan * 18.0 + tan.orthogonal() * 8.0, Pal.red(0.85 * a * dim, 1.8), 2.5)
 			draw_line(head - tan * 4.0, head - tan * 18.0 - tan.orthogonal() * 8.0, Pal.red(0.85 * a * dim, 1.8), 2.5)
-		# the old spot, struck through
-		draw_line(from + Vector2(-8, -8), from + Vector2(8, 8), Pal.red(0.7 * a * dim, 1.6), 2.5)
-		draw_line(from + Vector2(-8, 8), from + Vector2(8, -8), Pal.red(0.7 * a * dim, 1.6), 2.5)
+		# the old spot, struck through, a little in from the wall it was in
+		var xo := from + (Arena.ROOM.get_center() - from).normalized() * 30.0
+		draw_line(xo + Vector2(-8, -8), xo + Vector2(8, 8), Pal.red(0.7 * a * dim, 1.6), 2.5)
+		draw_line(xo + Vector2(-8, 8), xo + Vector2(8, -8), Pal.red(0.7 * a * dim, 1.6), 2.5)
 		if k >= FIX_SLIDE * 0.5:
 			# "corrected", on a dark plate at the arc's middle
 			var lab := Txt.t("corrected")

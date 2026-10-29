@@ -118,7 +118,7 @@ const WALL := {
 	8: [
 		["index", Vector2(80, 300), Vector2(1, 0), "screen", "馆藏历史：1 部 · 现行版本：第 214 版", "HISTORIES HELD: 1 · CURRENT EDITION: 214"],
 		["plate", Vector2(960, 1010), Vector2(0, -1), "floor", "旧文明档案 · 零号机项目 · 设计者姓名已删除", "OLD-ERA ARCHIVE · UNIT ZERO PROJECT · DESIGNER'S NAME DELETED"],
-		["rules", Vector2(1840, 470), Vector2(-1, 0), "notice", "借阅须知：只可阅读现行版本。旧版本从未存在。", "READERS MAY CONSULT THE CURRENT EDITION ONLY. OLD EDITIONS NEVER EXISTED."],
+		["rules", Vector2(1840, 476), Vector2(-1, 0), "notice", "借阅须知：只可阅读现行版本。旧版本从未存在。", "READERS MAY CONSULT THE CURRENT EDITION ONLY. OLD EDITIONS NEVER EXISTED."],
 		["scrawl", Vector2(1840, 900), Vector2(-1, 0), "scrawl", "他们改了所有的书。没改我们记得的。", "THEY REWROTE EVERY BOOK. NOT WHAT WE REMEMBER."],
 	],
 }

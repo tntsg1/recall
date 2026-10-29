@@ -27,9 +27,11 @@ const BAR_LEN := [900.0, 980.0, 1060.0]
 const BARS_N := [2, 3, 3]
 const IDLE_TIME := [1.6, 1.3, 1.1]
 const OPEN_TIME := [4.6, 4.2, 3.8]
-const KEEP := Rect2(610, 150, 700, 410)    # the cabinet and its drawers: no bar crosses it
-const PAGE := Rect2(1330, 104, 452, 296)
-const RAIL_Y := 92.0                       # the gantry its pens and stamp hang from
+const KEEP := Rect2(610, 120, 700, 440)    # the cabinet and its drawers: no bar crosses it
+# the index terminal and the viewport by it: bars stop short of them
+const CLEAR := [Rect2(70, 196, 190, 208), Rect2(398, 178, 144, 144)]
+const PAGE := Rect2(1218, 162, 452, 296)
+const RAIL_Y := 136.0                      # the gantry its pens and stamp hang from
 const REVEAL := 5.0                        # after it falls: R-0's page, restored, held centre stage
 const FILE_N := 6                          # R-0's page: a heading and five lines
 const LINE_EVERY := 3.4
@@ -401,6 +403,63 @@ func _pattern() -> float:
 	return 0.36
 
 
+# Shorten a bar so it stops short of an obstacle: from its wall end when the
+# obstacle lies near that end, before it when it lies toward the far end.
+func _clip(r: Rect2, ob: Rect2, horiz: bool, from_lo: bool) -> Rect2:
+	if not r.intersects(ob.grow(10.0)):
+		return r
+	var ax := 0 if horiz else 1
+	var lo: float = r.position[ax]
+	var hi: float = r.end[ax]
+	var wall: float = lo if from_lo else hi
+	var far: float = hi if from_lo else lo
+	var oc: float = ob.get_center()[ax]
+	if absf(oc - wall) < absf(oc - far):
+		# start past it
+		if from_lo:
+			lo = ob.end[ax] + 12.0
+		else:
+			hi = ob.position[ax] - 12.0
+	else:
+		if from_lo:
+			hi = ob.position[ax] - 12.0
+		else:
+			lo = ob.end[ax] + 12.0
+	if hi - lo < 10.0:
+		return Rect2(r.position, Vector2.ZERO)
+	var out := r
+	out.position[ax] = lo
+	out.size[ax] = hi - lo
+	return out
+
+
+# Keep a new bar at least 30 px from a parallel one it would overlap.
+func _apart(r: Rect2, horiz: bool) -> Rect2:
+	var ax := 1 if horiz else 0
+	for n in 2:
+		var moved := false
+		for br in bars:
+			if br.horiz != horiz:
+				continue
+			var o: Rect2 = br.r
+			if not o.grow(30.0).intersects(r):
+				continue
+			var d: float = r.get_center()[ax] - o.get_center()[ax]
+			var push := BAR_W + 30.0 - absf(d)
+			if push > 0.0:
+				var s := 1.0 if d >= 0.0 else -1.0
+				var room_lo: float = Arena.ROOM.position[ax] + 40.0
+				var room_hi: float = Arena.ROOM.end[ax] - 40.0
+				if r.get_center()[ax] + s * push > room_hi or r.get_center()[ax] + s * push < room_lo:
+					s = -s
+					push = BAR_W + 30.0 + absf(d)
+				r.position[ax] += s * push
+				moved = true
+		if not moved:
+			break
+	return r
+
+
 # From the second phase the bank nearer you shifts with the strike.
 func _shelves_with(p: Vector2) -> void:
 	if not game.shelves.active():
@@ -445,8 +504,11 @@ func _bar(horiz: bool, at: float, from_lo: bool, t0: float) -> void:
 			from_lo = false
 			var ny := KEEP.end.y + 12.0
 			r = Rect2(r.position.x, ny, BAR_W, room.end.y - ny)
+	for ob: Rect2 in CLEAR:
+		r = _clip(r, ob, horiz, from_lo)
 	if r.size.x < 120.0 and r.size.y < 120.0:
 		return
+	r = _apart(r, horiz)
 	bars.append({"r": r, "t": t0, "life": BAR_LIFE[phase], "held": [], "horiz": horiz, "from_lo": from_lo})
 	bar_n += 1
 
@@ -788,19 +850,17 @@ func _draw_stamp(st: Dictionary, dim: float) -> void:
 		var fl := 0.6 + 0.4 * sin(t * (18.0 + 20.0 * k))
 		draw_arc(c, STAMP_R, 0.0, TAU, 48, Pal.red((0.35 + 0.45 * k) * fl * dim, 1.4), 2.0)
 		draw_arc(c, STAMP_R + 40.0 * (1.0 - k), 0.0, TAU, 48, Pal.red(0.5 * k * dim, 1.3), 1.5)
-		var la := c + Vector2(-lw * 0.5, -STAMP_R - 14.0)
-		if la.y < Arena.ROOM.position.y + 24.0:
-			la.y = c.y + STAMP_R + 30.0
-		draw_rect(Rect2(la + Vector2(-6, -fs), Vector2(lw + 12, fs + 8)), Color(0.04, 0.0, 0.0, 0.75 * k))
+		var la := c + Vector2(-STAMP_R - 20.0 - lw, 8.0)
+		if la.x < Arena.ROOM.position.x + 12.0:
+			la.x = c.x + STAMP_R + 20.0
+		draw_rect(Rect2(la + Vector2(-8, -fs - 2.0), Vector2(lw + 16, fs + 12)), Color(0.04, 0.0, 0.0, 0.88))
+		draw_rect(Rect2(la + Vector2(-8, -fs - 2.0), Vector2(lw + 16, fs + 12)), Pal.red(0.4 * dim, 1.2), false, 1.0)
 		draw_string(font, la, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.red((0.5 + 0.5 * k) * dim, 1.5))
 		return
 	var a: float = 1.0 - clampf((st.t - STAMP_WARN) / 0.7, 0.0, 1.0)
 	draw_circle(c, STAMP_R, Color(0.0, 0.0, 0.0, 0.35 * a))
 	draw_arc(c, STAMP_R, 0.0, TAU, 48, Pal.red(0.9 * a * dim, 1.8), 4.0)
 	draw_arc(c, STAMP_R - 9.0, 0.0, TAU, 48, Pal.red(0.6 * a * dim, 1.5), 1.5)
-	draw_set_transform(c, -0.2, Vector2.ONE)
-	draw_string(font, Vector2(-lw * 0.5, fs * 0.36), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.red(0.95 * a * dim, 1.8))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 # The machine's other half: a gantry along the top wall on two struts from
@@ -885,7 +945,10 @@ func _draw_stamp_arm(st: Dictionary, dim: float) -> void:
 	if st.t > STAMP_WARN:
 		lift = Pal.ease_out(clampf((st.t - STAMP_WARN) / 0.25, 0.0, 1.0)) * 0.6
 	_draw_carriage(c.x, dim)
-	var head := Rect2(c - Vector2(30, 22) * (1.0 + 0.5 * lift), Vector2(60, 44) * (1.0 + 0.5 * lift))
+	# it hangs clear above the ring and drops only in the last moment
+	var drop := Pal.ease_in(clampf((k - 0.8) / 0.2, 0.0, 1.0)) if st.t <= STAMP_WARN else 1.0 - lift
+	var hc := c + Vector2(0, -(STAMP_R + 40.0) * (1.0 - drop))
+	var head := Rect2(hc - Vector2(30, 22), Vector2(60, 44))
 	draw_line(Vector2(c.x, RAIL_Y + 10.0), Vector2(c.x, head.position.y), Pal.foe(0.45 * dim), 3.0)
 	draw_rect(head, Color(0.05, 0.05, 0.055, 0.9))
 	draw_rect(head, Pal.foe(0.85 * dim, 1.3), false, 2.0)
@@ -942,7 +1005,8 @@ func _draw_page() -> void:
 	# the stamp
 	var sk: float = clampf(stamp_t / 0.18, 0.0, 1.0) if stamp_t >= 0.0 else 0.0
 	if dead_t >= 0.0:
-		sk *= 1.0 - clampf((dead_t - 3.6) / 0.8, 0.0, 1.0)
+		sk *= 1.0 - clampf((dead_t - 3.1) / 0.5, 0.0, 1.0)
+	var grey := clampf((dead_t - 2.3) / 0.6, 0.0, 1.0) if dead_t >= 0.0 else 0.0
 	if sk > 0.0:
 		var st := Txt.t("arc_file_stamp")
 		var ss := 18
@@ -950,6 +1014,10 @@ func _draw_page() -> void:
 		var sc := Vector2(r.end.x - stw * 0.5 - 30.0, r.end.y - 22.0)
 		var scale := 1.0 + 0.6 * (1.0 - Pal.ease_out(sk))
 		ci.draw_set_transform(sc, -0.08, Vector2(scale, scale))
-		ci.draw_rect(Rect2(-stw * 0.5 - 10.0, -ss - 2.0, stw + 20.0, ss + 14.0), Pal.red(0.85 * sk * dim, 1.8), false, 2.5)
-		ci.draw_string(bold, Vector2(-stw * 0.5, 4.0), st, HORIZONTAL_ALIGNMENT_LEFT, -1, ss, Pal.red(0.95 * sk * dim, 2.0))
+		var scol := Pal.red(0.85 * sk * dim, 1.8).lerp(Pal.ink(0.3 * sk * dim), grey)
+		ci.draw_rect(Rect2(-stw * 0.5 - 10.0, -ss - 2.0, stw + 20.0, ss + 14.0), scol, false, 2.5)
+		ci.draw_string(bold, Vector2(-stw * 0.5, 4.0), st, HORIZONTAL_ALIGNMENT_LEFT, -1, ss, Pal.red(0.95 * sk * dim, 2.0).lerp(Pal.ink(0.35 * sk * dim), grey))
+		if grey > 0.0:
+			# struck through
+			ci.draw_line(Vector2(-stw * 0.5 - 14.0, -ss * 0.3), Vector2(-stw * 0.5 - 14.0 + (stw + 28.0) * grey, -ss * 0.3), Pal.ink(0.7 * sk * dim, 1.2), 2.5)
 		ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
