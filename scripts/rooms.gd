@@ -110,10 +110,14 @@ func build(i: int, entry: String, risky: bool) -> void:
 		game.arms.setup(hand)
 		game.maglev.setup(hand, Chapters.story(game.chapter))
 		game.arcs.reach = Arcs.ARC_D
+		if game.scan_rings.on:
+			game.scan_rings.set_spots(ScanRings.SPOTS)
 	else:
 		game.lasers.set_fences(lay.get("fences", []))
 		game.maglev.set_rails(lay.get("maglev", []))
 		game.arcs.reach = lay.get("arc_reach", Arcs.ARC_D)
+		if game.scan_rings.on:
+			game.scan_rings.set_spots(lay.get("rings", []))
 		var crate_at := Rect2()
 		for ci in (lay.cover as Array).size():
 			if lay.kinds[ci] == "reserve":

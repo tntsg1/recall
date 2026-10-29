@@ -129,8 +129,8 @@ func _run() -> void:
 		game.rooms.open_doors()
 		await frames(50)
 		await shot("08_shape_%s" % sh)
-	# a room holding all four of the line's remnants, every one woken
-	if story == 5:
+	# a room holding as many of the chapter's remnants as fit, every one woken
+	if story >= 5:
 		for id in game.rooms.homes:
 			game.rooms.homes[id] = 2
 		var best_n := -1
@@ -140,6 +140,10 @@ func _run() -> void:
 			game.rooms.build(2, ["L", "R", "T", "B"][k3 % 4], false)
 			var sp: Dictionary = game.rooms.lay.get("spots", {})
 			var nsp := sp.size() + (2 if sp.has("yellow") else 0)
+			if story != 5 and sp.size() >= 3:
+				best_n = nsp
+				best_seed = k3
+				break
 			if nsp > best_n:
 				best_n = nsp
 				best_seed = k3
@@ -149,10 +153,31 @@ func _run() -> void:
 		game.rooms.build(2, ["L", "R", "T", "B"][best_seed % 4], false)
 		print("remnants in the room: ", game.rooms.lay.get("spots", {}).keys())
 		game.player.pos = game.rooms.start_pos()
-		for w in Lore.walls(5):
-			game.lore.hold["w5_%s" % w[0]] = 9.0
+		for w in Lore.walls(story):
+			game.lore.hold["w%d_%s" % [story, w[0]]] = 9.0
 		await frames(50)
 		await shot("08_remnants")
+	# the bureau's current at work: rounds in the walls arced together, an enemy crossing an arc
+	if story == 6:
+		game.rooms.cseed = 61000
+		game.rooms.build(3, "L", false)
+		# four rounds a step apart down the right-hand wall: the current chains them
+		game.wave_ctl.phase = Waves.FIGHT
+		for j in 4:
+			game.player.pos = Vector2(1760, 360 + j * 110)
+			game.bullets.fire(game.player.pos, Vector2.RIGHT)
+			await frames(4)
+		game.player.pos = Vector2(1300, 860)
+		await frames(40)
+		await shot("08_arcs")
+		var foe = game.enemies.spawn(Enemies.CHASER, Vector2(1790, 300))
+		foe.state = Enemies.ALIVE
+		foe.t = 1.0
+		for k5 in 40:
+			await frames(1)
+			if foe.flash > 0.0:
+				break
+		await shot("08_arc_cut")
 	# the line's guide rails at work: a round crossing a powered rail turns along it
 	if story == 5 and game.maglev.active():
 		game.rooms.cseed = 41000

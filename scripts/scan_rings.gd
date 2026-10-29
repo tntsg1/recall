@@ -11,6 +11,7 @@ const R := 92.0
 const SPOTS := [Vector2(520, 600), Vector2(760, 330), Vector2(1400, 600), Vector2(1160, 330)]
 
 var on := false
+var spots: Array = SPOTS.duplicate()   # this room's rings (the hand-made room: SPOTS)
 var last_beat := -1
 var lit := [false, false, false, false]
 var flash := [0.0, 0.0, 0.0, 0.0]
@@ -27,9 +28,24 @@ func _init() -> void:
 
 func setup(story: int) -> void:
 	on = story == 7
+	spots = SPOTS.duplicate()
 	last_beat = -1
 	lit = [false, false, false, false]
+	flash = [0.0, 0.0, 0.0, 0.0]
 	visible = on
+	queue_redraw()
+
+
+# A generated room's rings (centres); they trade on the beat as ever.
+func set_spots(list: Array) -> void:
+	spots = list.duplicate()
+	last_beat = -1
+	lit.clear()
+	flash.clear()
+	for i in spots.size():
+		lit.append(false)
+		flash.append(0.0)
+	visible = on and not spots.is_empty()
 	queue_redraw()
 
 
@@ -46,12 +62,12 @@ func step(dt: float) -> void:
 	if not on:
 		return
 	t += dt
-	for i in 4:
+	for i in spots.size():
 		flash[i] = maxf(0.0, flash[i] - dt / 0.3)
 	var bi := int(floor(game.sfx.beat()))
 	if bi != last_beat:
 		last_beat = bi
-		for i in 4:
+		for i in spots.size():
 			var now := lit_on(i, bi)
 			if now and not lit[i]:
 				flash[i] = 1.0
@@ -65,7 +81,7 @@ func _scan(i: int) -> void:
 	if game.wave_ctl.phase != Waves.FIGHT:
 		return
 	var p: Vector2 = game.player.pos
-	var c: Vector2 = SPOTS[i]
+	var c: Vector2 = spots[i]
 	if p.distance_to(c) < R and game.player.dash_t <= 0.0:
 		if game.on_player_hit((p - c).normalized() if p.distance_to(c) > 1.0 else Vector2.DOWN, null):
 			game.fx.ring(c, R * 0.5, R * 1.3, 0.3, Pal.red(0.9, 2.4), 3.0)
@@ -75,10 +91,10 @@ func _scan(i: int) -> void:
 func cross(a: Vector2, b: Vector2, bullet) -> bool:
 	if bullet.hit.has("joy"):
 		return false
-	for i in 4:
+	for i in spots.size():
 		if not lit[i]:
 			continue
-		var c: Vector2 = SPOTS[i]
+		var c: Vector2 = spots[i]
 		if a.distance_to(c) < R or Geometry2D.segment_intersects_circle(a, b, c, R) >= 0.0:
 			bullet.hit["joy"] = true
 			bullet.dmg *= 2.0
@@ -104,8 +120,8 @@ func _draw() -> void:
 			draw_arc(p + Vector2(0, 1), 6.0, PI * 0.15, PI * 0.85, 6, Pal.ink(0.9 * dim, 1.3), 1.5)
 	var frac: float = game.sfx.beat_frac()
 	var nb := last_beat + 1
-	for i in 4:
-		var c: Vector2 = SPOTS[i]
+	for i in spots.size():
+		var c: Vector2 = spots[i]
 		var is_lit: bool = lit[i]
 		var next := lit_on(i, nb) and not is_lit
 		# the floor ring itself: a double band with ticks round it

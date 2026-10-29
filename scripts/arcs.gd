@@ -148,7 +148,9 @@ func _draw() -> void:
 		var prev := p0
 		for j in range(1, segs + 1):
 			var u := j / float(segs)
-			var jit := 0.0 if j == segs else sin(t * 47.0 + k * 3.1 + j * 2.3) * 9.0 * (1.0 - absf(u - 0.5) * 1.2)
+			# (in a generated room the arcs jump wider: the room's brightest line)
+			var amp := 22.0 if game.arena.generated else 9.0
+			var jit := 0.0 if j == segs else sin(t * 47.0 + k * 3.1 + j * 2.3) * amp * (1.0 - absf(u - 0.5) * 1.2)
 			var q := p0 + d * u + n * jit
 			gl.append(prev)
 			gl.append(q)
@@ -161,9 +163,10 @@ func _draw() -> void:
 		else:
 			glow = gl
 			core = co
+	var bold: bool = game.arena.generated
 	if wglow.size() > 0:
-		draw_multiline(wglow, Pal.ink(0.06 * dim, 1.2), 6.0)
-		draw_multiline(wcore, Pal.ink(0.45 * dim, 1.6), 1.4)
+		draw_multiline(wglow, Pal.ink((0.12 if bold else 0.06) * dim, 1.4), 10.0 if bold else 6.0)
+		draw_multiline(wcore, Pal.ink((0.95 if bold else 0.45) * dim, 2.6 if bold else 1.6), 3.0 if bold else 1.4)
 	if glow.size() > 0:
 		draw_multiline(glow, Pal.ink(0.05 * dim, 1.2), 5.0)
 		draw_multiline(core, Pal.ink(0.95 * dim, 2.8), 2.0)

@@ -26,8 +26,9 @@ const EXIT_APART := 480.0                     # two ways on: this far apart, the
 const FROM_ENTRY := 700.0                     # a way on this far from the way in: the room is crossed
 
 # The chapters that walk room to room; the rest keep their one hand-made room.
-const ON := [1, 2, 3, 4, 5]
+const ON := [1, 2, 3, 4, 5, 6]
 const ARM_W := 200.0       # an arm's footing on its wall
+const RING_R := 92.0       # a mood-scan ring's radius (ScanRings.R)
 const POST := 48.0
 
 # Per chapter: room shapes (weights), its pieces of cover (weight, rects,
@@ -182,6 +183,28 @@ const STYLE := {
 		"count": 4, "area": 20500.0,
 		"themes": [["switch"], ["meter", "battery"], ["drum"]],
 		"props": {"ledger": [220.0, 180.0], "cabinet": [160.0, 150.0], "notice": [160.0, 150.0], "scrawl": [260.0, 150.0]},
+	},
+	7: {
+		# the bureau of thought: mood-sample cabinets, speaker amps, the
+		# synchronisation chairs; the chapter's own are its mood-scan rings set
+		# in the floor, two in the first room and four by the last
+		"shapes": {"hall": 3, "twin": 2, "corner": 2, "neck": 1, "bays": 2},
+		"pieces": [
+			[3, [Rect2(0, 0, 72, 72)], "sample"],
+			[2, [Rect2(0, 0, 130, 50)], "amp"],
+			[2, [Rect2(0, 0, 90, 90)], "chair"],
+			[2, [Rect2(0, 0, 110, 60)], "console"],
+		],
+		"landmarks": [
+			[3, [Rect2(0, 0, 90, 90), Rect2(90, 0, 90, 90), Rect2(180, 0, 90, 90)], "chair"],   # a row of chairs
+			[2, [Rect2(0, 0, 130, 50), Rect2(0, 50, 130, 50)], "amp"],                            # a stack of amps
+			[2, [Rect2(0, 0, 240, 60)], "console"],                                               # the operators' desk
+		],
+		"rings": [2, 2, 3, 3, 4, 4],
+		# the hand-made room: four corner pillars and a bar
+		"count": 5, "area": 25500.0,
+		"themes": [["sample"], ["chair"], ["amp", "console"]],
+		"props": {"monitor": [220.0, 180.0], "chair": [160.0, 150.0], "slogan": [320.0, 200.0], "scrawl": [220.0, 150.0]},
 	},
 }
 
@@ -362,6 +385,38 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		pid += want_f
 		for ci in range(before, (lay.cover as Array).size()):
 			area += (lay.cover[ci] as Rect2).get_area()
+	lay["rings"] = []
+	if st.has("rings"):
+		var want_r: int = (st.rings as Array)[mini(index, (st.rings as Array).size() - 1)]
+		for k in want_r:
+			var done := false
+			for tries in 80:
+				var c := Vector2(rng.randf_range(ROOM.position.x + RING_R + 40.0, ROOM.end.x - RING_R - 40.0), rng.randf_range(ROOM.position.y + RING_R + 40.0, ROOM.end.y - RING_R - 40.0))
+				var ok := true
+				for r: Rect2 in lay.walls + lay.cover:
+					if _dist(r, c) < RING_R + 30.0:
+						ok = false
+				for d: Dictionary in taken:
+					if (d.pos as Vector2).distance_to(c) < RING_R + 130.0:
+						ok = false
+				if c.distance_to(lay.start) < RING_R + 140.0:
+					ok = false
+				for z: Rect2 in [HUD_STRIP, HUD_TOP, BANNER, HUD_LORE]:
+					if _dist(z, c) < RING_R + 10.0:
+						ok = false
+				for d: Dictionary in lay.exits:
+					if _dist(d.label, c) < RING_R + 10.0:
+						ok = false
+				for o: Vector2 in lay.rings:
+					if o.distance_to(c) < RING_R * 2.0 + 90.0:
+						ok = false
+				if ok:
+					lay.rings.append(c)
+					done = true
+					break
+			if not done:
+				last_why = "rings"
+				return {}
 	lay["maglev"] = []
 	if st.has("maglev"):
 		var want_m: int = (st.maglev as Array)[mini(index, (st.maglev as Array).size() - 1)]
@@ -424,8 +479,10 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		_paint_station(lay, taken, rng)
 	elif story == 6:
 		_paint_bureau(lay, taken, rng)
-	else:
+	elif story == 1:
 		_paint(lay, taken, rng)
+	else:
+		lay["quiet"] = _quiet(lay)
 	return lay
 
 
@@ -440,18 +497,53 @@ static func _paint_bureau(lay: Dictionary, taken: Array, rng: RandomNumberGenera
 	_shuffle(order, rng)
 	for ci in order.slice(0, mini(3, order.size())):
 		var to: Vector2 = (cover[ci] as Rect2).get_center()
-		# from the nearest wall, out and round in one bend
-		var walls4 := [Vector2(ROOM.position.x, to.y), Vector2(ROOM.end.x, to.y), Vector2(to.x, ROOM.position.y), Vector2(to.x, ROOM.end.y)]
-		var from: Vector2 = walls4[0]
-		for w4: Vector2 in walls4:
-			if w4.distance_to(to) < from.distance_to(to):
-				from = w4
-		var jog := rng.randf_range(-160.0, 160.0)
-		var mid := from + (Vector2(0, jog) if absf(from.x - to.x) > 1.0 else Vector2(jog, 0))
-		mid = mid.clamp(ROOM.position + Vector2(20, 20), ROOM.end - Vector2(20, 20))
-		var bend := Vector2(to.x, mid.y) if absf(from.x - to.x) > 1.0 else Vector2(mid.x, to.y)
-		cables.append([from, mid if absf(from.x - to.x) > 1.0 else mid, bend, to])
+		# down from the top or up from the bottom wall, a little to one side,
+		# then one square bend across to it: every run straight
+		var lower: bool = to.y > (ROOM.position.y + ROOM.end.y) * 0.5
+		var x := clampf(to.x + rng.randf_range(-260.0, 260.0), ROOM.position.x + 40.0, ROOM.end.x - 40.0)
+		var from := Vector2(x, ROOM.end.y if lower else ROOM.position.y)
+		var bend := Vector2(x, to.y)
+		cables.append([from, bend, to])
 	lay["cables"] = cables
+	# two of the districts' meter cabinets on the walls, each showing its share
+	var cabs: Array = []
+	var dist := [0, 1, 2]
+	_shuffle(dist, rng)
+	for k in 2:
+		var side_n: Vector2 = [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1)][rng.randi() % 3]
+		var sp := _spot_for(side_n, [130.0, 80.0], lay, taken, rng, true)
+		if not sp.is_empty():
+			cabs.append([sp[0], sp[1], dist[k]])
+			taken.append({"pos": sp[0], "n": sp[1], "w": 130.0})
+	lay["cabinets"] = cabs
+	# 13th Street's own line: a wire run off a wall, looping where it was
+	# hung, to a bulb that is lit
+	lay["selfwire"] = []
+	for tries in 30:
+		var side_n: Vector2 = [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1)][rng.randi() % 3]
+		var sp := _spot_for(side_n, [120.0, 240.0], lay, taken, rng, true)
+		if sp.is_empty():
+			continue
+		var p0: Vector2 = sp[0]
+		var n: Vector2 = sp[1]
+		var tan := Vector2(n.y, -n.x)
+		# not across the cables already run along the floor
+		var reach := Rect2(p0 - tan * 60.0, Vector2.ZERO).expand(p0 + tan * 60.0 + n * 240.0).abs()
+		var crosses := false
+		for cb: Array in cables:
+			for kk in cb.size() - 1:
+				if _seg_hits(cb[kk], cb[kk + 1], reach):
+					crosses = true
+		if crosses:
+			continue
+		var pts: Array = [p0]
+		var q := p0
+		for k in 4:
+			q = q + n * rng.randf_range(40.0, 60.0) + tan * rng.randf_range(-36.0, 36.0)
+			pts.append(q)
+		lay.selfwire = pts
+		taken.append({"pos": p0, "n": n, "w": 120.0})
+		break
 	lay["stencil"] = []
 	var solid: Array = lay.walls + lay.cover
 	for tries in 30:
@@ -951,6 +1043,10 @@ static func _fits(placed: Array[Rect2], lay: Dictionary, taken: Array) -> bool:
 	for z: Rect2 in lay.get("arm_zones", []):
 		if _bounds(placed).intersects(z):
 			return false
+	for c: Vector2 in lay.get("rings", []):
+		for r in placed:
+			if _dist(r, c) < RING_R + 30.0:
+				return false
 	for d: Dictionary in lay.exits:
 		if _bounds(placed).intersects((d.label as Rect2).grow(20.0)):
 			return false
@@ -1022,7 +1118,9 @@ static func _spot_for(n: Vector2, need: Array, lay: Dictionary, taken: Array, rn
 			if r.intersects(front.grow(-1.0)):
 				ok = false
 		for d: Dictionary in taken:
-			if (d.pos as Vector2).distance_to(p) < half + float(d.get("w", DOOR_W)) / 2.0 + 30.0:
+			# (a spawn gate's red frame keeps further off words)
+			var gap := 70.0 if float(d.get("w", DOOR_W)) < DOOR_W else 30.0
+			if (d.pos as Vector2).distance_to(p) < half + float(d.get("w", DOOR_W)) / 2.0 + gap:
 				ok = false
 		if ok:
 			return [p, n]

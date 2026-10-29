@@ -275,10 +275,26 @@ func _draw() -> void:
 			_draw_wired_bulb(dim)
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	elif story == 7:
-		_draw_samples(dim)
-		_draw_chairs(dim)
-		_draw_lightboards(dim)
-		_draw_terminal(Vector2(80, 560), dim, "w7_monitor")
+		var gen7: bool = game.arena.generated
+		if gen7:
+			_draw_thought_cover(dim)
+		else:
+			_draw_samples(dim)
+			_draw_chairs(dim)
+		var slogan_at = game.rooms.spot("slogan", Vector2(350, 70))
+		if slogan_at != null:
+			draw_set_transform(slogan_at - Vector2(350, 70), 0.0, Vector2.ONE)
+			_draw_lightboards(dim, gen7)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		var mon_at = game.rooms.spot("monitor", Vector2(80, 560))
+		if mon_at != null:
+			_draw_terminal(mon_at, dim, "w7_monitor")
+		var sc7 = game.rooms.spot("scrawl", Vector2(1840, 380))
+		if gen7 and sc7 != null:
+			_draw_scrawl(sc7, dim)
+		var ch7 = game.rooms.spot("chair", Vector2(1840, 690))
+		if gen7 and ch7 != null and shows.get("w7_chair", 0.0) <= 0.01:
+			_draw_wall_notice(ch7, dim)
 	elif story == 10:
 		_draw_yard(dim)
 		_draw_terminal(Vector2(80, 560), dim, "w10_schedule")
@@ -844,19 +860,125 @@ func _draw_union_cover(dim: float) -> void:
 				draw_string(sf, ins.position + Vector2(5, 14), pk, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.6 * dim))
 
 
+# A generated room of the bureau of thought by kind: mood-sample cabinets,
+# amps pumping on the beat, synchronisation chairs (helmet over the seat,
+# a fixed smile under it where someone sits), the operators' console.
+func _draw_thought_cover(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var kinds: Array = lay.get("kinds", [])
+	var cover: Array = lay.get("cover", [])
+	var sf := Fonts.get_font("SemiBold")
+	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.3, 0.0, 1.0)
+	for i in cover.size():
+		var r: Rect2 = cover[i]
+		var kind: String = kinds[i] if i < kinds.size() else "sample"
+		var long_x := r.size.x >= r.size.y
+		var ins := r.grow(-6.0)
+		match kind:
+			"sample":
+				# a sample cabinet: jars of bottled mood, their levels, the label
+				for k in 3:
+					var jc := Vector2(lerpf(ins.position.x + 12.0, ins.end.x - 12.0, k / 2.0), ins.get_center().y + 4.0)
+					draw_rect(Rect2(jc - Vector2(7, 14), Vector2(14, 28)), Pal.ink(0.4 * dim), false, 1.2)
+					var lvl := 0.3 + 0.5 * fmod(i * 0.37 + k * 0.29, 1.0)
+					draw_rect(Rect2(jc + Vector2(-5, 12 - 24.0 * lvl), Vector2(10, 24.0 * lvl)), Pal.foe(0.35 * dim, 1.2))
+				draw_string(sf, r.position + Vector2(0, -5), Txt.t("mood_sample"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+			"amp":
+				# an amplifier: its speaker cones pump on the beat
+				var span := r.size.x if long_x else r.size.y
+				var nc := int(span / 34.0)
+				for k in nc:
+					var u := (k + 0.5) / nc
+					var gc := Vector2(lerpf(ins.position.x, ins.end.x, u), ins.get_center().y) if long_x else Vector2(ins.get_center().x, lerpf(ins.position.y, ins.end.y, u))
+					draw_arc(gc, 12.0, 0.0, TAU, 16, Pal.ink(0.35 * dim), 1.5)
+					draw_circle(gc, 5.0 + 2.0 * beat_k, Pal.ink((0.3 + 0.4 * beat_k) * dim))
+			"chair":
+				# a synchronisation chair from above: the seat, armrests with straps,
+				# the helmet over the head-rest, lit on the beat
+				var c := r.get_center()
+				draw_rect(Rect2(c - Vector2(26, 22), Vector2(52, 44)), Pal.ink(0.35 * dim), false, 1.5)
+				for sx: float in [-1.0, 1.0]:
+					draw_line(c + Vector2(sx * 32.0, -16), c + Vector2(sx * 32.0, 18), Pal.ink(0.45 * dim), 3.0)
+				var hm := c + Vector2(0, -6)
+				draw_circle(hm, 14.0, Color(0.05, 0.05, 0.055))
+				draw_arc(hm, 14.0, 0.0, TAU, 18, Pal.ink(0.75 * dim, 1.2), 2.0)
+				draw_circle(hm, 3.5, Pal.foe((0.3 + 0.7 * beat_k) * dim, 1.4 + 1.4 * beat_k))
+				if i % 3 == 1:
+					# someone in it: the smile under the helmet's rim
+					draw_arc(hm + Vector2(0, 6), 7.0, PI * 0.2, PI * 0.8, 8, Pal.foe((0.6 + 0.4 * beat_k) * dim, 1.6), 2.0)
+				draw_string(sf, r.position + Vector2(0, -5), "NI-%02d" % (i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+			"console":
+				# the operators' console: a tempo readout, faders all pushed to "happy"
+				draw_string(sf, ins.position + Vector2(6, 16), "140 BPM", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.foe((0.6 + 0.3 * beat_k) * dim, 1.3))
+				var span2 := r.size.x if long_x else r.size.y
+				var nf := int(span2 / 22.0) - 2
+				for k in maxi(nf, 2):
+					var x := ins.position.x + 70.0 + k * 18.0 if long_x else ins.get_center().x
+					if long_x and x > ins.end.x - 8.0:
+						break
+					draw_line(Vector2(x, ins.position.y + 8.0), Vector2(x, ins.end.y - 8.0), Pal.ink(0.25 * dim), 1.0)
+					draw_rect(Rect2(Vector2(x - 4.0, ins.position.y + 8.0), Vector2(8, 5)), Pal.ink(0.6 * dim))
+
+
 # A generated bureau floor: the cables feeding its cover, a voltage stencil.
 func _draw_bureau_paint(dim: float) -> void:
 	var lay: Dictionary = game.rooms.lay
 	var quiet: Array = lay.get("quiet", [])
+	# (cut where words are, and where cover or a wall block stands over it)
+	var cable_cut: Array = quiet.duplicate()
+	for r: Rect2 in game.arena.walls + game.arena.inner:
+		cable_cut.append(r.grow(2.0))
 	for cb: Array in lay.get("cables", []):
 		for k in cb.size() - 1:
 			var a: Vector2 = cb[k]
 			var b: Vector2 = cb[k + 1]
 			if a.distance_to(b) < 2.0:
 				continue
-			for sp: Array in _open_spans(a, b, quiet):
-				draw_line(sp[0], sp[1], Color(0.07, 0.07, 0.075), 7.0)
-				draw_line(sp[0], sp[1], Pal.ink(0.2 * dim), 1.0)
+			for sp: Array in _open_spans(a, b, cable_cut):
+				draw_line(sp[0], sp[1], Color(0.09, 0.09, 0.095), 9.0)
+				draw_line(sp[0], sp[1], Pal.ink(0.2 * dim), 1.5)
+		# a junction box where it leaves the wall
+		var jb: Vector2 = cb[0]
+		draw_rect(Rect2(jb - Vector2(12, 12), Vector2(24, 24)), Color(0.08, 0.08, 0.085))
+		draw_rect(Rect2(jb - Vector2(12, 12), Vector2(24, 24)), Pal.ink(0.5 * dim), false, 1.5)
+	# the districts' meter cabinets: a locked box, the needle at its share, the name
+	var sf2 := Fonts.get_font("SemiBold")
+	for cab: Array in lay.get("cabinets", []):
+		var c: Vector2 = cab[0]
+		var n: Vector2 = cab[1]
+		var k2: int = cab[2]
+		var side := n.orthogonal()
+		var box := PackedVector2Array([c - side * 46.0, c + side * 46.0, c + side * 46.0 + n * 34.0, c - side * 46.0 + n * 34.0])
+		draw_colored_polygon(box, Color(0.07, 0.07, 0.075))
+		box.append(box[0])
+		draw_polyline(box, Pal.ink(0.6 * dim), 1.5)
+		var dc := c + n * 17.0 - side * 22.0
+		draw_arc(dc, 11.0, 0.0, TAU, 16, Pal.ink(0.5 * dim), 1.2)
+		var share: float = [1.0, 0.8, 0.005][k2]
+		draw_line(dc, dc + Vector2.from_angle(PI + PI * share) * 9.0, Pal.ink(0.85 * dim, 1.2), 1.5)
+		var lk := c + n * 17.0 + side * 24.0
+		draw_rect(Rect2(lk - Vector2(6, 5), Vector2(12, 11)), Pal.ink(0.5 * dim), false, 1.5)
+		var lab: String = Txt.t(GridMaster.CABLE_KEYS[k2]) + " · " + GridMaster.CABLE_SHARE[k2]
+		var lw := sf2.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+		# its name and share just clear of the box, on the room's side of it
+		var lp: Vector2
+		if n.x > 0.5:
+			lp = Vector2(c.x + 46.0, c.y + 5.0)
+		elif n.x < -0.5:
+			lp = Vector2(c.x - 46.0 - lw, c.y + 5.0)
+		else:
+			lp = Vector2(c.x - lw / 2.0, c.y + n.y * 56.0 + 5.0)
+		draw_string(sf2, lp, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink((0.95 if k2 == 2 else 0.6) * dim, 1.3 if k2 == 2 else 1.0))
+	# 13th Street's own line: the wire looping off the wall, and its lit bulb
+	var sw: Array = lay.get("selfwire", [])
+	if sw.size() >= 2:
+		var wire := PackedVector2Array()
+		for q: Vector2 in sw:
+			wire.append(q)
+		draw_polyline(wire, Pal.ink(0.5 * dim), 1.5)
+		var bulb: Vector2 = sw[sw.size() - 1]
+		draw_texture_rect(Fx.make_glow_texture(), Rect2(bulb - Vector2(60, 60), Vector2(120, 120)), false, Color(1, 1, 1, 0.14 * dim))
+		draw_circle(bulb, 7.0, Pal.ink(0.85 * dim, 1.8))
 	var sten: Array = lay.get("stencil", [])
 	if not sten.is_empty():
 		var sf := Fonts.get_font("SemiBold")
@@ -882,7 +1004,14 @@ func _draw_bureau_cover(dim: float) -> void:
 				draw_line(ins.get_center() + Vector2(-10, 8), ins.get_center() + Vector2(10, -10), Pal.ink(0.55 * dim), 3.0)
 				draw_circle(ins.get_center() + Vector2(-10, 8), 3.0, Pal.ink(0.6 * dim))
 				draw_colored_polygon(PackedVector2Array([ins.position + Vector2(6, 18), ins.position + Vector2(14, 4), ins.position + Vector2(12, 12), ins.position + Vector2(18, 12), ins.position + Vector2(9, 26), ins.position + Vector2(11, 18)]), Pal.ink(0.45 * dim))
-				draw_string(sf, ins.position + Vector2(22, 14), "SW-%02d" % (i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+				# one number for a pair stood together, outside the pair
+				var pair_first: bool = i + 1 < cover.size() and lay.piece[i + 1] == lay.piece[i]
+				var pair_second: bool = i > 0 and lay.piece[i - 1] == lay.piece[i]
+				if pair_first:
+					var both: Rect2 = r.merge(cover[i + 1])
+					draw_string(sf, both.position + Vector2(0, -5), "SW-%02d/%02d" % [i + 1, i + 2], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.55 * dim))
+				elif not pair_second:
+					draw_string(sf, r.position + Vector2(0, -5), "SW-%02d" % (i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.55 * dim))
 			"meter":
 				# a meter cabinet: its dial, the needle all but at zero
 				var dc := ins.get_center() - Vector2(0, ins.size.y * 0.15)
@@ -1000,6 +1129,11 @@ func _draw_station_cover(dim: float) -> void:
 # The parts of axis-aligned line a-b outside every rect, as [from, to].
 func _open_spans(a: Vector2, b: Vector2, rects: Array) -> Array:
 	var horiz := absf(b.y - a.y) < 0.5
+	# (either way along the line: the spans run from its low end)
+	if (horiz and b.x < a.x) or (not horiz and b.y < a.y):
+		var sw := a
+		a = b
+		b = sw
 	var lo := a.x if horiz else a.y
 	var hi := b.x if horiz else b.y
 	var cuts: Array = []
@@ -1893,7 +2027,8 @@ func _draw_samples(dim: float) -> void:
 
 # Light boards along the top wall: the slogan, and a row of faces from the
 # mood monitor, every one smiling but one.
-func _draw_lightboards(dim: float) -> void:
+# (`slogan_only`: a generated room carries the slogan board, not the faces)
+func _draw_lightboards(dim: float, slogan_only := false) -> void:
 	var sf := Fonts.get_font("SemiBold")
 	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.3, 0.0, 1.0)
 	# the slogan board; woken by a recall it runs the slogan in full
@@ -1912,6 +2047,8 @@ func _draw_lightboards(dim: float) -> void:
 		var n := int(ceil(full.length() * clampf(wake * 1.6, 0.0, 1.0)))
 		var fw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
 		draw_string(sf, Vector2(r.get_center().x - fw / 2.0, r.position.y + 62.0), full.substr(0, n), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.red(0.9 * wake * dim, 1.4))
+	if slogan_only:
+		return
 	var fr := Rect2(1450, 80, 290, 46)
 	draw_rect(fr, Color(0.03, 0.03, 0.035))
 	draw_rect(fr, Pal.ink(0.45 * dim), false, 1.5)
