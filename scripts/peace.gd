@@ -395,14 +395,32 @@ func _run(dt: float) -> void:
 			if gun_t >= GUN_WARN and gun_t - dt < GUN_WARN:
 				game.sfx.play("cross", 0.5, 2.0)
 				game.cam.add_trauma(0.5)
+			if gun_t >= GUN_WARN and gun_t - dt < GUN_WARN:
+				# a plate in its way takes the shot, and is thrown along it
+				var cut := _gun_end()
+				if cut.k >= 0:
+					game.plates.vel[cut.k] = ((game.plates.vel[cut.k] as Vector2) + Vector2.from_angle(gun_a) * 260.0).limit_length(Plates.MAX_SPEED)
+					game.fx.sparks(cut.at, -Vector2.from_angle(gun_a), 12, Pal.ink(1.0, 2.2), 520.0, 0.3, 0.8)
+					game.fx.flash(cut.at, 60.0, 0.2, Pal.ink(0.8, 2.2))
 			if gun_t >= GUN_WARN and gun_t < GUN_WARN + GUN_FIRE:
-				var q := Geometry2D.get_closest_point_to_segment(p, BOW, BOW + Vector2.from_angle(gun_a) * 2400.0)
+				var q := Geometry2D.get_closest_point_to_segment(p, BOW, _gun_end().at)
 				if q.distance_to(p) < 26.0 and game.player.dash_t <= 0.0:
 					game.on_player_hit(Vector2.from_angle(gun_a).orthogonal(), null)
 					gun_t = GUN_WARN + GUN_FIRE
 			if gun_t >= GUN_WARN + GUN_FIRE:
 				gun_t = -1.0
 				gun_cd = GUN_EVERY
+
+
+# Where the bow gun's beam stops: the far wall, or the first plate across it.
+func _gun_end() -> Dictionary:
+	var d := Vector2.from_angle(gun_a)
+	var far := BOW + d * 2400.0
+	var best := {"at": far, "k": -1}
+	var h: Dictionary = game.arena.raycast(BOW + d * 40.0, far)
+	if h:
+		best = {"at": h.point, "k": game.plates.plate_of(int(h.get("rect", -1))) if game.plates.active() else -1}
+	return best
 
 
 func _pick(ai: int, x: float) -> int:
@@ -626,12 +644,12 @@ func _draw_weapons(dim: float) -> void:
 		draw_circle(a, 5.0, Pal.red(dim, 2.4))
 	if gun_t >= 0.0:
 		var d2 := Vector2.from_angle(gun_a)
-		var far := BOW + d2 * 2400.0
+		var far: Vector2 = _gun_end().at
 		if gun_t < GUN_WARN:
 			var k2 := gun_t / GUN_WARN
 			var fl2 := 0.55 + 0.45 * sin(t * (18.0 + 24.0 * k2))
 			# the footprint it will burn, filling in
-			draw_line(BOW, far, Pal.red(0.05 * k2 * dim, 1.0), 52.0)
+			draw_line(BOW, far, Pal.red(0.1 * k2 * dim, 1.0), 52.0)
 			draw_line(BOW, far, Pal.red((0.2 + 0.6 * k2) * fl2 * dim, 1.6), 1.5 + 2.5 * k2)
 			draw_line(BOW + d2.orthogonal() * 26.0, far + d2.orthogonal() * 26.0, Pal.red((0.25 + 0.4 * k2) * dim, 1.3), 2.0)
 			draw_line(BOW - d2.orthogonal() * 26.0, far - d2.orthogonal() * 26.0, Pal.red((0.25 + 0.4 * k2) * dim, 1.3), 2.0)
@@ -643,6 +661,7 @@ func _draw_weapons(dim: float) -> void:
 			draw_line(BOW, far, Pal.red(k3 * dim, 2.6), 26.0)
 			draw_line(BOW, far, Pal.ink(k3 * dim, 2.6), 6.0)
 			draw_circle(BOW, 40.0 * k3, Pal.ink(0.8 * k3 * dim, 2.4))
+			draw_circle(far, 30.0 * k3, Pal.ink(0.7 * k3 * dim, 2.2))
 
 
 # The progress board on the gantry: the stage, the percentage, a bar.
