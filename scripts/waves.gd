@@ -14,12 +14,13 @@ const L := Enemies.LEECH
 const U := Enemies.PULSE
 const E := Enemies.ECHO
 const I := Enemies.INSPECTOR
+const W := Enemies.PROOFREADER
 const COUNT := 7
 const BOSS := 6
-const COST := {C: 1, G: 5, H: 4, P: 3, L: 3, U: 4, E: 3, I: 3}
+const COST := {C: 1, G: 5, H: 4, P: 3, L: 3, U: 4, E: 3, I: 3, W: 3}
 const BUDGET := [16, 22, 28, 32, 40, 48]
 # the waves' own notes, by enemy pool (the boss wave's note comes from Chapters)
-const NOTES := [{2: "note_guard", 3: "note_charger"}, {0: "note_mirror", 1: "note_prism"}, {0: "note_arms", 1: "note_leech"}, {0: "note_rings", 1: "note_pulse"}, {}, {0: "note_rails"}, {0: "note_lasers", 1: "note_echo"}, {0: "note_arcs", 1: "note_inspector"}]
+const NOTES := [{2: "note_guard", 3: "note_charger"}, {0: "note_mirror", 1: "note_prism"}, {0: "note_arms", 1: "note_leech"}, {0: "note_rings", 1: "note_pulse"}, {}, {0: "note_rails"}, {0: "note_lasers", 1: "note_echo"}, {0: "note_arcs", 1: "note_inspector"}, {0: "note_shelves", 1: "note_proofreader"}]
 const SIDES := ["T", "B", "L", "R"]
 
 var game
@@ -88,6 +89,10 @@ func _build_plan() -> void:
 				for k in 3:
 					kinds.append(I)
 				left -= COST[I] * 3
+			1 when pool == 8:
+				for k in 3:
+					kinds.append(W)
+				left -= COST[W] * 3
 			1:
 				pass
 			2 when pool == 0:
@@ -112,6 +117,8 @@ func _build_plan() -> void:
 					mix = [G, H, H, P, E]
 				elif pool == 7:
 					mix = [G, H, P, L, I, I]
+				elif pool == 8:
+					mix = [G, H, P, L, E, W, W]
 				elif pool == 4:
 					mix = [G, H, P, L, U, E, E]
 				for k in specials:

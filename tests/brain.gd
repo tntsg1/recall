@@ -181,6 +181,37 @@ func think(game) -> void:
 			var ad2: float = q5.distance_to(p)
 			if ad2 < 40.0:
 				move += (p - q5) / maxf(ad2, 1.0) * 1.5
+	# archive shelving: leave an aisle that is about to close by its nearer end
+	if game.shelves.active():
+		for bank in 2:
+			var g: int = game.shelves.closing(bank)
+			if g <= 0 or g >= Shelves.N:
+				continue
+			var lo: float = game.shelves.xs[bank * Shelves.N + g - 1] + Shelves.W
+			var hi: float = game.shelves.xs[bank * Shelves.N + g]
+			if p.x > lo - 20.0 and p.x < hi + 20.0 and p.y > Shelves.TOP - 30.0 and p.y < Shelves.TOP + Shelves.H + 30.0:
+				move += Vector2(0, -2.5 if p.y < Shelves.TOP + Shelves.H * 0.5 else 2.5)
+	# the archivist: out from under a bar being marked; keep off the cabinet
+	if bs is Archivist and bs.state == Archivist.RUN:
+		for br in bs.bars:
+			if br.t >= 0.0 and br.t < Archivist.BAR_WARN:
+				var r: Rect2 = br.r
+				if r.grow(40.0).has_point(p):
+					var out := Vector2(0, signf(p.y - r.get_center().y)) if br.horiz else Vector2(signf(p.x - r.get_center().x), 0)
+					if out == Vector2.ZERO:
+						out = Vector2.DOWN
+					move += out * 3.0
+					if br.t > Archivist.BAR_WARN - 0.15 and r.grow(Player.R).has_point(p):
+						bot.dash = true
+		for st in bs.stamps:
+			var sd: float = (st.c as Vector2).distance_to(p)
+			if st.t < Archivist.STAMP_WARN and sd < Archivist.STAMP_R + 40.0:
+				move += (p - (st.c as Vector2)) / maxf(sd, 1.0) * 3.0
+				if st.t > Archivist.STAMP_WARN - 0.15 and sd < Archivist.STAMP_R + 6.0:
+					bot.dash = true
+		var kd: float = bs.pos.distance_to(p)
+		if kd < 330.0:
+			move += (p - bs.pos) / maxf(kd, 1.0) * (330.0 - kd) / 60.0
 	# the express's pressure wave off the platform: dash through its edge
 	if bs is Boss and bs.state == Boss.RUN and bs.station_t < Boss.WAVE_TIME:
 		var wr: float = Boss.WAVE_R0 + (Boss.WAVE_R1 - Boss.WAVE_R0) * Pal.ease_out(bs.station_t / Boss.WAVE_TIME)
@@ -214,6 +245,13 @@ func think(game) -> void:
 				break
 		nearest = {"pos": gt, "vel": Vector2.ZERO}
 		nd = gt.distance_to(p)
+	elif bs is Archivist and bs.state == Archivist.RUN and bs.drawer_k > 0.3:
+		var ap: Vector2 = bs.core_pos()
+		nearest = {"pos": ap, "vel": Vector2.ZERO}
+		nd = ap.distance_to(p)
+		# stand off the drawer's face, so the line in and back goes through it
+		var face: Vector2 = Archivist.FACES[bs.phase]
+		move += ((ap + face * 330.0) - p).normalized() * 0.9
 	elif (bs is Boss and (bs.state == Boss.RUN or bs.state == Boss.ENTER)) or (bs is Warden and bs.state == Warden.RUN) or (bs is Devourer and bs.state == Devourer.RUN) or (bs is Metronome and bs.state == Metronome.RUN) or (bs is Zero and bs.state == Zero.RUN) or (bs is Testbed and bs.state == Testbed.RUN):
 		if bs.core_open > 0.5 or not (bs is Boss or bs is Testbed):
 			var cp: Vector2 = bs.core_pos()

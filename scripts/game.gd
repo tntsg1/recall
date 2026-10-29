@@ -24,6 +24,7 @@ var arms: Arms               # the production floor's robot arms and reserve cra
 var maglev: Maglev           # the superconducting line's guide rails (chapter 5)
 var arcs: Arcs               # the energy bureau's live current between your rounds (chapter 6)
 var scan_rings: ScanRings    # the bureau of thought's mood-scan rings (chapter 7)
+var shelves: Shelves        # the deep archive's mobile shelving (chapter 8)
 var radio_n := 0
 var wave_ctl: Waves
 var fx: Fx
@@ -191,6 +192,9 @@ func _ready() -> void:
 	scan_rings = ScanRings.new()
 	scan_rings.game = self
 	add_child(scan_rings)
+	shelves = Shelves.new()
+	shelves.game = self
+	add_child(shelves)
 	player = Player.new()
 	player.game = self
 	add_child(player)
@@ -200,7 +204,7 @@ func _ready() -> void:
 	possess = Possess.new()
 	possess.game = self
 	add_child(possess)
-	for pair in [["lockdown", Lockdown], ["warden", Warden], ["testbed", Testbed], ["grid", GridMaster], ["devourer", Devourer], ["train", Boss], ["metronome", Metronome], ["zero", Zero]]:
+	for pair in [["lockdown", Lockdown], ["warden", Warden], ["testbed", Testbed], ["grid", GridMaster], ["devourer", Devourer], ["train", Boss], ["metronome", Metronome], ["archivist", Archivist], ["zero", Zero]]:
 		var bn = pair[1].new()
 		bn.game = self
 		add_child(bn)
@@ -1002,6 +1006,7 @@ func _run_frame(dt: float) -> void:
 	maglev.step(sdt)
 	arcs.step(sdt)
 	scan_rings.step(sdt)
+	shelves.step(sdt)
 	if prof_on:
 		_lap("player+possess")
 	trail.append([sim_time, player.pos])
@@ -1765,6 +1770,7 @@ func next_chapter() -> void:
 	maglev.setup(Chapters.room(chapter), Chapters.story(chapter))
 	arcs.setup(Chapters.story(chapter))
 	scan_rings.setup(Chapters.story(chapter))
+	shelves.setup(Chapters.story(chapter))
 	lore.start_chapter(chapter)
 	sfx.start_chapter(Chapters.music(chapter))
 	sfx.play("chapter", 1.0, -2.0)

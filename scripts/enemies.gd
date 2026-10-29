@@ -5,7 +5,7 @@ extends Node2D
 # its armour goes; it shatters into those edges when it dies.
 
 enum { WARN, SPAWN, ALIVE, DEAD, HOST }   # HOST: seized by you (Possess drives it)
-enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO, INSPECTOR }
+enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO, INSPECTOR, PROOFREADER }
 enum { APPROACH, WINDUP, DASH, STUN, RECOVER }
 
 const SPEC := {
@@ -17,6 +17,7 @@ const SPEC := {
 	PULSE: {"hp": 70.0, "r": 19.0, "sides": 6, "speed": 0.0},
 	ECHO: {"hp": 40.0, "r": 13.0, "sides": 8, "speed": 0.0},
 	INSPECTOR: {"hp": 55.0, "r": 23.0, "sides": 4, "speed": 110.0},
+	PROOFREADER: {"hp": 50.0, "r": 20.0, "sides": 5, "speed": 125.0},
 }
 const WARN_TIME := 0.55
 const SPAWN_TIME := 0.6
@@ -66,6 +67,7 @@ var list: Array[E] = []
 var game
 var halo_tex: Texture2D
 var next_id := 1
+var fixes: Array = []        # a proofreader's corrections: [round, from, to, t]
 
 
 func _ready() -> void:
@@ -343,6 +345,8 @@ func _die(e: E, dir: Vector2) -> void:
 		if n > 0:
 			game.sfx.play("lit", 1.2, -6.0)
 		game.lore.on_inspector_down(e.pos)
+	if e.kind == PROOFREADER:
+		game.lore.on_kind_down(PROOFREADER, e.pos)
 	if e.grip != null:
 		if game.bullets.held_by(e.grip).size() >= 4:
 			game.ach("leech4")
@@ -377,6 +381,7 @@ func _die(e: E, dir: Vector2) -> void:
 
 func step(dt: float) -> void:
 	var pl: Vector2 = game.player.pos
+	_step_fixes(dt)
 	var i := 0
 	while i < list.size():
 		var e := list[i]
@@ -431,6 +436,8 @@ func step(dt: float) -> void:
 						_leech(e, pl, dt)
 					INSPECTOR:
 						_inspector(e, pl, dt)
+					PROOFREADER:
+						_proofreader(e, pl, dt)
 					PULSE:
 						_pulse(e, pl, dt)
 					ECHO:
@@ -586,6 +593,112 @@ func _inspector(e: E, pl: Vector2, dt: float) -> void:
 	e.vel = Pal.damp2(e.vel, _steer(e, want) * e.speed, 3.0, dt)
 	if e.vel.length() > 5.0:
 		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-6.0 * dt))
+
+
+# The proofreader: walks to the nearest of your rounds it has not corrected,
+# writes over it a moment, then moves it to another wall — farther from you.
+# The line home is no longer the line you laid; what it corrects stays put.
+const FIX_R := 70.0
+const FIX_WRITE := 0.7
+const FIX_SLIDE := 0.35
+const FIX_SHOW := 1.8
+
+
+func _proofreader(e: E, pl: Vector2, dt: float) -> void:
+	e.cool = maxf(0.0, e.cool - dt)
+	var target = e.anchor
+	if target != null and (target.state != Bullets.EMBED or target.corrected):
+		target = null
+	if e.mode != 1 and target == null and e.cool <= 0.0:
+		var td := 1400.0
+		for b in game.bullets.list:
+			if b.state == Bullets.EMBED and not b.foe and not b.corrected and b.dark_by == 0 and not _claimed(b, e):
+				var d: float = b.pos.distance_to(e.pos)
+				if d < td:
+					td = d
+					target = b
+	e.anchor = target
+	if e.mode == 1:
+		e.mode_t += dt
+		e.vel = Pal.damp2(e.vel, Vector2.ZERO, 8.0, dt)
+		if target == null:
+			e.mode = 0
+		elif e.mode_t >= FIX_WRITE:
+			_correct(e, target)
+			e.mode = 0
+			e.anchor = null
+			e.cool = 1.4
+		return
+	var want := Vector2.ZERO
+	if target != null:
+		var d2: float = target.pos.distance_to(e.pos)
+		want = _route(e, target.pos)
+		if d2 < FIX_R:
+			e.mode = 1
+			e.mode_t = 0.0
+			game.sfx.play("tick", 1.4, -12.0)
+	else:
+		var away := e.pos - pl
+		want = away.normalized() if away.length() < 380.0 else Vector2.from_angle(sin(e.t * 0.4 + e.seed) * 3.0)
+	e.vel = Pal.damp2(e.vel, _steer(e, want) * e.speed, 3.0, dt)
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-6.0 * dt))
+
+
+func _claimed(b, me: E) -> bool:
+	for o in list:
+		if o != me and o.kind == PROOFREADER and o.anchor == b:
+			return true
+	return false
+
+
+# Pick another wall within reach, the farther from you the better.
+func _correct(e: E, b) -> void:
+	var best := Vector2.INF
+	var bs := -INF
+	var best_rect := -1
+	for k in 16:
+		var d := Vector2.from_angle(TAU * k / 16.0 + e.seed)
+		var h: Dictionary = game.arena.raycast(e.pos, e.pos + d * 1600.0)
+		if h.is_empty():
+			continue
+		var q: Vector2 = h.point
+		var moved := q.distance_to(b.pos)
+		if moved < 220.0 or moved > 760.0:
+			continue
+		var score := q.distance_to(game.player.pos) + randf() * 120.0
+		if score > bs:
+			bs = score
+			best = q
+			best_rect = int(h.get("rect", -1))
+	b.corrected = true
+	if best == Vector2.INF:
+		return
+	b.shelf = game.shelves.shelf_of(best_rect) if game.shelves.active() else -1
+	fixes.append([b, b.pos, best, 0.0])
+	game.fx.flash(b.pos, 20.0, 0.12, Pal.red(0.5, 1.8))
+	game.sfx.play("tick", 0.8, -8.0)
+
+
+func _step_fixes(dt: float) -> void:
+	var i := 0
+	while i < fixes.size():
+		var fx_: Array = fixes[i]
+		var was: float = fx_[3]
+		fx_[3] = was + dt
+		var b = fx_[0]
+		if was < FIX_SLIDE and b.state == Bullets.EMBED:
+			var k: float = Pal.ease_io(clampf(fx_[3] / FIX_SLIDE, 0.0, 1.0))
+			b.pos = (fx_[1] as Vector2).lerp(fx_[2], k)
+			b.set_head(b.pos)
+			game.bullets.faint_dirty = true
+			if fx_[3] >= FIX_SLIDE:
+				game.fx.flash(b.pos, 24.0, 0.14, Pal.red(0.6, 2.0))
+				game.fx.ring(b.pos, 4.0, 22.0, 0.25, Pal.red(0.8, 2.0), 1.5)
+		if fx_[3] >= FIX_SHOW:
+			fixes.remove_at(i)
+		else:
+			i += 1
 
 
 # When a pillar stands between it and the target, head for the pillar corner that
@@ -780,6 +893,9 @@ func _poly(e: E) -> Array[Vector2]:
 		INSPECTOR:
 			# a clipboard-shaped body, longer than it is wide
 			pts = [Vector2(e.r * 1.1, -e.r * 0.75), Vector2(e.r * 1.1, e.r * 0.75), Vector2(-e.r * 1.1, e.r * 0.75), Vector2(-e.r * 1.1, -e.r * 0.75)]
+		PROOFREADER:
+			# a pen nib, pointing the way it walks
+			pts = [Vector2(e.r * 1.35, 0), Vector2(e.r * 0.15, e.r * 0.72), Vector2(-e.r * 0.95, e.r * 0.55), Vector2(-e.r * 0.95, -e.r * 0.55), Vector2(e.r * 0.15, -e.r * 0.72)]
 	pts.append(pts[0])
 	return pts
 
@@ -866,6 +982,22 @@ func _draw() -> void:
 			draw_rect(Rect2(bp + Vector2(-4, 6), Vector2(8, 5)), Pal.foe(0.7 * dim), false, 1.2)
 			draw_line(bp + Vector2(-10, -10), bp + Vector2(10, 12), Pal.red(0.85 * dim, 1.4), 2.0)
 			draw_arc(e.pos, DIM_R, 0.0, TAU, 40, Pal.foe(0.28 * dim), 1.5)
+		if e.kind == PROOFREADER:
+			# the nib's slit and breather hole, red ink on its tip
+			var fwd := Vector2.from_angle(e.rot)
+			var tip: Vector2 = e.pos + fwd * e.r * 1.35
+			draw_line(tip, e.pos + fwd * e.r * 0.1, Pal.foe(0.75 * dim), 1.2)
+			draw_arc(e.pos, 3.5, 0.0, TAU, 10, Pal.foe(0.8 * dim), 1.2)
+			draw_circle(tip, 3.5, Pal.red(0.95 * dim, 2.0))
+			if e.mode == 1 and e.anchor != null:
+				# writing over the round: a red scribble growing on it
+				var wk := clampf(e.mode_t / FIX_WRITE, 0.0, 1.0)
+				var q: Vector2 = e.anchor.pos
+				var sl := PackedVector2Array()
+				for j in 2 + int(wk * 10.0):
+					sl.append(q + Vector2(-12.0 + j * 2.4, sin(j * 2.1 + e.t * 20.0) * 5.0))
+				draw_polyline(sl, Pal.red(0.9 * dim, 2.0), 1.5)
+				draw_line(tip, q, Pal.red(0.25 * dim, 1.4), 1.0)
 		if e.kind == CHARGER and e.mode == STUN:
 			for k in 3:
 				var a3 := e.t * 5.0 + TAU * k / 3.0
@@ -875,6 +1007,45 @@ func _draw() -> void:
 			for k in e.sides:
 				poly.append(tr * pts[k])
 			draw_colored_polygon(poly, Pal.foe(0.7 * e.flash, 1.15))
+	if not fixes.is_empty() or game.shelves.active():
+		_draw_fixes(dim)
+
+
+func _draw_fixes(dim: float) -> void:
+	var font := Fonts.get_font("SemiBold")
+	for fx_ in fixes:
+		var b = fx_[0]
+		var k: float = fx_[3]
+		var a := 1.0 - clampf((k - FIX_SHOW + 0.5) / 0.5, 0.0, 1.0)
+		var from: Vector2 = fx_[1]
+		var to: Vector2 = b.pos if b.state == Bullets.EMBED else fx_[2]
+		var d := to - from
+		if d.length() > 4.0:
+			var n := d.normalized()
+			var segs := PackedVector2Array()
+			var s0 := 0.0
+			while s0 < d.length() - 12.0:
+				segs.append(from + n * s0)
+				segs.append(from + n * minf(s0 + 14.0, d.length() - 12.0))
+				s0 += 22.0
+			if segs.size() > 0:
+				draw_multiline(segs, Pal.red(0.7 * a * dim, 1.8), 2.0)
+			draw_line(to - n * 4.0, to - n * 16.0 + n.orthogonal() * 7.0, Pal.red(0.8 * a * dim, 1.8), 2.0)
+			draw_line(to - n * 4.0, to - n * 16.0 - n.orthogonal() * 7.0, Pal.red(0.8 * a * dim, 1.8), 2.0)
+			# the old spot, struck through
+			draw_line(from + Vector2(-7, -7), from + Vector2(7, 7), Pal.red(0.6 * a * dim, 1.6), 2.0)
+		if k >= FIX_SLIDE:
+			var lab := Txt.t("corrected")
+			var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+			var at := to + Vector2(-lw * 0.5, -18.0)
+			at.x = clampf(at.x, Arena.ROOM.position.x + 6.0, Arena.ROOM.end.x - lw - 6.0)
+			at.y = maxf(at.y, Arena.ROOM.position.y + 18.0)
+			draw_rect(Rect2(at + Vector2(-5, -14), Vector2(lw + 10, 19)), Color(0.05, 0.0, 0.0, 0.8 * a))
+			draw_string(font, at, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.red(0.95 * a * dim, 1.8))
+	for b in game.bullets.list:
+		if b.corrected and b.state == Bullets.EMBED:
+			var p: Vector2 = b.pos + Vector2(9, -9)
+			draw_polyline(PackedVector2Array([p + Vector2(-4, 0), p + Vector2(-1, 3), p + Vector2(5, -4)]), Pal.red(0.85 * dim, 1.6), 1.5)
 
 
 func _core(e: E, tr: Transform2D, k: float, col: Color) -> void:

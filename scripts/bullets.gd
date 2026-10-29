@@ -67,6 +67,8 @@ class B:
 	var last_hit := Vector2.ZERO
 	var via_done := false       # bent once through a seized leech's well on the way home
 	var dark_by := 0            # the inspector who put it out (0: lit); it cannot be recalled
+	var shelf := -1             # the archive shelf it is embedded in (it rides along)
+	var corrected := false      # a proofreader moved it; it stays where it was put
 
 	func total() -> float:
 		return cum[cum.size() - 1]
@@ -656,6 +658,9 @@ func _fly(b: B, dt: float) -> void:
 	var burn: Dictionary = game.lasers.cut(a, to)
 	if burn:
 		to = burn.point
+	var red_cut: Dictionary = game.boss.cut(a, to) if game.boss is Archivist else {}
+	if red_cut:
+		to = red_cut.point
 	var h: Dictionary = game.arena.raycast(a, to)
 	var end: Vector2 = h.point if h else to
 	var sh: Dictionary = {} if Loadout.gun == "rail" else game.enemies.shield_hit(a, end)
@@ -708,6 +713,9 @@ func _fly(b: B, dt: float) -> void:
 	if b.just_bent:
 		b.just_bent = false
 		return
+	if red_cut and not h:
+		_redact(b, end, red_cut.bar)
+		return
 	if burn and not h:
 		_burn(b, end)
 		return
@@ -742,8 +750,10 @@ func _fly(b: B, dt: float) -> void:
 			b.t = 0.0
 			b.life = 0.0
 			b.hit.clear()
+			b.shelf = game.shelves.shelf_of(int(h.get("rect", -1))) if game.shelves.active() else -1
 			game.on_embed(b, h.normal)
-			scars.append([h.point, h.normal, 0.0])
+			if b.shelf < 0:
+				scars.append([h.point, h.normal, 0.0])
 			if scars.size() > 160:
 				scars.remove_at(0)
 	else:
@@ -764,6 +774,16 @@ func _burn(b: B, at: Vector2) -> void:
 	game.sfx.play("expire", randf_range(1.5, 1.7), -11.0)
 	if not b.child:
 		game.on_ammo_home(b)
+
+
+# A redaction bar takes the round: it is held there until the bar lifts.
+func _redact(b: B, at: Vector2, bar: int) -> void:
+	b.pos = at
+	b.set_head(at)
+	b.state = FADE
+	b.t = 0.0
+	b.settled = false
+	game.boss.take(b, at, bar)
 
 
 func _bend(b: B, at: Vector2, new_dir: Vector2, nudge: Vector2 = Vector2.ZERO) -> void:
@@ -830,6 +850,13 @@ func _return(b: B, dt: float) -> void:
 			b.charge = 0
 			_burn(b, lc.point)
 			return
+		if game.boss is Archivist:
+			var rc: Dictionary = game.boss.cut(pts[k], pts[k + 1])
+			if rc:
+				game.enemies.sweep(pts[k], rc.point, b, true)
+				b.charge = 0
+				_redact(b, rc.point, rc.bar)
+				return
 		game.enemies.sweep(pts[k], pts[k + 1], b, true)
 	b.s = s1
 	var np := pts[pts.size() - 1]

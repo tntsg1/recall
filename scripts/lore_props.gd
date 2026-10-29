@@ -28,7 +28,7 @@ var focus_last := 0.0
 var row_cache := {}
 var mirror_tick := 0.0
 var shutter_up := 0.0        # chapter 4: the quota window opens once the intake falls
-var inspector_told := false
+var told := {}               # kinds whose fallen last log was shown this chapter
 
 
 func _ready() -> void:
@@ -47,7 +47,7 @@ func start_chapter(ch: int) -> void:
 	shows.clear()
 	hold.clear()
 	shutter_up = 0.0
-	inspector_told = false
+	told.clear()
 	memory_fixed = Vector2.INF
 	if story == 5 and game.bosses_by.has("train"):
 		# the line runs here: its loop is laid from the start
@@ -123,10 +123,15 @@ func step(dt: float) -> void:
 # A shell was seized: its memory, once per seizing, cycling through its lines.
 # A fallen inspector's last log, once a chapter, where it fell.
 func on_inspector_down(at: Vector2) -> void:
-	if inspector_told:
+	on_kind_down(Enemies.INSPECTOR, at)
+
+
+# A fallen inspector's or proofreader's last log, once a chapter, where it fell.
+func on_kind_down(kind: int, at: Vector2) -> void:
+	if told.has(kind):
 		return
-	inspector_told = true
-	var m := Lore.seize_line(story, Enemies.INSPECTOR, 0)
+	told[kind] = true
+	var m := Lore.seize_line(story, kind, 0)
 	if m.is_empty():
 		return
 	memory = m.text
@@ -208,6 +213,11 @@ func _draw() -> void:
 		_draw_chairs(dim)
 		_draw_lightboards(dim)
 		_draw_terminal(Vector2(80, 560), dim, "w7_monitor")
+	elif story == 8:
+		_draw_deep(dim)
+		_draw_terminal(Vector2(80, 300), dim, "w8_index")
+		if shows.get("w8_rules", 0.0) <= 0.01:
+			_draw_wall_notice(Vector2(1840, 470), dim)
 	elif story == 4:
 		_draw_stations(dim)
 		_draw_presses(dim)
@@ -521,7 +531,7 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 			yy += step
 	elif id != "" or int(t * 2.0) % 3 != 0:
 		var dots := ".".repeat(int(t * 2.0) % 4)
-		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output", 5: "term_timetable", 6: "term_power", 7: "term_mood"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
+		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output", 5: "term_timetable", 6: "term_power", 7: "term_mood", 8: "term_archive"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
 
 
 # The queue: posts with a rope slung between them, and the waiting line.
@@ -1408,3 +1418,54 @@ func _draw_memory() -> void:
 	mem_layer.draw_rect(Rect2(p + Vector2(-12, -24), Vector2(tw + 24, 34)), Possess.cyan(0.25 * a, 1.0), false, 1.0)
 	mem_layer.draw_line(p + Vector2(-12, -24), p + Vector2(-12, 10), Possess.cyan(a, 1.8), 2.0)
 	mem_layer.draw_string(font, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Possess.cyan(0.95 * a, 1.4))
+
+
+# ---------------------------------------------------------------- the deep archive
+
+# Portholes in the top wall onto the black water, marine snow drifting past;
+# a pressure gauge by the floor's corner; the plaque set in the floor.
+func _draw_deep(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	for x: float in [470.0, 1450.0]:
+		var c := Vector2(x, 44.0)
+		draw_circle(c, 18.0, Color(0.02, 0.025, 0.03))
+		draw_arc(c, 18.0, 0.0, TAU, 28, Pal.ink(0.5 * dim), 2.5)
+		draw_arc(c, 22.0, 0.0, TAU, 28, Pal.ink(0.25 * dim), 1.5)
+		for b in 8:
+			var a := TAU * b / 8.0
+			draw_circle(c + Vector2.from_angle(a) * 20.5, 1.3, Pal.ink(0.45 * dim))
+		for j in 7:
+			var sx := fmod(j * 37.0 + t * (3.0 + j % 3), 32.0) - 16.0
+			var sy := fmod(j * 23.0 + t * (6.0 + j % 4), 32.0) - 16.0
+			var q := c + Vector2(sx, sy)
+			if q.distance_to(c) < 15.0:
+				draw_circle(q, 0.9 + (j % 2) * 0.5, Pal.ink(0.3 * dim))
+		draw_arc(c, 12.0, PI * 1.1, PI * 1.45, 8, Pal.ink(0.35 * dim, 1.3), 1.5)
+	# the gauge
+	var g := Vector2(140.0, 950.0)
+	draw_circle(g, 26.0, Color(0.04, 0.04, 0.045))
+	draw_arc(g, 26.0, 0.0, TAU, 32, Pal.ink(0.55 * dim), 2.0)
+	var ticks := PackedVector2Array()
+	for k in 9:
+		var a := PI * 0.75 + PI * 1.5 * k / 8.0
+		ticks.append(g + Vector2.from_angle(a) * 19.0)
+		ticks.append(g + Vector2.from_angle(a) * 23.0)
+	draw_multiline(ticks, Pal.ink(0.4 * dim), 1.2)
+	var na := PI * 0.75 + PI * 1.5 * (0.82 + 0.01 * sin(t * 1.3))
+	draw_line(g, g + Vector2.from_angle(na) * 18.0, Pal.red(0.85 * dim, 1.5), 2.0)
+	draw_circle(g, 3.0, Pal.ink(0.6 * dim))
+	draw_string(sf, Vector2(176.0, 956.0), Txt.t("depth_gauge"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.42 * dim))
+	# the plaque in the floor, before a sweep wakes its words
+	if shows.get("w8_plate", 0.0) <= 0.01:
+		var pr := Rect2(760.0, 950.0, 400.0, 34.0)
+		draw_rect(pr, Color(0.05, 0.05, 0.055))
+		draw_rect(pr, Pal.ink(0.3 * dim), false, 1.5)
+		for k in 4:
+			draw_circle(pr.position + Vector2(8.0 + (pr.size.x - 16.0) * (k % 2), 8.0 + (pr.size.y - 16.0) * (k / 2)), 2.0, Pal.ink(0.4 * dim))
+		var bars := PackedVector2Array()
+		var x := pr.position.x + 30.0
+		while x < pr.end.x - 30.0:
+			bars.append(Vector2(x, pr.get_center().y))
+			bars.append(Vector2(minf(x + 36.0, pr.end.x - 30.0), pr.get_center().y))
+			x += 48.0
+		draw_multiline(bars, Pal.ink(0.18 * dim), 6.0)

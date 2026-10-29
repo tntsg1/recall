@@ -12,6 +12,9 @@ var rects: Array[Rect2] = []   # every solid; mirrors last
 var inner: Array[Rect2] = []   # pillars and bars (drawn with full outline)
 var mirrors: Array[Rect2] = [] # panels that reflect instead of holding a round
 var mirror_from := 9999        # index in rects where mirrors begin
+var movers: Array[Rect2] = []  # the archive's shelves: solid, moved by Shelves (drawn there)
+var mover_from := 9999         # index in rects where movers begin
+var soft: Array[Rect2] = []    # solid to bodies only (the archivist's cabinet and bars)
 var shine := 0.0
 var game
 
@@ -26,6 +29,7 @@ func setup(ch: int) -> void:
 	rects.clear()
 	inner.clear()
 	mirrors.clear()
+	soft.clear()
 	var r := ROOM
 	rects.append(Rect2(r.position.x - OUTER, r.position.y - OUTER, r.size.x + OUTER * 2.0, OUTER))
 	rects.append(Rect2(r.position.x - OUTER, r.end.y, r.size.x + OUTER * 2.0, OUTER))
@@ -60,6 +64,9 @@ func setup(ch: int) -> void:
 			# two more stacks mid-range: cover from the flame and the rail gun
 			inner.append(Rect2(730, 530, 110, 64))
 			inner.append(Rect2(1080, 530, 110, 64))
+		7:
+			# the deep archive: nothing fixed to hide behind but the shelving
+			pass
 		2:
 			# the Maw: six blocks in a ring, the middle left for what lives there
 			for k in 6:
@@ -78,6 +85,9 @@ func setup(ch: int) -> void:
 			mirrors.append(Rect2(1180, 255, 220, 28))
 			mirrors.append(Rect2(520, 797, 220, 28))
 	rects.append_array(inner)
+	mover_from = rects.size()
+	movers = Shelves.initial(ch)
+	rects.append_array(movers)
 	mirror_from = rects.size()
 	rects.append_array(mirrors)
 	queue_redraw()
@@ -133,8 +143,13 @@ func raycast(a: Vector2, b: Vector2) -> Dictionary:
 	return {"point": a + d * best, "normal": nrm, "t": best, "mirror": best_i >= mirror_from, "rect": best_i}
 
 
+func set_mover(i: int, r: Rect2) -> void:
+	movers[i] = r
+	rects[mover_from + i] = r
+
+
 func push_circle(p: Vector2, rad: float) -> Vector2:
-	for r in rects:
+	for r: Rect2 in rects + soft:
 		var c := Vector2(clampf(p.x, r.position.x, r.end.x), clampf(p.y, r.position.y, r.end.y))
 		var d := p - c
 		var l := d.length()
@@ -154,7 +169,7 @@ func push_circle(p: Vector2, rad: float) -> Vector2:
 func is_free(p: Vector2, rad: float) -> bool:
 	if not ROOM.grow(-rad).has_point(p):
 		return false
-	for r in inner:
+	for r: Rect2 in inner + movers + soft:
 		if r.grow(rad).has_point(p):
 			return false
 	return true

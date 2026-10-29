@@ -60,6 +60,15 @@ const SEIZE := {
 		Enemies.LEECH: [["我把走神的念头吸走，存进档案。", "I DRAW OFF THE WANDERING THOUGHTS AND FILE THEM."]],
 		Enemies.PULSE: [["一拍，一动。不在拍上的动作，不算数。", "ONE BEAT, ONE MOVE. A MOVE OFF THE BEAT DOES NOT COUNT."]],
 	},
+	8: {
+		Enemies.CHASER: [["档案员 0081。我的工作是让旧版本消失。", "ARCHIVE CLERK 0081. MY JOB IS TO MAKE OLD EDITIONS DISAPPEAR."],
+			["我每天修订四百页。改完的，比原来的更真实。", "I REVISE FOUR HUNDRED PAGES A DAY. THE REVISED ONES ARE TRUER THAN THE ORIGINALS."]],
+		Enemies.GUARD: [["这扇门三百年没对外开过。开过的那次，也已修订。", "THIS DOOR HAS NOT OPENED IN THREE HUNDRED YEARS. THE ONE TIME IT DID HAS BEEN REVISED."]],
+		Enemies.CHARGER: [["海底很安静。被删除的东西，不会出声。", "IT IS QUIET ON THE SEABED. DELETED THINGS MAKE NO SOUND."]],
+		Enemies.ECHO: [["每一版我都记得。所以他们只让我记最新一版。", "I REMEMBER EVERY EDITION. SO THEY LET ME KEEP ONLY THE LATEST."]],
+		Enemies.LEECH: [["我把多余的历史吸走。剩下的刚好够用。", "I DRAW OFF THE SURPLUS HISTORY. WHAT IS LEFT IS JUST ENOUGH."]],
+		Enemies.PROOFREADER: [["错字要改，错的人也要改。这是同一份工作。", "WRONG WORDS ARE CORRECTED. WRONG PEOPLE TOO. IT IS THE SAME JOB."]],
+	},
 }
 
 # remnants: [id, wall point, inward normal, kind of mark, zh, en]
@@ -106,6 +115,12 @@ const WALL := {
 		["slogan", Vector2(350, 70), Vector2(0, 1), "sign", "请保持愉快 · 愉快是公民的义务", "STAY HAPPY · HAPPINESS IS A CIVIC DUTY"],
 		["scrawl", Vector2(1840, 380), Vector2(-1, 0), "scrawl", "我的心跳，不是你们的节拍。", "MY HEARTBEAT IS NOT YOUR TEMPO."],
 	],
+	8: [
+		["index", Vector2(80, 300), Vector2(1, 0), "screen", "馆藏历史：1 部 · 现行版本：第 214 版", "HISTORIES HELD: 1 · CURRENT EDITION: 214"],
+		["plate", Vector2(960, 1010), Vector2(0, -1), "floor", "旧文明档案 · 零号机项目 · 设计者姓名已删除", "OLD-ERA ARCHIVE · UNIT ZERO PROJECT · DESIGNER'S NAME DELETED"],
+		["rules", Vector2(1840, 470), Vector2(-1, 0), "notice", "借阅须知：只可阅读现行版本。旧版本从未存在。", "READERS MAY CONSULT THE CURRENT EDITION ONLY. OLD EDITIONS NEVER EXISTED."],
+		["scrawl", Vector2(1840, 900), Vector2(-1, 0), "scrawl", "他们改了所有的书。没改我们记得的。", "THEY REWROTE EVERY BOOK. NOT WHAT WE REMEMBER."],
+	],
 }
 
 const RADIO := {
@@ -143,6 +158,11 @@ const RADIO := {
 		"wave": [["思想与意识管理局今日同步市民 48 万人次，零情绪事故。", "THE BUREAU OF THOUGHT SYNCHRONISED 480,000 CITIZENS TODAY. ZERO MOOD INCIDENTS."],
 			["请勿在公共场所表现出疲惫，以免影响他人幸福。", "DO NOT LOOK TIRED IN PUBLIC. IT AFFECTS OTHERS' HAPPINESS."]],
 		"boss": [["同步装置暂停。请市民自行保持愉快，直至恢复。", "THE SYNCHRONISER IS PAUSED. CITIZENS, STAY HAPPY ON YOUR OWN UNTIL IT RETURNS."]],
+	},
+	8: {
+		"wave": [["深海历史档案库今日修订 1.2 万页，历史更加准确。", "THE DEEP ARCHIVE REVISED 12,000 PAGES TODAY. HISTORY IS MORE ACCURATE THAN EVER."],
+			["请勿私自保存旧版本资料。旧版本已不再真实。", "DO NOT KEEP OLD EDITIONS. OLD EDITIONS ARE NO LONGER TRUE."]],
+		"boss": [["档案修订机暂停工作。在此期间，历史以昨日版本为准。", "THE ARCHIVIST IS PAUSED. UNTIL IT RETURNS, YESTERDAY'S EDITION OF HISTORY APPLIES."]],
 	},
 }
 
