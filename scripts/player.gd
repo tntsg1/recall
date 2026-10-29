@@ -142,6 +142,8 @@ func _draw() -> void:
 		return
 	# a dark pool under you, so your own rounds' light never swallows you
 	draw_texture_rect(Fx.make_glow_texture(), Rect2(-Vector2(46, 46), Vector2(92, 92)), false, Color(0, 0, 0, 0.7))
+	# and a dark rim, so you read over any words you stand on
+	draw_circle(Vector2.ZERO, R + 5.0, Color(0, 0, 0, 0.6))
 	var f: float = game.focus
 	for g in ghosts:
 		var k: float = 1.0 - g[1] / 0.28

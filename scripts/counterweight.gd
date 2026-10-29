@@ -298,7 +298,7 @@ func _step_w(w: W, k: int, dt: float) -> void:
 			if _other_down(w):
 				# the other is coming down or is down: wait off to one side
 				hp_at = p + Vector2(380.0 * side * (1.0 if w.spare else -1.0), -200.0)
-			w.pos = w.pos.lerp(_clamp(hp_at), 1.0 - exp(-1.6 * dt))
+			w.pos = w.pos.lerp(_clear_of_cover(_clamp(hp_at), w.half), 1.0 - exp(-1.6 * dt))
 			w.hang_t -= dt
 			# the two take turns
 			var turn_ok := not (phase == 2 and next_w != k)
@@ -506,16 +506,13 @@ func _draw_weight(w: W, dim: float) -> void:
 	var a := 1.0 - 0.62 * lift
 	# the cable, up to the top wall
 	# the cable: four strands up to a pulley block, swaying a little
-	var cy := minf(Arena.ROOM.position.y + 90.0, r.position.y)
+	# (its pulley is up past the wall: only the strands come down)
+	var cy := minf(Arena.ROOM.position.y, r.position.y)
 	var sway := sin(t * 1.3 + (1.0 if w.spare else 0.0)) * 6.0 * (0.3 + lift)
 	var py := Vector2(c.x + sway * 0.3, cy)
 	for st in 4:
 		var ox := (st - 1.5) * 4.0
-		draw_line(py + Vector2(ox, 0), Vector2(c.x + ox + sway, r.position.y + 6.0), Pal.ink((0.38 if st % 2 == 0 else 0.25) * dim), 1.5)
-	var pb := Rect2(py - Vector2(20, 14), Vector2(40, 22))
-	draw_rect(pb, Color(0.06, 0.06, 0.065))
-	draw_rect(pb, Pal.ink(0.5 * dim), false, 1.5)
-	draw_arc(py + Vector2(0, -3), 8.0, 0.0, TAU, 16, Pal.ink(0.5 * dim), 1.5)
+		draw_line(py + Vector2(ox, 0), Vector2(c.x + ox + sway, r.position.y + 6.0), Pal.ink((0.24 if st % 2 == 0 else 0.15) * dim), 1.2)
 	var col := Pal.foe(a * dim, 1.0 + 0.8 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
 	draw_rect(r, Color(0.05, 0.05, 0.055, 0.6 + 0.4 * a))
 	# the plates: five bands across it, spreading apart once it has landed

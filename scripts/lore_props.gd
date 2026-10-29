@@ -1523,7 +1523,7 @@ func _alt_str() -> String:
 # as the car climbs, the lit cities on it and, off on its own, the faint few
 # lights of 13th Street. Seats with their backs and belts; numbered pillars;
 # handrails along the side walls; the viewing deck's limit across the floor.
-const LIFT_WINDOWS := [Rect2(250, 160, 400, 200), Rect2(1270, 160, 400, 200)]
+const LIFT_WINDOWS := [Rect2(330, 160, 380, 200), Rect2(1210, 160, 380, 200)]
 
 
 func _draw_lift(dim: float) -> void:

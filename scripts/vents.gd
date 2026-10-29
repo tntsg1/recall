@@ -213,6 +213,30 @@ func _draw() -> void:
 		seg.append(p - d * 8.0 - d.orthogonal() * 5.0)
 	if seg.size() > 0:
 		draw_multiline(seg, Pal.ink(0.38 * dim, 1.2), 1.5)
+	# whatever is being drawn in wears a small arrow toward the door
+	if open_k() > 0.0:
+		var marks := PackedVector2Array()
+		for b in game.bullets.list:
+			if b.state == Bullets.FLY and not b.foe:
+				_arrow(marks, b.pos, force_at(b.pos))
+		for e in game.enemies.list:
+			if e.state == Enemies.ALIVE:
+				_arrow(marks, e.pos + Vector2(0, -e.r - 10.0), force_at(e.pos))
+		if marks.size() > 0:
+			draw_multiline(marks, Pal.ink(0.6 * dim, 1.4), 1.5)
+
+
+func _arrow(out: PackedVector2Array, p: Vector2, f: Vector2) -> void:
+	if f.length() < 30.0:
+		return
+	var d := f.normalized()
+	var tip := p + d * 16.0
+	out.append(p + d * 4.0)
+	out.append(tip)
+	out.append(tip)
+	out.append(tip - d * 6.0 + d.orthogonal() * 4.0)
+	out.append(tip)
+	out.append(tip - d * 6.0 - d.orthogonal() * 4.0)
 
 
 func _draw_door(i: int, dim: float) -> void:
@@ -233,11 +257,17 @@ func _draw_door(i: int, dim: float) -> void:
 	if ok > 0.0:
 		var hole := Rect2(c - along * gap - n * 6.0, Vector2.ZERO).expand(c + along * gap + n * 30.0)
 		draw_rect(hole, Color(0.0, 0.0, 0.0, 1.0))
-		for s2 in 14:
+		# out there: stars streaming past the gap
+		for s2 in 22:
 			var u := fmod(t * 2.4 + s2 * 0.29, 1.0)
 			var q := c + along * (sin(s2 * 2.3) * gap * 0.85) + n * (30.0 - 34.0 * u)
 			if absf((q - c).dot(along)) < gap - 2.0:
-				draw_line(q, q + n * (8.0 + 14.0 * u), Pal.ink((0.9 - 0.6 * u) * ok * dim, 1.8), 1.5)
+				draw_line(q, q + n * (8.0 + 14.0 * u), Pal.ink((0.95 - 0.5 * u) * ok * dim, 2.2), 1.5)
+				draw_circle(q, 1.4, Pal.ink(ok * dim, 2.4))
+		# rings closing on the gap across the floor before it
+		for rk in 3:
+			var ru := fmod(t * 1.2 + rk / 3.0, 1.0)
+			draw_arc(c, 40.0 + 220.0 * (1.0 - ru), (-n).angle() + PI * 0.5 + 0.1, (-n).angle() + PI * 1.5 - 0.1, 32, Pal.ink(0.22 * ru * ok * dim, 1.2), 1.5)
 	# the two panels, sliding apart into the housing
 	for sd: float in [-1.0, 1.0]:
 		var inner := c + along * sd * gap
@@ -264,7 +294,7 @@ func _draw_door(i: int, dim: float) -> void:
 		var q0 := c + along * (-HALF - 10.0 + j * (HALF * 2.0 + 20.0) / 8.0) + n * 48.0
 		hatch.append(q0)
 		hatch.append(q0 + n * 34.0 + along * 18.0)
-	draw_multiline(hatch, Pal.red(a, 1.5), 4.0)
+	draw_multiline(hatch, Pal.red(a * 0.8, 1.15), 4.0)
 	if ok <= 0.0:
 		# the reach of the draught, marked while it is still shut
 		draw_arc(c, R * (0.4 + 0.58 * warn_k), (-n).angle() + PI * 0.5 + 0.05, (-n).angle() + PI * 1.5 - 0.05, 48, Pal.red(0.22 * fl * dim, 1.2), 1.5)
