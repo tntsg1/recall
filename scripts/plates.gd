@@ -134,6 +134,11 @@ func step(dt: float) -> void:
 				continue
 			var ox := minf(r.end.x, o.end.x) - maxf(r.position.x, o.position.x)
 			var oy := minf(r.end.y, o.end.y) - maxf(r.position.y, o.position.y)
+			if v.length() > 70.0:
+				# a knock: sparks where it struck
+				var hp := Vector2(clampf(p.x, o.position.x, o.end.x), clampf(p.y, o.position.y, o.end.y))
+				game.fx.sparks(hp, (p - hp).normalized() if p.distance_to(hp) > 0.1 else Vector2.UP, 4, Pal.ink(0.9, 1.6), 260.0, 0.18, 1.0)
+				game.sfx.play("embed", 0.7, -14.0)
 			if ox < oy:
 				var sx := 1.0 if r.get_center().x > o.get_center().x else -1.0
 				p.x += ox * sx

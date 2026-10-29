@@ -53,10 +53,10 @@ func _run() -> void:
 	anchor.hp = 1e9
 	await frames(150)
 	# rounds into the left plate: it drifts off
-	game.player.pos = Vector2(760, 590)
+	game.player.pos = Vector2(760, 650)
 	for k in 4:
 		game.bullets.fire(game.player.pos, Vector2.from_angle(PI + (k - 1.5) * 0.02))
-	await frames(40)
+	await frames(16)
 	await shot("2_shoved")
 	# a chaser between; recall: the plate is yanked back through it
 	var c = game.enemies.spawn(Enemies.CHASER, Vector2(640, 600))
@@ -119,4 +119,8 @@ func _run() -> void:
 	while bs.gun_t < Peace.GUN_WARN * 0.8:
 		await process_frame
 	await shot("8_gun")
+	while bs.gun_t < Peace.GUN_WARN + 0.05:
+		game.player.pos = Vector2(1500, 860)
+		await process_frame
+	await shot("8b_gun_fire")
 	quit()

@@ -393,6 +393,9 @@ func _draw_view() -> void:
 		var ps: Vector2 = game.get_viewport().get_canvas_transform() * game.player.pos
 		if ps.distance_to(cp) < 170.0:
 			a *= lerpf(0.3, 1.0, ps.distance_to(cp) / 170.0)
+		# over the Peace's gantry it stands back
+		if game.boss is Peace and game.boss.alive():
+			a *= 0.45
 		view.draw_set_transform(cp, 0.0, Vector2(k, k))
 		combo_odo.set_text(cs, 1.0)
 		combo_odo.draw(view, font_b, 0.0, 22.0, csz, Possess.cyan(a, 2.4 + 2.0 * combo_stamp) if combo_seize else Pal.red(a, 2.4 + 2.0 * combo_stamp), 0)

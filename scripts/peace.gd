@@ -630,9 +630,12 @@ func _draw_weapons(dim: float) -> void:
 		if gun_t < GUN_WARN:
 			var k2 := gun_t / GUN_WARN
 			var fl2 := 0.55 + 0.45 * sin(t * (18.0 + 24.0 * k2))
+			# the footprint it will burn, filling in
+			draw_line(BOW, far, Pal.red(0.05 * k2 * dim, 1.0), 52.0)
 			draw_line(BOW, far, Pal.red((0.2 + 0.6 * k2) * fl2 * dim, 1.6), 1.5 + 2.5 * k2)
-			draw_line(BOW + d2.orthogonal() * 26.0, far + d2.orthogonal() * 26.0, Pal.red(0.25 * k2 * dim), 1.0)
-			draw_line(BOW - d2.orthogonal() * 26.0, far - d2.orthogonal() * 26.0, Pal.red(0.25 * k2 * dim), 1.0)
+			draw_line(BOW + d2.orthogonal() * 26.0, far + d2.orthogonal() * 26.0, Pal.red((0.25 + 0.4 * k2) * dim, 1.3), 2.0)
+			draw_line(BOW - d2.orthogonal() * 26.0, far - d2.orthogonal() * 26.0, Pal.red((0.25 + 0.4 * k2) * dim, 1.3), 2.0)
+			draw_circle(BOW, 10.0 + 14.0 * k2, Pal.red(0.5 * k2 * fl2 * dim, 1.8))
 		else:
 			var k3 := 1.0 - (gun_t - GUN_WARN) / GUN_FIRE
 			draw_line(BOW, far, Color(0, 0, 0, 0.5 * k3), 90.0)

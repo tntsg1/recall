@@ -1630,7 +1630,7 @@ func _draw_yard(dim: float) -> void:
 	draw_multiline(seams, Pal.ink(0.05 * dim), 1.0)
 	# tether anchors on the side walls, a slack line from each
 	for side: float in [92.0, 1828.0]:
-		for ay: float in [180.0, 420.0, 700.0, 940.0]:
+		for ay: float in [300.0, 820.0]:
 			var a := Vector2(side, ay)
 			draw_circle(a, 5.0, Color(0.06, 0.06, 0.065))
 			draw_arc(a, 5.0, 0.0, TAU, 12, Pal.ink(0.5 * dim), 1.5)
@@ -1657,8 +1657,8 @@ func _draw_yard(dim: float) -> void:
 			dl.append(Vector2(x2, kr.end.y))
 			dl.append(Vector2(minf(x2 + 16.0, kr.end.x), kr.end.y))
 			x2 += 28.0
-		draw_multiline(dl, Pal.ink(0.12 * dim), 1.5)
-		draw_line(Vector2(kr.position.x, kr.get_center().y), Vector2(kr.end.x, kr.get_center().y), Pal.ink(0.1 * dim), 3.0)
+		draw_multiline(dl, Pal.ink(0.18 * dim), 1.5)
+		draw_line(Vector2(kr.position.x, kr.get_center().y), Vector2(kr.end.x, kr.get_center().y), Pal.ink(0.15 * dim), 3.0)
 		for k in Peace.N + 1:
 			var rx := Peace.X0 + Peace.SEC_W * k
 			draw_line(Vector2(rx, kr.position.y + 8.0), Vector2(rx, kr.end.y - 8.0), Pal.ink(0.07 * dim), 1.5)

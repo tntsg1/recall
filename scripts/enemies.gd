@@ -165,7 +165,8 @@ func on_escort(e: E, at: Vector2, dir: Vector2) -> void:
 	e.shield_flash = 1.0
 	e.knock += dir * 260.0
 	game.fx.sparks(at, -dir, 8, Pal.foe(1.0, 2.0), 420.0, 0.22, 0.9)
-	game.fx.ring(at, 6.0, 30.0, 0.25, Pal.foe(0.9, 1.8), 2.0)
+	game.fx.ring(at, 6.0, 60.0, 0.3, Pal.ink(1.0, 2.2), 3.0)
+	game.fx.flash(at, 30.0, 0.15, Pal.ink(0.8, 2.0))
 	game.sfx.play("shield", randf_range(1.2, 1.35), -6.0)
 
 
@@ -1098,7 +1099,10 @@ func _draw() -> void:
 					dl.append(e.pos + tn * minf(s0 + 7.0, tl - e.anchor.r - 4.0))
 					s0 += 13.0
 				if dl.size() > 0:
-					draw_multiline(dl, Pal.foe(0.35 * dim), 1.2)
+					draw_multiline(dl, Pal.foe(0.55 * dim), 1.6)
+				# and a small shield mark over what it guards
+				var wm: Vector2 = e.anchor.pos + Vector2(0, -e.anchor.r - 14.0)
+				draw_polyline(PackedVector2Array([wm + Vector2(-6, -5), wm + Vector2(6, -5), wm + Vector2(6, 1), wm + Vector2(0, 6), wm + Vector2(-6, 1), wm + Vector2(-6, -5)]), Pal.foe(0.75 * dim, 1.3), 1.5)
 		if e.kind == PROOFREADER:
 			# the nib's slit and breather hole, red ink on its tip
 			var fwd := Vector2.from_angle(e.rot)
