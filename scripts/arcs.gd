@@ -161,5 +161,5 @@ func _draw() -> void:
 		draw_multiline(wglow, Pal.ink(0.06 * dim, 1.2), 6.0)
 		draw_multiline(wcore, Pal.ink(0.45 * dim, 1.6), 1.4)
 	if glow.size() > 0:
-		draw_multiline(glow, Pal.ink(0.07 * dim, 1.3), 6.0)
+		draw_multiline(glow, Pal.ink(0.05 * dim, 1.2), 5.0)
 		draw_multiline(core, Pal.ink(0.95 * dim, 2.8), 2.0)

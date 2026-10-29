@@ -887,8 +887,14 @@ func _draw_floor_cables(dim: float) -> void:
 		var n := Vector2(1, 0) if to.x < 100.0 else (Vector2(-1, 0) if to.x > 1800.0 else Vector2(0, -1))
 		var b := to + n * 34.0
 		var a: Vector2 = GridMaster.HOME + (b - GridMaster.HOME).normalized() * 90.0
-		draw_line(a, b, Color(0.07, 0.07, 0.075), 9.0)
+		var cw: float = GridMaster.CABLE_W[k]
+		draw_line(a, b, Color(0.07, 0.07, 0.075), cw * 1.2 + 2.0)
 		draw_line(a, b, Pal.ink(0.22 * dim), 1.0)
+		if k == 2:
+			# 13th Street's line: a faint pulse now and then, all it ever gets
+			var ph := fmod(t * 0.5, 1.0)
+			var q := b.lerp(a, ph)
+			draw_line(q, q + (a - b).normalized() * 30.0, Pal.foe(0.5 * dim * (1.0 - ph), 1.4), 1.5)
 	# the transformer's empty plinth in the middle
 	var pr := Rect2(GridMaster.HOME - Vector2(90, 90), Vector2(180, 180))
 	draw_rect(pr, Pal.ink(0.12 * dim), false, 2.0)
