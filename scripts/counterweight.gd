@@ -507,17 +507,23 @@ func _draw_weight(w: W, dim: float) -> void:
 	# the cable, up to the top wall
 	# the cable: four strands up to a pulley block, swaying a little
 	# (its pulley is up past the wall: only the strands come down)
-	var cy := minf(Arena.ROOM.position.y, r.position.y)
+	var cy := minf(Arena.ROOM.position.y + 46.0, r.position.y)
 	var sway := sin(t * 1.3 + (1.0 if w.spare else 0.0)) * 6.0 * (0.3 + lift)
 	var py := Vector2(c.x + sway * 0.3, cy)
 	for st in 4:
 		var ox := (st - 1.5) * 4.0
-		draw_line(py + Vector2(ox, 0), Vector2(c.x + ox + sway, r.position.y + 6.0), Pal.ink((0.24 if st % 2 == 0 else 0.15) * dim), 1.2)
+		# fading out up toward the wall, heavier nearer the weight
+		var q0 := py + Vector2(ox, 0)
+		var q2 := Vector2(c.x + ox + sway, r.position.y + 6.0)
+		var q1 := q0.lerp(q2, 0.35)
+		var ca := (0.26 if st % 2 == 0 else 0.16) * dim
+		draw_line(q0, q1, Pal.ink(ca * 0.35), 1.0)
+		draw_line(q1, q2, Pal.ink(ca), 1.4)
 	var col := Pal.foe(a * dim, 1.0 + 0.8 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
 	draw_rect(r, Color(0.05, 0.05, 0.055, 0.6 + 0.4 * a))
 	# the plates: five bands across it, spreading apart once it has landed
 	var bands := 5
-	var spread: float = w.plates * 7.0
+	var spread: float = w.plates * 13.0
 	for j in bands:
 		var y0 := r.position.y + j * r.size.y / bands + (j - 2) * spread
 		var pr := Rect2(r.position.x - (j % 2) * 4.0 * w.plates, y0 + 2.0, r.size.x + (j % 2) * 8.0 * w.plates, r.size.y / bands - 4.0)
