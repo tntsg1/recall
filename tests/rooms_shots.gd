@@ -129,6 +129,47 @@ func _run() -> void:
 		game.rooms.open_doors()
 		await frames(50)
 		await shot("08_shape_%s" % sh)
+	# a room holding all four of the line's remnants, every one woken
+	if story == 5:
+		for id in game.rooms.homes:
+			game.rooms.homes[id] = 2
+		var best_n := -1
+		var best_seed := 52000
+		for k3 in 240:
+			game.rooms.cseed = 52000 + k3
+			game.rooms.build(2, ["L", "R", "T", "B"][k3 % 4], false)
+			var sp: Dictionary = game.rooms.lay.get("spots", {})
+			var nsp := sp.size() + (2 if sp.has("yellow") else 0)
+			if nsp > best_n:
+				best_n = nsp
+				best_seed = k3
+			if sp.has("yellow") and sp.size() >= 3:
+				break
+		game.rooms.cseed = 52000 + best_seed
+		game.rooms.build(2, ["L", "R", "T", "B"][best_seed % 4], false)
+		print("remnants in the room: ", game.rooms.lay.get("spots", {}).keys())
+		game.player.pos = game.rooms.start_pos()
+		for w in Lore.walls(5):
+			game.lore.hold["w5_%s" % w[0]] = 9.0
+		await frames(50)
+		await shot("08_remnants")
+	# the line's guide rails at work: a round crossing a powered rail turns along it
+	if story == 5 and game.maglev.active():
+		game.rooms.cseed = 41000
+		game.rooms.build(3, "L", false)
+		var rl: Array = game.maglev.rails[0]
+		var mid: Vector2 = ((rl[0] as Vector2) + (rl[1] as Vector2)) * 0.5
+		var along: Vector2 = ((rl[1] as Vector2) - (rl[0] as Vector2)).normalized()
+		var side: Vector2 = along.orthogonal()
+		game.player.pos = (mid + side * 260.0).clamp(Arena.ROOM.position + Vector2(60, 60), Arena.ROOM.end - Vector2(60, 60))
+		game.wave_ctl.phase = Waves.FIGHT
+		game.maglev.t = 0.5 - float(rl[2]) * Maglev.PERIOD * 0.5 + Maglev.PERIOD
+		await frames(6)
+		for j in 3:
+			game.bullets.fire(game.player.pos, ((mid + along * (j - 1) * 70.0) - game.player.pos).normalized())
+			await frames(4)
+		await frames(10)
+		await shot("08_rail_bend")
 	# the production floor's arms at work: marking, sweeping, plucking rounds
 	if story == 4 and game.arms.active():
 		game.rooms.cseed = 31000

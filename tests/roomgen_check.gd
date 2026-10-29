@@ -16,7 +16,7 @@ func _ok(cond: bool, what: String) -> void:
 
 # Whether a room's floor has its chapter's long lines (tracks, queue lanes, firing lanes, belts).
 func _lined(lay: Dictionary) -> bool:
-	for k in ["rails", "lanes", "lanes3", "belts"]:
+	for k in ["rails", "lanes", "lanes3", "belts", "maglev"]:
 		if not (lay.get(k, []) as Array).is_empty():
 			return true
 	return false
@@ -43,7 +43,7 @@ func _initialize() -> void:
 				var exits: Array = [{}]
 				if idx == 5:
 					exits = [{"boss": true}]
-				elif (k + idx) % 3 == 0:
+				elif (k + idx) % 3 == 0 and idx < 4:     # (as in a run: forks only in the first four rooms)
 					exits = [{}, {"risky": true}]
 				# the chapter's remnants, one to a room in turn (the first room its own where it has them)
 				var ids: Array = []

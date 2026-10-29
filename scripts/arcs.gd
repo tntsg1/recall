@@ -13,6 +13,7 @@ const HIT_EVERY := 0.3
 const ARC_DMG := 9.0
 const CABLE_DMG := 7.0
 
+var reach := ARC_D        # how far the current jumps (a generated room's place sets it)
 var arcs: Array = []      # [a, b]
 var on := false
 var t := 0.0
@@ -29,6 +30,7 @@ func _init() -> void:
 
 func setup(story: int) -> void:
 	on = story == 6
+	reach = ARC_D
 	arcs.clear()
 	enemy_cd.clear()
 	visible = on
@@ -74,7 +76,7 @@ func _link() -> void:
 			if i == j:
 				continue
 			var d: float = (pts[i] as Vector2).distance_to(pts[j])
-			if d > 18.0 and d < ARC_D:
+			if d > 18.0 and d < reach:
 				near.append([d, j])
 		near.sort_custom(func(x, y): return x[0] < y[0])
 		for n in mini(MAX_LINKS, near.size()):

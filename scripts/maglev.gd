@@ -174,9 +174,22 @@ func _draw() -> void:
 			s += 14.0
 		var lit: bool = live[g]
 		var w: float = warn[g]
-		draw_multiline(coils, Pal.ink((0.35 if lit else 0.14) * dim, 1.4 if lit else 1.0), 2.0)
+		# in a generated room: no rungs (a belt has those) - two dark conductor
+		# bars bolted down, and when it is powered a glowing core between them
+		var gen: bool = game != null and game.arena.generated
+		if gen:
+			coils.clear()
+			var bolt := 10.0
+			while bolt < span - 6.0:
+				for side2: float in [-1.0, 1.0]:
+					draw_circle(a + d * bolt + n * HALF_W * side2, 1.8, Pal.ink(0.35 * dim))
+				bolt += 40.0
+			if lit:
+				draw_colored_polygon(bed, Pal.ink(0.05 * dim, 1.2))
+		else:
+			draw_multiline(coils, Pal.ink((0.35 if lit else 0.14) * dim, 1.4 if lit else 1.0), 2.0)
 		for side: float in [-1.0, 1.0]:
-			draw_line(a + n * HALF_W * side, b + n * HALF_W * side, Pal.ink(0.5 * dim), 1.5)
+			draw_line(a + n * HALF_W * side, b + n * HALF_W * side, Pal.ink((0.65 if lit else 0.4) * dim, 1.4 if lit else 1.0), 2.0 if gen else 1.5)
 		if lit:
 			# powered: a thin bright core and chevrons running out from the middle
 			# both ways, the way the field throws a round
@@ -189,13 +202,14 @@ func _draw() -> void:
 				for sd: float in [-1.0, 1.0]:
 					var q := a + d * (mid + sd * ps)
 					var fw := d * sd
-					chev.append(q - fw * 6.0 + n * 8.0)
+					var cw := 5.0 if game != null and game.arena.generated else 8.0
+					chev.append(q - fw * 6.0 + n * cw)
 					chev.append(q + fw * 2.0)
 					chev.append(q + fw * 2.0)
-					chev.append(q - fw * 6.0 - n * 8.0)
+					chev.append(q - fw * 6.0 - n * cw)
 				ps += 92.0
 			if chev.size() > 0:
-				draw_multiline(chev, Pal.ink(0.7 * dim, 1.8), 2.0)
+				draw_multiline(chev, Pal.ink(0.7 * dim, 1.8), 3.0 if game != null and game.arena.generated else 2.0)
 		elif w > 0.0:
 			var fl := 0.5 + 0.5 * sin(now * (20.0 + 24.0 * w))
 			draw_line(a, b, Pal.ink((0.15 + 0.5 * w) * fl * dim, 1.8), 1.5 + 2.0 * w)
@@ -204,11 +218,18 @@ func _draw() -> void:
 			draw_circle(e, 7.0, Pal.WALL)
 			draw_arc(e, 7.0, 0.0, TAU, 14, Pal.ink(0.55 * dim), 1.5)
 			draw_circle(e, 3.0, Pal.ink((1.0 if lit else (0.8 * w if w > 0.0 else 0.2)) * dim, 2.4 if lit else 1.0))
+	var calm: bool = game != null and game.arena.generated
 	for th in thrown:
 		var tb = th[0]
 		var ka: float = 1.0 - th[2] / 1.4
-		draw_line(th[1], tb.pos, Pal.ink(0.2 * ka * dim, 1.4), 7.0)
-		draw_line(th[1], tb.pos, Pal.ink(0.9 * ka * dim, 2.0), 3.0)
+		if calm:
+			# a round sent along the rail: a fading tail, not a beam across the room
+			var tail := (tb.pos as Vector2) - ((tb.pos as Vector2) - (th[1] as Vector2)).limit_length(220.0)
+			draw_line(tail, tb.pos, Pal.ink(0.12 * ka * dim, 1.2), 5.0)
+			draw_line(tail, tb.pos, Pal.ink(0.55 * ka * dim, 1.5), 2.0)
+		else:
+			draw_line(th[1], tb.pos, Pal.ink(0.2 * ka * dim, 1.4), 7.0)
+			draw_line(th[1], tb.pos, Pal.ink(0.9 * ka * dim, 2.0), 3.0)
 	for bf in bend_flash:
 		var k: float = bf[1] / 0.35
 		draw_arc(bf[0], 6.0 + 16.0 * k, 0.0, TAU, 16, Pal.ink((1.0 - k) * dim, 2.0), 2.0)

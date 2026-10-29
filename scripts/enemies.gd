@@ -65,6 +65,7 @@ class E:
 	var bounce := 0.0           # knocked hard by a seized shell: a wall throws it back
 	var pinned := 0.0           # rammed into a wall by a seized guard: recalls cut it twice as hard
 	var elite := false          # the harder way's: more of it, ringed red
+	var seen_at := -1.0         # when it last had you in sight (generated rooms)
 
 var list: Array[E] = []
 var game
@@ -607,7 +608,7 @@ func _leech(e: E, pl: Vector2, dt: float) -> void:
 		# full, or nothing to take: keep away from you
 		var away := e.pos - pl
 		want = away.normalized() if away.length() < 420.0 else Vector2.from_angle(sin(e.t * 0.4 + e.seed) * 3.0)
-	e.vel = Pal.damp2(e.vel, _steer(e, want) * e.speed * (0.7 if held >= 4 else 1.0), 3.0, dt)
+	e.vel = Pal.damp2(e.vel, _steer(e, _seek(e, pl, want)) * e.speed * (0.7 if held >= 4 else 1.0), 3.0, dt)
 	if e.vel.length() > 5.0:
 		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-6.0 * dt))
 
@@ -896,6 +897,14 @@ func _seek(e: E, pl: Vector2, want: Vector2) -> Vector2:
 
 
 func _steer(e: E, want: Vector2) -> Vector2:
+	# in a generated room nothing waits out of sight for ever: five seconds
+	# without a line to you and it comes round to find you, whatever it was doing
+	if game.arena.generated:
+		var now: float = game.sim_time
+		if e.seen_at < 0.0 or game.arena.raycast(e.pos, game.player.pos).is_empty():
+			e.seen_at = now
+		elif now - e.seen_at > 5.0:
+			want = game.arena.nav_dir(e.pos, game.player.pos)
 	# Near the room's edge, lean back toward the middle: otherwise anything that
 	# wanders or keeps its distance ends up pressed to the outer wall, sliding along it.
 	var room := Arena.ROOM

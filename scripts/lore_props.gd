@@ -49,7 +49,7 @@ func start_chapter(ch: int) -> void:
 	shutter_up = 0.0
 	told.clear()
 	memory_fixed = Vector2.INF
-	if story == 5 and game.bosses_by.has("train"):
+	if story == 5 and game.bosses_by.has("train") and not game.rooms.active:
 		# the line runs here: its loop is laid from the start
 		var tr = game.bosses_by["train"]
 		tr.track_draw = 1.0
@@ -238,7 +238,9 @@ func _draw() -> void:
 		var gen5: bool = game.arena.generated
 		var plat_at = game.rooms.spot("yellow", Vector2(960, 1010))
 		if plat_at != null:
-			draw_set_transform(plat_at - Vector2(960, 1010), 0.0, Vector2.ONE)
+			# (a generated room keeps a shorter stretch of wall for it: drawn a little narrower)
+			var sx := 0.84 if gen5 else 1.0
+			draw_set_transform(plat_at - Vector2(960.0 * sx, 1010.0), 0.0, Vector2(sx, 1.0))
 			_draw_platform(dim)
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		if gen5:
@@ -250,14 +252,28 @@ func _draw() -> void:
 		if tt_at != null:
 			_draw_terminal(tt_at, dim, "w5_timetable")
 	elif story == 6:
-		_draw_floor_cables(dim)
-		_draw_cabinets(dim)
-		_draw_terminal(Vector2(80, 700), dim, "w6_ledger")
-		if shows.get("w6_notice", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 205), dim)
-		if shows.get("w6_cabinet", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 700), dim)
-		_draw_wired_bulb(dim)
+		var gen6: bool = game.arena.generated
+		if gen6:
+			_draw_bureau_paint(dim)
+			_draw_bureau_cover(dim)
+		else:
+			_draw_floor_cables(dim)
+			_draw_cabinets(dim)
+		var ledger_at = game.rooms.spot("ledger", Vector2(80, 700))
+		if ledger_at != null:
+			_draw_terminal(ledger_at, dim, "w6_ledger")
+		var n6_at = game.rooms.spot("notice", Vector2(1840, 205))
+		if n6_at != null and shows.get("w6_notice", 0.0) <= 0.01:
+			_draw_wall_notice(n6_at, dim)
+		var c6_at = game.rooms.spot("cabinet", Vector2(1840, 700))
+		if c6_at != null and shows.get("w6_cabinet", 0.0) <= 0.01:
+			_draw_wall_notice(c6_at, dim)
+		# the bulb someone wired themselves hangs over the graffiti
+		var s6_at = game.rooms.spot("scrawl", Vector2(1320, 70))
+		if s6_at != null:
+			draw_set_transform(s6_at - Vector2(1320, 70), 0.0, Vector2.ONE)
+			_draw_wired_bulb(dim)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	elif story == 7:
 		_draw_samples(dim)
 		_draw_chairs(dim)
@@ -828,6 +844,88 @@ func _draw_union_cover(dim: float) -> void:
 				draw_string(sf, ins.position + Vector2(5, 14), pk, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.6 * dim))
 
 
+# A generated bureau floor: the cables feeding its cover, a voltage stencil.
+func _draw_bureau_paint(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var quiet: Array = lay.get("quiet", [])
+	for cb: Array in lay.get("cables", []):
+		for k in cb.size() - 1:
+			var a: Vector2 = cb[k]
+			var b: Vector2 = cb[k + 1]
+			if a.distance_to(b) < 2.0:
+				continue
+			for sp: Array in _open_spans(a, b, quiet):
+				draw_line(sp[0], sp[1], Color(0.07, 0.07, 0.075), 7.0)
+				draw_line(sp[0], sp[1], Pal.ink(0.2 * dim), 1.0)
+	var sten: Array = lay.get("stencil", [])
+	if not sten.is_empty():
+		var sf := Fonts.get_font("SemiBold")
+		draw_string(sf, sten[0], sten[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 40, Color(1, 1, 1, 0.045 * dim))
+
+
+# A generated bureau floor's equipment by kind: switch housings, meter
+# cabinets (their needles barely off zero), cable drums, battery banks, a
+# transformer, a switchboard.
+func _draw_bureau_cover(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var kinds: Array = lay.get("kinds", [])
+	var cover: Array = lay.get("cover", [])
+	var sf := Fonts.get_font("SemiBold")
+	for i in cover.size():
+		var r: Rect2 = cover[i]
+		var kind: String = kinds[i] if i < kinds.size() else "switch"
+		var long_x := r.size.x >= r.size.y
+		var ins := r.grow(-7.0)
+		match kind:
+			"switch":
+				# a switch housing: its lever, a warning flash, its number
+				draw_line(ins.get_center() + Vector2(-10, 8), ins.get_center() + Vector2(10, -10), Pal.ink(0.55 * dim), 3.0)
+				draw_circle(ins.get_center() + Vector2(-10, 8), 3.0, Pal.ink(0.6 * dim))
+				draw_colored_polygon(PackedVector2Array([ins.position + Vector2(6, 18), ins.position + Vector2(14, 4), ins.position + Vector2(12, 12), ins.position + Vector2(18, 12), ins.position + Vector2(9, 26), ins.position + Vector2(11, 18)]), Pal.ink(0.45 * dim))
+				draw_string(sf, ins.position + Vector2(22, 14), "SW-%02d" % (i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+			"meter":
+				# a meter cabinet: its dial, the needle all but at zero
+				var dc := ins.get_center() - Vector2(0, ins.size.y * 0.15)
+				draw_arc(dc, 14.0, PI, TAU, 14, Pal.ink(0.5 * dim), 1.5)
+				draw_line(dc, dc + Vector2.from_angle(PI + 0.12) * 12.0, Pal.ink(0.85 * dim, 1.2), 1.5)
+				draw_rect(Rect2(ins.position + Vector2(6, ins.size.y - 18.0), Vector2(ins.size.x - 12.0, 10)), Pal.ink(0.25 * dim), false, 1.0)
+			"drum":
+				# a cable drum seen from above: the reel, the wound cable
+				var c := r.get_center()
+				draw_arc(c, r.size.x * 0.42, 0.0, TAU, 24, Pal.ink(0.45 * dim), 2.0)
+				for k in 4:
+					draw_arc(c, r.size.x * (0.34 - k * 0.05), 0.0, TAU, 20, Pal.ink(0.2 * dim), 1.0)
+				draw_circle(c, 6.0, Pal.ink(0.5 * dim))
+			"battery":
+				# a battery bank: cells in a row, terminals on top
+				var span := r.size.x if long_x else r.size.y
+				var nc := int(span / 28.0)
+				for k in nc:
+					var u := (k + 0.5) / nc
+					var cc := Vector2(lerpf(ins.position.x, ins.end.x, u), ins.get_center().y) if long_x else Vector2(ins.get_center().x, lerpf(ins.position.y, ins.end.y, u))
+					draw_rect(Rect2(cc - Vector2(9, 9), Vector2(18, 18)), Pal.ink(0.3 * dim), false, 1.0)
+					draw_line(cc + Vector2(-4, -2), cc + Vector2(4, -2), Pal.ink(0.5 * dim), 1.5)
+			"transformer":
+				# a transformer: its fins along both sides, the bushings on top, the danger plate
+				var n2 := int(ins.size.x / 12.0)
+				for k in n2:
+					var x := ins.position.x + 6.0 + k * 12.0
+					draw_line(Vector2(x, ins.position.y), Vector2(x, ins.position.y + 14.0), Pal.ink(0.35 * dim), 2.0)
+					draw_line(Vector2(x, ins.end.y - 14.0), Vector2(x, ins.end.y), Pal.ink(0.35 * dim), 2.0)
+				for k in 3:
+					draw_circle(ins.get_center() + Vector2((k - 1) * 30.0, 0), 8.0, Pal.ink(0.5 * dim))
+				draw_string(sf, ins.position + Vector2(6, ins.size.y * 0.5 + 24.0), Txt.t("hv_danger"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.red(0.6 * dim, 1.0))
+			"switchboard":
+				# a switchboard: a row of breakers, all but one thrown off
+				var span2 := r.size.x if long_x else r.size.y
+				var nb := int(span2 / 24.0)
+				for k in nb:
+					var u := (k + 0.5) / nb
+					var bc := Vector2(lerpf(ins.position.x, ins.end.x, u), ins.get_center().y) if long_x else Vector2(ins.get_center().x, lerpf(ins.position.y, ins.end.y, u))
+					var up := k == nb - 1
+					draw_line(bc, bc + (Vector2(0, -10) if up else Vector2(0, 8)), Pal.ink((0.8 if up else 0.35) * dim, 1.2 if up else 1.0), 3.0)
+
+
 # A generated concourse floor: way-arrows for the line.
 func _draw_station_paint(dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
@@ -873,22 +971,29 @@ func _draw_station_cover(dim: float) -> void:
 				if long_x:
 					draw_string(sf, Vector2(ins.position.x + 4, ins.end.y - 6), Txt.t("cx_dest"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.4 * dim))
 			"barrier":
-				# a ticket barrier: two flaps meeting, the reader lit red
+				# a ticket barrier: a cabinet at each end, two flaps reaching for
+				# each other across the passage, the card reader on the near cabinet
 				var c := ins.get_center()
-				var half := Vector2(ins.size.x * 0.5, 0) if long_x else Vector2(0, ins.size.y * 0.5)
-				draw_line(c - half, c - half * 0.1, Pal.ink(0.5 * dim), 4.0)
-				draw_line(c + half, c + half * 0.1, Pal.ink(0.5 * dim), 4.0)
-				draw_circle(c - half * 0.8, 3.0, Pal.red(0.8 * dim, 1.8))
+				var along := Vector2(ins.size.x * 0.5, 0) if long_x else Vector2(0, ins.size.y * 0.5)
+				var across := Vector2(0, ins.size.y * 0.5) if long_x else Vector2(ins.size.x * 0.5, 0)
+				for sd: float in [-1.0, 1.0]:
+					var cab := Rect2(c + along * sd * 0.82 - (along.normalized() * 8.0 + across), Vector2.ZERO).expand(c + along * sd * 0.82 + along.normalized() * 8.0 + across).abs()
+					draw_rect(cab, Pal.ink(0.4 * dim))
+					var flap_from := c + along * sd * 0.62
+					var open := 0.5 + 0.5 * sin(t * 0.8 + i)
+					draw_line(flap_from, flap_from - along * sd * 0.5 * (1.0 - 0.6 * open), Pal.ink(0.6 * dim), 3.0)
+				var reading := fmod(t * 0.6 + i * 0.37, 1.0) < 0.12
+				draw_circle(c - along * 0.82 - across * 0.4, 2.5, Pal.red(0.8 * dim, 1.2) if reading else Pal.ink(0.3 * dim))
 			"pillar5":
 				# a station pillar: the line's roundel on it
 				var c2 := rr.get_center()
 				draw_arc(c2, 18.0, 0.0, TAU, 20, Pal.ink(0.5 * dim), 3.0)
 				draw_line(c2 - Vector2(24, 0), c2 + Vector2(24, 0), Pal.ink(0.5 * dim), 5.0)
 			"signal":
-				# a signal box: its panel of lamps, one red
+				# a signal box: its panel of small white lamps, the one in turn red (no glow)
 				for k in 6:
 					var lp := ins.position + Vector2(18.0 + (k % 3) * 34.0, 30.0 + (k / 3) * 34.0)
-					draw_circle(lp, 7.0, Pal.red(0.8 * dim, 1.8) if k == int(t * 0.7) % 6 else Pal.ink(0.25 * dim))
+					draw_circle(lp, 5.0, Pal.red(0.7 * dim, 1.0) if k == int(t * 0.7) % 6 else Pal.ink(0.35 * dim))
 				draw_string(sf, ins.position + Vector2(4, 14), "SIG-5", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
 
 

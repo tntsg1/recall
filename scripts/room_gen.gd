@@ -26,7 +26,7 @@ const EXIT_APART := 480.0                     # two ways on: this far apart, the
 const FROM_ENTRY := 700.0                     # a way on this far from the way in: the room is crossed
 
 # The chapters that walk room to room; the rest keep their one hand-made room.
-const ON := [1, 2, 3, 4]
+const ON := [1, 2, 3, 4, 5]
 const ARM_W := 200.0       # an arm's footing on its wall
 const POST := 48.0
 
@@ -142,11 +142,11 @@ const STYLE := {
 		# the superconducting line's concourse: freight containers, ticket
 		# barriers, station pillars; the chapter's own are its maglev guide
 		# rails set in the floor, one in the first room and three by the last
-		"shapes": {"hall": 3, "twin": 2, "corner": 2, "neck": 2, "bays": 1},
+		"shapes": {"hall": 3, "twin": 2, "corner": 1, "neck": 1, "bays": 2},
 		"pieces": [
 			[3, [Rect2(0, 0, 160, 60)], "cargo"],
 			[2, [Rect2(0, 0, 160, 60), Rect2(0, 60, 160, 60)], "cargo"],
-			[2, [Rect2(0, 0, 120, 34)], "barrier"],
+			[2, [Rect2(0, 0, 160, 48)], "barrier"],
 			[2, [Rect2(0, 0, 70, 70)], "pillar5"],
 		],
 		"landmarks": [
@@ -158,8 +158,30 @@ const STYLE := {
 		# the hand-made station (the yard's floor): six blocks
 		"count": 6, "area": 50000.0,
 		"themes": [["cargo"], ["barrier", "pillar5"], ["cargo", "barrier"]],
-		"props": {"timetable": [220.0, 180.0], "yellow": [760.0, 90.0], "manifest": [0.0, 0.0], "scrawl": [220.0, 130.0]},
+		"props": {"timetable": [220.0, 180.0], "yellow": [620.0, 90.0], "manifest": [0.0, 0.0], "scrawl": [220.0, 130.0]},
 		"on_cover": {"manifest": "cargo"},
+	},
+	6: {
+		# the energy bureau's floor: switch housings, meter cabinets, cable
+		# drums, battery banks. The chapter's own is the current itself: it
+		# arcs between your rounds, reaching further room by room
+		"shapes": {"hall": 3, "twin": 2, "corner": 2, "neck": 2, "bays": 2},
+		"pieces": [
+			[3, [Rect2(0, 0, 80, 64)], "switch"],
+			[2, [Rect2(0, 0, 60, 100)], "meter"],
+			[2, [Rect2(0, 0, 84, 84)], "drum"],
+			[2, [Rect2(0, 0, 140, 46)], "battery"],
+		],
+		"landmarks": [
+			[3, [Rect2(0, 0, 150, 100)], "transformer"],
+			[2, [Rect2(0, 0, 220, 50)], "switchboard"],
+			[2, [Rect2(0, 0, 80, 64), Rect2(80, 0, 80, 64)], "switch"],
+		],
+		"arc_reach": [150.0, 155.0, 160.0, 170.0, 180.0, 190.0],
+		# the hand-made floor: four low switch housings
+		"count": 4, "area": 20500.0,
+		"themes": [["switch"], ["meter", "battery"], ["drum"]],
+		"props": {"ledger": [220.0, 180.0], "cabinet": [160.0, 150.0], "notice": [160.0, 150.0], "scrawl": [260.0, 150.0]},
 	},
 }
 
@@ -180,7 +202,7 @@ static func make(story: int, index: int, cseed: int, entry: String, exits: Array
 	var rng := RandomNumberGenerator.new()
 	for attempt in 150:
 		rng.seed = hash([cseed, story, index, entry, exits.size(), attempt])
-		var lay := _try(st, story, index, cseed, entry, exits, remnants, rng, attempt >= 100)
+		var lay := _try(st, story, index, cseed, entry, exits, remnants, rng, attempt >= 60)
 		if lay.is_empty():
 			continue
 		lay["attempt"] = attempt
@@ -291,6 +313,11 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 	if lay.gates.size() < (2 if (lay.arms as Array).size() >= 2 else 3):
 		last_why = "t3"
 		return {}
+	# the remnants on walls first: their stretch of wall and the floor in front
+	# are kept for them, and the cover goes round
+	if not _remnants(lay, st, story, index, e, remnants, taken, rng, spare, false):
+		last_why = "t6"
+		return {}
 	# cover, piece by piece
 	var lo_n := 3 if sparse else int(ceil(st.count * 0.75))
 	var hi_n := 5 if sparse else int(floor(st.count * 1.25))
@@ -375,37 +402,10 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		area += pa
 		if is_mech:
 			mech_left -= 1
-	# the remnants this room holds, each on a wall facing the way its words read
-	var all_w: Array = Lore.walls(story)
-	for id: String in remnants:
-		var w: Array = []
-		for ww in all_w:
-			if ww[0] == id:
-				w = ww
-		if w.is_empty():
-			continue
-		var need: Array = st.props.get(id, [220.0, 140.0])
-		var spot: Array = []
-		var on_kind: String = st.get("on_cover", {}).get(id, "")
-		if on_kind != "":
-			# on the lid of a piece of that kind, read from above
-			for ci in (lay.cover as Array).size():
-				if lay.kinds[ci] == on_kind:
-					var cr: Rect2 = lay.cover[ci]
-					spot = [Vector2(cr.get_center().x, cr.position.y), Vector2(0, -1)]
-					break
-		elif id == st.get("entry_prop", "") and index == 0:
-			if NORMAL[entry] == w[2]:
-				spot = [e.pos, e.n]
-		else:
-			spot = _spot_for(w[2], need, lay, taken, rng, w[3] == "scrawl" or w[3] == "scrawl_top")
-		if spot.is_empty() and spare:
-			continue
-		if spot.is_empty():
-			last_why = "t6"
-			return {}
-		lay.spots[id] = spot
-		taken.append({"pos": spot[0], "n": spot[1], "w": need[0]})
+	# then the remnants read off cover, once the cover stands
+	if not _remnants(lay, st, story, index, e, remnants, taken, rng, spare, true):
+		last_why = "t6"
+		return {}
 	# both halves of the room have something in them (the first room: a fair piece each)
 	var halves := [0.0, 0.0]
 	for r: Rect2 in lay.cover:
@@ -422,9 +422,48 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		_paint_union(lay, taken, rng)
 	elif story == 5:
 		_paint_station(lay, taken, rng)
+	elif story == 6:
+		_paint_bureau(lay, taken, rng)
 	else:
 		_paint(lay, taken, rng)
 	return lay
+
+
+# The bureau's floor: cables run from the walls in square bends to the
+# cover they feed (cut where words are), a high-voltage stencil or two.
+static func _paint_bureau(lay: Dictionary, taken: Array, rng: RandomNumberGenerator) -> void:
+	lay["quiet"] = _quiet(lay)
+	lay["arc_reach"] = (STYLE[6].arc_reach as Array)[mini(lay.index, 5)]
+	var cables: Array = []
+	var cover: Array = lay.cover
+	var order: Array = range(cover.size())
+	_shuffle(order, rng)
+	for ci in order.slice(0, mini(3, order.size())):
+		var to: Vector2 = (cover[ci] as Rect2).get_center()
+		# from the nearest wall, out and round in one bend
+		var walls4 := [Vector2(ROOM.position.x, to.y), Vector2(ROOM.end.x, to.y), Vector2(to.x, ROOM.position.y), Vector2(to.x, ROOM.end.y)]
+		var from: Vector2 = walls4[0]
+		for w4: Vector2 in walls4:
+			if w4.distance_to(to) < from.distance_to(to):
+				from = w4
+		var jog := rng.randf_range(-160.0, 160.0)
+		var mid := from + (Vector2(0, jog) if absf(from.x - to.x) > 1.0 else Vector2(jog, 0))
+		mid = mid.clamp(ROOM.position + Vector2(20, 20), ROOM.end - Vector2(20, 20))
+		var bend := Vector2(to.x, mid.y) if absf(from.x - to.x) > 1.0 else Vector2(mid.x, to.y)
+		cables.append([from, mid if absf(from.x - to.x) > 1.0 else mid, bend, to])
+	lay["cables"] = cables
+	lay["stencil"] = []
+	var solid: Array = lay.walls + lay.cover
+	for tries in 30:
+		var at := Vector2(rng.randf_range(ROOM.position.x + 160.0, ROOM.end.x - 300.0), rng.randf_range(ROOM.position.y + 160.0, ROOM.end.y - 200.0))
+		var box := Rect2(at - Vector2(10, 50), Vector2(260, 70))
+		var ok := true
+		for r: Rect2 in solid + lay.quiet:
+			if r.grow(20.0).intersects(box):
+				ok = false
+		if ok:
+			lay.stencil = [at, "▲ 380 kV"]
+			break
 
 
 # The concourse floor: painted way-arrows for the line, the tactile strip by
@@ -434,8 +473,8 @@ static func _paint_station(lay: Dictionary, taken: Array, rng: RandomNumberGener
 	var solid: Array = lay.walls + lay.cover
 	var arrows: Array = []
 	for tries in 30:
-		if arrows.size() >= rng.randi_range(2, 3):
-			break
+		if arrows.size() >= 1:
+			break       # one way-arrow to a room: more reads as wallpaper
 		var at := Vector2(rng.randf_range(ROOM.position.x + 160.0, ROOM.end.x - 160.0), rng.randf_range(ROOM.position.y + 160.0, ROOM.end.y - 160.0))
 		var box := Rect2(at - Vector2(110, 40), Vector2(220, 80))
 		var ok := true
@@ -529,9 +568,7 @@ static func _paint_range(lay: Dictionary, taken: Array, rng: RandomNumberGenerat
 	lay["lanes3"] = []
 	for tries in 16:
 		var side: String = ["T", "L", "R"][rng.randi() % 3]
-		if side == lay.entry.side:
-			continue
-		# not out from a wall a way on stands in
+		# not out from a wall a way on stands in (the way in, shut behind you, will do)
 		var by_door := false
 		for d: Dictionary in lay.exits:
 			if d.side == side:
@@ -696,6 +733,57 @@ static func _paint(lay: Dictionary, taken: Array, rng: RandomNumberGenerator) ->
 			lay.stencil = [at, "%02d" % (13 + lay.index)]
 			break
 
+
+
+# The remnants this room holds, each on a wall facing the way its words read
+# (`on_cover`: just those read off a piece of cover). False if one finds no
+# place and late tries may not leave it out.
+static func _remnants(lay: Dictionary, st: Dictionary, story: int, index: int, e: Dictionary, remnants: Array, taken: Array, rng: RandomNumberGenerator, spare: bool, on_cover: bool) -> bool:
+	var all_w: Array = Lore.walls(story)
+	for id: String in remnants:
+		var w: Array = []
+		for ww in all_w:
+			if ww[0] == id:
+				w = ww
+		if w.is_empty():
+			continue
+		var on_kind: String = st.get("on_cover", {}).get(id, "")
+		if (on_kind != "") != on_cover:
+			continue
+		var need: Array = (st.props.get(id, [220.0, 140.0]) as Array).duplicate()
+		# graffiti runs as long as its words: along a top wall the wall must be
+		# that long; on a side wall the words run out into the room
+		var words := 22.0 * (w[4] as String).length() + 60.0
+		if w[3] == "scrawl_top":
+			need[0] = maxf(need[0], words)
+		elif w[3] == "scrawl":
+			need[1] = maxf(need[1], minf(words, 520.0))
+		var spot: Array = []
+		if on_kind != "":
+			# on the lid of a piece of that kind, read from above
+			# (one lying the long way first: its words want the width)
+			for pass_n in 2:
+				for ci in (lay.cover as Array).size():
+					var cr: Rect2 = lay.cover[ci]
+					if lay.kinds[ci] == on_kind and (pass_n == 1 or cr.size.x >= cr.size.y):
+						spot = [Vector2(cr.get_center().x, cr.position.y), Vector2(0, -1)]
+						break
+				if not spot.is_empty():
+					break
+		elif id == st.get("entry_prop", "") and index == 0:
+			if NORMAL[e.side] == w[2]:
+				spot = [e.pos, e.n]
+		else:
+			spot = _spot_for(w[2], need, lay, taken, rng, w[3] == "scrawl" or w[3] == "scrawl_top")
+		if spot.is_empty() and spare:
+			continue
+		if spot.is_empty():
+			return false
+		lay.spots[id] = spot
+		var tan := Vector2(absf((spot[1] as Vector2).y), absf((spot[1] as Vector2).x))
+		var front := Rect2(spot[0] - tan * need[0] / 2.0, Vector2.ZERO).expand(spot[0] + tan * need[0] / 2.0 + (spot[1] as Vector2) * need[1]).abs()
+		taken.append({"pos": spot[0], "n": spot[1], "w": need[0], "front": front if on_kind == "" else Rect2()})
+	return true
 
 # ---------------------------------------------------------------- shapes
 
@@ -882,6 +970,8 @@ static func _fits(placed: Array[Rect2], lay: Dictionary, taken: Array) -> bool:
 		for d: Dictionary in taken:
 			if _dist(r, d.pos) < CLEAR:
 				return false
+			if (d.get("front", Rect2()) as Rect2).size.x > 0.0 and r.intersects(d.front):
+				return false
 		if _dist(r, lay.start) < 170.0:
 			return false
 	return true
@@ -924,7 +1014,7 @@ static func _spot_for(n: Vector2, need: Array, lay: Dictionary, taken: Array, rn
 		# the floor in front of it: open, and not inside another wall block
 		var front := Rect2(p - tan * half, Vector2.ZERO).expand(p + tan * half + n * deep)
 		front = front.abs()
-		var ok := ROOM.grow(1.0).encloses(front) and not front.intersects(HUD_STRIP) and not front.intersects(HUD_LORE)
+		var ok := ROOM.grow(1.0).encloses(front) and not front.intersects(HUD_STRIP) and not front.intersects(HUD_LORE) and not front.intersects(BANNER.grow(20.0))
 		for d: Dictionary in lay.exits:
 			if front.grow(30.0).intersects(d.label):
 				ok = false

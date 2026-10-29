@@ -65,7 +65,18 @@ func setup(ch: int) -> void:
 	var rooms: Array = [1, 2, 3, 4, 5] if not RoomGen.STYLE[story].get("first_room", []).is_empty() else [0, 1, 2, 3, 4, 5]
 	RoomGen._shuffle(rooms, rng)
 	var first: Array = RoomGen.STYLE[story].get("first_room", [])
-	for w in Lore.walls(story):
+	# the remnants that need the most wall go to the earliest rooms: a room
+	# that finds no wall for one hands it on, and the earlier, the more rooms
+	# there are to hand it to (the boss's room shows them all in any case)
+	var ws: Array = Lore.walls(story).duplicate()
+	var props: Dictionary = RoomGen.STYLE[story].get("props", {})
+	ws.sort_custom(func(p, q): return float((props.get(p[0], [0.0]) as Array)[0]) > float((props.get(q[0], [0.0]) as Array)[0]))
+	# (the biggest of them: the earlier of the first two rooms drawn)
+	if rooms.size() >= 2 and rooms[1] < rooms[0]:
+		var tmp = rooms[0]
+		rooms[0] = rooms[1]
+		rooms[1] = tmp
+	for w in ws:
 		if first.has(w[0]):
 			homes[w[0]] = 0
 		elif not rooms.is_empty():
@@ -98,14 +109,21 @@ func build(i: int, entry: String, risky: bool) -> void:
 		game.lasers.setup(hand)
 		game.arms.setup(hand)
 		game.maglev.setup(hand, Chapters.story(game.chapter))
+		game.arcs.reach = Arcs.ARC_D
 	else:
 		game.lasers.set_fences(lay.get("fences", []))
 		game.maglev.set_rails(lay.get("maglev", []))
+		game.arcs.reach = lay.get("arc_reach", Arcs.ARC_D)
 		var crate_at := Rect2()
 		for ci in (lay.cover as Array).size():
 			if lay.kinds[ci] == "reserve":
 				crate_at = lay.cover[ci]
 		game.arms.set_layout(lay.get("arms", []), crate_at, lay.get("belts", []))
+	# the central express's loop belongs to its own (hand-made) room
+	if game.bosses_by.has("train") and Chapters.story(game.chapter) == 5:
+		var tr = game.bosses_by["train"]
+		tr.track_draw = 1.0 if lay.is_empty() else 0.0
+		tr.rails.queue_redraw()
 	game.lore.queue_redraw()
 	queue_redraw()
 
@@ -302,6 +320,9 @@ func _draw_gate(g: Dictionary, hot: float, dim: float) -> void:
 	var a := p - tan * hw
 	var b := p + tan * hw
 	draw_colored_polygon(PackedVector2Array([a, b, b - n * 14.0, a - n * 14.0]), Color(0.02, 0.02, 0.025, 1.0))
+	# (what a gate shows of itself stands a step in from the wall's edge)
+	a += n * 8.0
+	b += n * 8.0
 	for k in 5:
 		var q := a.lerp(b, (k + 0.5) / 5.0)
 		draw_line(q, q - n * 12.0, Pal.ink(0.28 * dim), 2.0)

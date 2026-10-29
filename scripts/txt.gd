@@ -262,6 +262,7 @@ const S := {
 	"ration": ["口粮", "RATION"],
 	"packer": ["包装机 PK-1", "PACKER PK-1"],
 	"silo": ["面粉仓", "FLOUR SILO"],
+	"hv_danger": ["高压危险", "HIGH VOLTAGE"],
 	"line_name": ["中央线 · 本站不停", "CENTRAL LINE · DOES NOT STOP"],
 	"door_risky": ["险路", "THE HARD WAY"],
 	"door_risky_sub": ["敌人更多 · 有精英\n每击掉 2 格 · 多一次强化", "MORE OF THEM · AN ELITE\nEACH HIT −2 · ONE MORE PICK"],
