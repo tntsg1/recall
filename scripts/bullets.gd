@@ -71,6 +71,7 @@ class B:
 	var corrected := false      # a proofreader moved it; it stays where it was put
 	var curve_acc := 0.0        # turning in an airlock's draught since its last path point
 	var plate := -1             # the hull plate it is embedded in (it rides, and yanks it when recalled)
+	var stasis := -1            # the stasis field holding it in mid-air
 
 	func total() -> float:
 		return cum[cum.size() - 1]
@@ -607,7 +608,7 @@ func step(dt: float, real_dt: float) -> void:
 				if b.hist.size() > 10:
 					b.hist.remove_at(0)
 				if f >= 1.0 and b.home_zero:
-					if game.boss is Zero:
+					if game.boss is Zero or game.boss is Observed:
 						game.boss.stolen_hit(b.pos)
 					list.remove_at(i)
 					continue
@@ -665,6 +666,9 @@ func _fly(b: B, dt: float) -> void:
 	var red_cut: Dictionary = game.boss.cut(a, to) if game.boss is Archivist else {}
 	if red_cut:
 		to = red_cut.point
+	var st: Dictionary = game.stasis.catch(a, to) if game.stasis.active() else {}
+	if st:
+		to = st.point
 	var h: Dictionary = game.arena.raycast(a, to)
 	var end: Vector2 = h.point if h else to
 	var sh: Dictionary = {} if Loadout.gun == "rail" else game.enemies.shield_hit(a, end)
@@ -716,6 +720,9 @@ func _fly(b: B, dt: float) -> void:
 	game.enemies.sweep(a, end, b, false)
 	if b.just_bent:
 		b.just_bent = false
+		return
+	if st and not h:
+		_hang(b, end, st.k)
 		return
 	if red_cut and not h:
 		_redact(b, end, red_cut.bar)
@@ -782,6 +789,18 @@ func _burn(b: B, at: Vector2) -> void:
 		game.on_ammo_home(b)
 
 
+# A stasis field stops the round in mid-air: it is embedded there, in nothing.
+func _hang(b: B, at: Vector2, k: int) -> void:
+	b.pos = at
+	b.set_head(at)
+	b.state = EMBED
+	b.t = 0.0
+	b.life = 0.0
+	b.hit.clear()
+	b.stasis = k
+	game.stasis.on_catch(b, k)
+
+
 # A redaction bar takes the round: it is held there until the bar lifts.
 func _redact(b: B, at: Vector2, bar: int) -> void:
 	b.pos = at
@@ -824,6 +843,8 @@ func _return(b: B, dt: float) -> void:
 	for k in pts.size() - 1:
 		if game.scan_rings.active():
 			game.scan_rings.cross(pts[k], pts[k + 1], b)
+		if game.boss is Observed:
+			game.boss.observe(pts[k], pts[k + 1])
 		var es: Dictionary = game.enemies.escort_hit(pts[k], pts[k + 1])
 		if es:
 			# an escort drone throws itself across the line: the round comes home from there
@@ -1051,7 +1072,7 @@ func _draw() -> void:
 				var s2 := b.s
 				# the head carries the light; the tail behind it stays a quiet line,
 				# so a flock coming home never buries you or what it is cutting
-				var tc := Pal.you(0.9, 2.4) if b.zero_pass else (Pal.you(0.35, 1.2) if b.shadow else Pal.red(0.55, 1.7))
+				var tc := (Pal.red(1.0, 2.6) if game.boss is Observed else Pal.you(0.9, 2.4)) if b.zero_pass else (Pal.you(0.35, 1.2) if b.shadow else Pal.red(0.55, 1.7))
 				_trail(1, b.sub(s2, minf(b.total(), s2 + 160.0)), tc)
 			HOME, ORBIT:
 				if b.hist.size() > 1:
@@ -1165,8 +1186,16 @@ func _draw_paths() -> void:
 		_cw.append(Pal.you(0.2 * a))
 	for b in list:
 		if b.state == EMBED and b.foe and b.zlight > 0.0:
-			# Zero is about to call it: its whole way back flickers
-			_poly_w(b.path, Pal.you(0.5 + 0.4 * sin(game.real_time * 24.0), 1.6))
+			if game.boss is Observed:
+				# the subject is about to call it: red dashes marching home along its line
+				var tot2 := b.total()
+				var at2 := tot2 - fmod(game.real_time * 160.0, 26.0)
+				while at2 > 0.0:
+					_poly_r(PackedVector2Array([b.sample(at2), b.sample(maxf(0.0, at2 - 13.0))]), Pal.red(0.75, 1.8))
+					at2 -= 26.0
+			else:
+				# Zero is about to call it: its whole way back flickers
+				_poly_w(b.path, Pal.you(0.5 + 0.4 * sin(game.real_time * 24.0), 1.6))
 		if b.state == EMBED:
 			var rem := life_max - b.life
 			if b.light > 0.0:

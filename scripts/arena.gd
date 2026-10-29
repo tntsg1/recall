@@ -67,6 +67,12 @@ func setup(ch: int) -> void:
 		7:
 			# the deep archive: nothing fixed to hide behind but the shelving
 			pass
+		10:
+			# the institute: four instrument plinths, the floor between left to the fields
+			for c in [Vector2(330, 250), Vector2(1590, 250), Vector2(330, 870), Vector2(1590, 870)]:
+				inner.append(Rect2(c - Vector2(48, 28), Vector2(96, 56)))
+			inner.append(Rect2(700, 545, 70, 40))
+			inner.append(Rect2(1150, 545, 70, 40))
 		9:
 			# the shipyard: a crate of armour steel; the rest is the plates adrift
 			inner.append(Rect2(170, 880, 150, 70))

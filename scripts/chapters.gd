@@ -15,6 +15,7 @@ const LIST := [
 	{"story": 8, "room": 7, "pool": 8, "music": 1, "boss": "archivist", "note": "note_boss_archivist", "par": [72.0, 108.0]},
 	{"story": 9, "room": 8, "pool": 9, "music": 2, "boss": "counterweight", "note": "note_boss_counterweight", "par": [45.0, 70.0]},
 	{"story": 10, "room": 9, "pool": 10, "music": 3, "boss": "peace", "note": "note_boss_peace", "par": [42.0, 70.0]},
+	{"story": 11, "room": 10, "pool": 11, "music": 0, "boss": "observed", "note": "note_boss_observed", "par": [60.0, 95.0]},
 	{"story": 12, "room": 4, "pool": 4, "music": 4, "boss": "zero", "note": "note_boss_5", "par": [60.0, 90.0]},
 ]
 

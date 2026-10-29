@@ -27,6 +27,7 @@ var scan_rings: ScanRings    # the bureau of thought's mood-scan rings (chapter 
 var shelves: Shelves        # the deep archive's mobile shelving (chapter 8)
 var vents: Vents            # the lift car's airlock doors (chapter 9)
 var plates: Plates          # the shipyard's hull plates adrift (chapter 10)
+var stasis: Stasis          # the institute's stasis fields (chapter 11)
 var radio_n := 0
 var wave_ctl: Waves
 var fx: Fx
@@ -203,6 +204,9 @@ func _ready() -> void:
 	plates = Plates.new()
 	plates.game = self
 	add_child(plates)
+	stasis = Stasis.new()
+	stasis.game = self
+	add_child(stasis)
 	player = Player.new()
 	player.game = self
 	add_child(player)
@@ -212,7 +216,7 @@ func _ready() -> void:
 	possess = Possess.new()
 	possess.game = self
 	add_child(possess)
-	for pair in [["lockdown", Lockdown], ["warden", Warden], ["testbed", Testbed], ["grid", GridMaster], ["devourer", Devourer], ["train", Boss], ["metronome", Metronome], ["archivist", Archivist], ["counterweight", Counterweight], ["peace", Peace], ["zero", Zero]]:
+	for pair in [["lockdown", Lockdown], ["warden", Warden], ["testbed", Testbed], ["grid", GridMaster], ["devourer", Devourer], ["train", Boss], ["metronome", Metronome], ["archivist", Archivist], ["counterweight", Counterweight], ["peace", Peace], ["observed", Observed], ["zero", Zero]]:
 		var bn = pair[1].new()
 		bn.game = self
 		add_child(bn)
@@ -1017,6 +1021,7 @@ func _run_frame(dt: float) -> void:
 	shelves.step(sdt)
 	vents.step(sdt)
 	plates.step(sdt)
+	stasis.step(sdt)
 	if prof_on:
 		_lap("player+possess")
 	trail.append([sim_time, player.pos])
@@ -1783,6 +1788,7 @@ func next_chapter() -> void:
 	shelves.setup(Chapters.story(chapter))
 	vents.setup(Chapters.story(chapter))
 	plates.setup(Chapters.story(chapter))
+	stasis.setup(Chapters.story(chapter))
 	lore.start_chapter(chapter)
 	sfx.start_chapter(Chapters.music(chapter))
 	sfx.play("chapter", 1.0, -2.0)

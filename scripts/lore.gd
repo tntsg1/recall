@@ -90,6 +90,17 @@ const SEIZE := {
 		Enemies.ECHO: [["每一艘的名字我都记得：和平一号到和平九十号。", "I REMEMBER EVERY NAME: PEACE ONE TO PEACE NINETY."]],
 		Enemies.ESCORT: [["我护着重要的东西。我自己不重要。", "I GUARD WHAT MATTERS. I DO NOT MATTER."]],
 	},
+	11: {
+		Enemies.CHASER: [["研究员 0703。我的课题是让一秒钟更长——用于加班。", "RESEARCHER 0703. MY PROJECT: A LONGER SECOND — FOR OVERTIME."],
+			["所里的老设备，都是照一台七百年前的机器仿的。", "THE OLD EQUIPMENT HERE WAS ALL COPIED FROM ONE MACHINE, SEVEN HUNDRED YEARS OLD."]],
+		Enemies.GUARD: [["实验室门口写着：观测即改变。所以禁止观测。", "THE LAB DOOR SAYS: TO OBSERVE IS TO CHANGE. SO OBSERVING IS FORBIDDEN."]],
+		Enemies.CHARGER: [["董事长两百岁了。研究所的结论：这不算异常。", "THE CHAIRMAN IS TWO HUNDRED. THE INSTITUTE'S FINDING: THIS IS NOT AN ANOMALY."]],
+		Enemies.PRISM: [["我把光拐个弯，让观测结果更好看。", "I BEND THE LIGHT A LITTLE SO THE RESULTS LOOK BETTER."]],
+		Enemies.LEECH: [["我吸走多出来的时间，存进董事们的账户。", "I DRAW OFF THE SPARE TIME AND BANK IT TO THE DIRECTORS."]],
+		Enemies.PULSE: [["每一拍，我借给董事会一秒钟。从不归还。", "EACH BEAT I LEND THE BOARD ONE SECOND. NONE COME BACK."]],
+		Enemies.ECHO: [["我被复制过三次。他们说，每一份都是我。", "I HAVE BEEN COPIED THREE TIMES. THEY SAY EVERY COPY IS ME."]],
+		Enemies.PHASE: [["我一半在这里。另一半在排队等审批。", "HALF OF ME IS HERE. THE OTHER HALF IS WAITING FOR APPROVAL."]],
+	},
 }
 
 # remnants: [id, wall point, inward normal, kind of mark, zh, en]
@@ -154,6 +165,12 @@ const WALL := {
 		["tether", Vector2(1840, 530), Vector2(-1, 0), "notice", "失重区作业请系好安全绳。安全绳从工资中扣除。", "WEAR YOUR TETHER IN ZERO-G ZONES. TETHERS ARE DEDUCTED FROM YOUR PAY."],
 		["scrawl", Vector2(1840, 740), Vector2(-1, 0), "scrawl", "他们说是为了保护我们。炮口对着我们。", "THEY SAY IT IS TO PROTECT US. THE GUNS POINT AT US."],
 	],
+	11: [
+		["eliminated", Vector2(80, 560), Vector2(1, 0), "screen", "已消除异常：时间 · 引力 · 死亡（进行中）", "ANOMALIES ELIMINATED: TIME · GRAVITY · DEATH (IN PROGRESS)"],
+		["sample", Vector2(600, 1010), Vector2(0, -1), "floor", "意识转移试验 · 唯一成功样本：编号零 · 下落不明", "CONSCIOUSNESS TRANSFER · ONLY SUCCESSFUL SUBJECT: NO. ZERO · WHEREABOUTS UNKNOWN"],
+		["observe", Vector2(1840, 470), Vector2(-1, 0), "notice", "实验进行中请勿观测。观测者将被列入实验对象。", "EXPERIMENT IN PROGRESS. DO NOT OBSERVE. OBSERVERS WILL BE ADDED TO THE SUBJECTS."],
+		["scrawl", Vector2(1840, 690), Vector2(-1, 0), "scrawl", "他们想永远活着。我们只想活到月底。", "THEY WANT TO LIVE FOREVER. WE JUST WANT TO MAKE IT TO MONTH'S END."],
+	],
 }
 
 const RADIO := {
@@ -206,6 +223,11 @@ const RADIO := {
 		"wave": [["近地轨道船坞今日焊接装甲 4800 平方米，和平力量持续增强。", "THE ORBITAL YARD WELDED 4,800 M² OF ARMOUR TODAY. THE FORCES OF PEACE GROW STRONGER."],
 			["和平九十一号即将下水。请市民收看直播并保持感动。", "PEACE NINETY-ONE LAUNCHES SOON. CITIZENS, WATCH THE BROADCAST AND REMAIN MOVED."]],
 		"boss": [["和平号建造暂停。所有已完成部分均属和平用途。", "WORK ON THE PEACE IS SUSPENDED. ALL COMPLETED PARTS ARE FOR PEACEFUL USE."]],
+	},
+	11: {
+		"wave": [["中央异常物理研究所宣布：本年度发现异常 0 起。", "THE CENTRAL INSTITUTE OF ANOMALOUS PHYSICS REPORTS: 0 ANOMALIES FOUND THIS YEAR."],
+			["近日出现的不明设备不属于异常。它不存在。", "THE UNKNOWN DEVICE SEEN RECENTLY IS NOT AN ANOMALY. IT DOES NOT EXIST."]],
+		"boss": [["观测实验提前结束。实验对象已确认不存在。", "THE OBSERVATION ENDED EARLY. THE SUBJECT IS CONFIRMED NOT TO EXIST."]],
 	},
 }
 

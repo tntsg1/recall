@@ -218,6 +218,11 @@ func _draw() -> void:
 		_draw_terminal(Vector2(80, 560), dim, "w10_schedule")
 		if shows.get("w10_tether", 0.0) <= 0.01:
 			_draw_wall_notice(Vector2(1840, 530), dim)
+	elif story == 11:
+		_draw_lab(dim)
+		_draw_terminal(Vector2(80, 560), dim, "w11_eliminated")
+		if shows.get("w11_observe", 0.0) <= 0.01:
+			_draw_wall_notice(Vector2(1840, 470), dim)
 	elif story == 9:
 		_draw_lift(dim)
 		_draw_terminal(Vector2(80, 545), dim, "w9_altitude")
@@ -511,8 +516,8 @@ func _draw_scan(o: Vector2, dim: float) -> void:
 # A registration terminal on the left wall: a kiosk with a screen that
 # shows its remnant when a recall sweeps it, "REGISTERING..." otherwise.
 func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
-	var wide := 40.0 if story == 9 or story == 10 else 0.0
-	var tall := 24.0 if story == 10 else 0.0
+	var wide := 40.0 if story == 9 or story == 10 or story == 11 else 0.0
+	var tall := 24.0 if story == 10 or story == 11 else 0.0
 	var body := Rect2(c.x + 4.0, c.y - 80.0 - tall, 130.0 + wide, 160.0 + tall)
 	draw_rect(body, Color(0.05, 0.05, 0.055, 1.0))
 	draw_rect(body, Pal.ink(0.55 * dim), false, 2.0)
@@ -551,6 +556,11 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 			# the lift's altimeter, climbing
 			draw_string(font, scr.position + Vector2(8, 26), Txt.t("term_altitude"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.4 * dim))
 			draw_string(Fonts.get_font("SemiBold"), scr.position + Vector2(8, 56), Txt.t("altitude") % _alt_str(), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.75 * dim, 1.2))
+			return
+		if story == 11:
+			# the anomaly count: nought, as it has been for 87 years
+			draw_string(font, scr.position + Vector2(8, 26), Txt.t("term_anomaly"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.4 * dim))
+			draw_string(Fonts.get_font("SemiBold"), scr.position + Vector2(8, 74), "0", HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Pal.ink(0.75 * dim, 1.2))
 			return
 		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output", 5: "term_timetable", 6: "term_power", 7: "term_mood", 8: "term_archive", 10: "term_schedule"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
 
@@ -1666,3 +1676,90 @@ func _draw_yard(dim: float) -> void:
 		for k in 4:
 			var cx := Peace.X0 + 60.0 + k * 170.0
 			draw_rect(Rect2(cx - 22.0, kr.end.y + 6.0, 44.0, 14.0), Pal.ink(0.14 * dim), false, 1.5)
+
+
+# The institute's floor: lab tiling, cable runs from the instrument plinths
+# to the field posts, a sensor on each plinth sweeping the room, and the
+# banner over the door with the year's count of anomalies.
+func _draw_lab(dim: float) -> void:
+	var tiles := PackedVector2Array()
+	var x := 200.0
+	while x < 1800.0:
+		tiles.append(Vector2(x, 90.0))
+		tiles.append(Vector2(x, 1000.0))
+		x += 120.0
+	var y := 130.0
+	while y < 1000.0:
+		tiles.append(Vector2(90.0, y))
+		tiles.append(Vector2(1830.0, y))
+		y += 120.0
+	draw_multiline(tiles, Pal.ink(0.04 * dim), 1.0)
+	var plinths := [Vector2(330, 250), Vector2(1590, 250), Vector2(330, 870), Vector2(1590, 870)]
+	# cable runs, each plinth to its nearest field, laid in right angles
+	var runs := PackedVector2Array()
+	for k in plinths.size():
+		var p: Vector2 = plinths[k]
+		var best: Vector2 = Stasis.FIELDS[0]
+		for fc: Vector2 in Stasis.FIELDS:
+			if fc.distance_to(p) < best.distance_to(p):
+				best = fc
+		var edge: Vector2 = best + (p - best).normalized() * (Stasis.R + 8.0)
+		var mid := Vector2(p.x, edge.y)
+		runs.append(p)
+		runs.append(mid)
+		runs.append(mid)
+		runs.append(edge)
+	draw_multiline(runs, Pal.ink(0.1 * dim), 3.0)
+	draw_multiline(runs, Color(0.03, 0.03, 0.035), 1.0)
+	# the instruments, one of each: a sensor dish sweeping, an oscilloscope,
+	# a clock whose hand will not settle, a pendulum swinging the wrong way
+	for k in plinths.size():
+		var p: Vector2 = plinths[k] + Vector2(0, -4)
+		match k:
+			0:
+				var a := t * 0.5
+				draw_arc(p, 16.0, a - 0.9, a + 0.9, 14, Pal.ink(0.6 * dim, 1.2), 2.5)
+				draw_line(p, p + Vector2.from_angle(a) * 20.0, Pal.ink(0.5 * dim), 1.5)
+				draw_circle(p, 3.0, Pal.ink(0.6 * dim))
+			1:
+				var sc := Rect2(p - Vector2(30, 14), Vector2(60, 28))
+				draw_rect(sc, Color(0.03, 0.03, 0.035))
+				draw_rect(sc, Pal.ink(0.4 * dim), false, 1.0)
+				var wv := PackedVector2Array()
+				for j in 25:
+					var wx := sc.position.x + 3.0 + j * 2.25
+					wv.append(Vector2(wx, sc.get_center().y + sin(j * 0.7 - t * 6.0) * 7.0 * (1.0 if j % 9 != 4 else 0.2)))
+				draw_polyline(wv, Pal.ink(0.7 * dim, 1.4), 1.2)
+			2:
+				draw_arc(p, 15.0, 0.0, TAU, 24, Pal.ink(0.55 * dim), 1.5)
+				for j in 12:
+					var d := Vector2.from_angle(TAU * j / 12.0)
+					draw_line(p + d * 12.0, p + d * 14.5, Pal.ink(0.4 * dim), 1.0)
+				var ha := -PI * 0.5 + sin(t * 3.1) * 0.6 + sin(t * 7.3) * 0.25
+				draw_line(p, p + Vector2.from_angle(ha) * 12.0, Pal.ink(0.75 * dim, 1.3), 1.5)
+			3:
+				var top := p + Vector2(0, -18)
+				var sw := sin(-t * 1.7) * 0.7
+				var bob := top + Vector2.from_angle(PI * 0.5 + sw) * 30.0
+				draw_line(top + Vector2(-10, 0), top + Vector2(10, 0), Pal.ink(0.5 * dim), 2.0)
+				draw_line(top, bob, Pal.ink(0.55 * dim), 1.2)
+				draw_circle(bob, 4.0, Pal.ink(0.7 * dim, 1.3))
+		for j in 5:
+			var on := int(t * 3.0 + j + k) % 5 != 0
+			draw_rect(Rect2((plinths[k] as Vector2) + Vector2(-38 + j * 8, 18), Vector2(5, 4)), Pal.ink((0.5 if on else 0.15) * dim), true)
+	# the two sample boxes mid-floor, stencilled and taped shut
+	var sbf := Fonts.get_font("SemiBold")
+	var bl := Txt.t("sample_box")
+	var bw := sbf.get_string_size(bl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	for bx: Rect2 in [Rect2(700, 545, 70, 40), Rect2(1150, 545, 70, 40)]:
+		draw_line(bx.position + Vector2(0, 20), bx.position + Vector2(70, 20), Pal.ink(0.3 * dim), 4.0)
+		draw_rect(Rect2(bx.get_center() - Vector2(bw * 0.5 + 4.0, 8.0), Vector2(bw + 8.0, 15.0)), Color(0.05, 0.05, 0.055))
+		draw_string(sbf, bx.get_center() + Vector2(-bw * 0.5, 4.0), bl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.65 * dim))
+	# the banner over the top wall
+	var sf := Fonts.get_font("SemiBold")
+	var lab := Txt.t("anomaly_gauge")
+	var lw := sf.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+	var bc := Vector2(1340, 92)
+	draw_rect(Rect2(bc - Vector2(lw * 0.5 + 12.0, 12.0), Vector2(lw + 24.0, 24.0)), Color(0.05, 0.05, 0.055))
+	draw_rect(Rect2(bc - Vector2(lw * 0.5 + 12.0, 12.0), Vector2(lw + 24.0, 24.0)), Pal.ink(0.4 * dim), false, 1.0)
+	draw_string(sf, bc + Vector2(-lw * 0.5, 5.0), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.6 * dim))

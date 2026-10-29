@@ -59,7 +59,7 @@ func step(dt: float, real_dt: float, move: Vector2, aim_at: Vector2) -> void:
 		if dash_t <= 0.0:
 			vel = dash_dir * SPEED
 	else:
-		var target := move.limit_length(1.0) * SPEED * (1.12 if game.has("lean") else 1.0) * (1.25 if game.wave_haste else 1.0)
+		var target: Vector2 = move.limit_length(1.0) * SPEED * (1.12 if game.has("lean") else 1.0) * (1.25 if game.wave_haste else 1.0) * game.stasis.slow_at(pos)
 		vel = Pal.damp2(vel, target, 16.0 if move != Vector2.ZERO else 12.0, dt)
 	pos += vel * dt
 	pos = game.arena.push_circle(pos, R)

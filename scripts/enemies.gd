@@ -5,7 +5,7 @@ extends Node2D
 # its armour goes; it shatters into those edges when it dies.
 
 enum { WARN, SPAWN, ALIVE, DEAD, HOST }   # HOST: seized by you (Possess drives it)
-enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO, INSPECTOR, PROOFREADER, ESCORT }
+enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO, INSPECTOR, PROOFREADER, ESCORT, PHASE }
 enum { APPROACH, WINDUP, DASH, STUN, RECOVER }
 
 const SPEC := {
@@ -19,6 +19,7 @@ const SPEC := {
 	INSPECTOR: {"hp": 55.0, "r": 23.0, "sides": 4, "speed": 110.0},
 	PROOFREADER: {"hp": 50.0, "r": 27.0, "sides": 5, "speed": 125.0},
 	ESCORT: {"hp": 26.0, "r": 12.0, "sides": 3, "speed": 520.0},
+	PHASE: {"hp": 48.0, "r": 21.0, "sides": 6, "speed": 150.0},
 }
 const WARN_TIME := 0.55
 const SPAWN_TIME := 0.6
@@ -205,6 +206,15 @@ func sweep(a: Vector2, b: Vector2, bullet, ret: bool) -> void:
 	for e in list:
 		if e.state != ALIVE or bullet.hit.has(e.id):
 			continue
+		if e.kind == PHASE and phased(e):
+			# it passes through: a glint where it crossed
+			if not bullet.hit.has(-e.id):
+				var qp := Geometry2D.get_closest_point_to_segment(e.pos, a, b)
+				if qp.distance_to(e.pos) <= e.r + 3.0:
+					bullet.hit[-e.id] = true
+					game.fx.ring(qp, 3.0, e.r * 1.4, 0.22, Pal.foe(0.6, 1.5), 1.2)
+					game.fx.flash(qp, 14.0, 0.08, Pal.foe(0.4, 1.4))
+			continue
 		var q := Geometry2D.get_closest_point_to_segment(e.pos, a, b)
 		if q.distance_to(e.pos) <= e.r + 3.0:
 			bullet.hit[e.id] = true
@@ -342,6 +352,8 @@ func _chain(from: E, dmg: float) -> void:
 
 # Blast school / Echo / Singularity damage: plain, no chain of its own.
 func blast_hit(e: E, dir: Vector2, dmg: float) -> void:
+	if e.kind == PHASE and phased(e):
+		return
 	e.hp -= dmg
 	e.flash = 1.0
 	e.knock += dir * 220.0
@@ -469,6 +481,8 @@ func step(dt: float) -> void:
 						_proofreader(e, pl, dt)
 					ESCORT:
 						_escort(e, pl, dt)
+					PHASE:
+						_phaser(e, pl, dt)
 					PULSE:
 						_pulse(e, pl, dt)
 					ECHO:
@@ -489,7 +503,7 @@ func step(dt: float) -> void:
 					_gravity(e, dt)
 				if game.lv.magnet > 0:
 					_magnet(e, dt)
-				var spd: float = game.enemy_speed()
+				var spd: float = game.enemy_speed() * game.stasis.slow_at(e.pos)
 				if game.has("magnetic_tip") and _near_round(e.pos, 120.0):
 					spd *= 0.7
 				var intended: Vector2 = e.pos + (e.vel * spd + e.knock) * dt
@@ -724,6 +738,41 @@ func _escort(e: E, pl: Vector2, dt: float) -> void:
 		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-10.0 * dt))
 
 
+const PH_SOLID := 1.9
+const PH_GONE := 1.6
+const PH_TURN := 0.35         # the flicker at the end of each state
+
+
+# A phaser: solid, then not. Its clock stands still in a held stasis field,
+# so one caught there stays as it was.
+func _phaser(e: E, pl: Vector2, dt: float) -> void:
+	var sl: float = game.stasis.slow_at(e.pos)
+	e.mode_t += dt * (0.12 if sl < 0.9 else 1.0)
+	var span := PH_SOLID if e.mode == 0 else PH_GONE
+	if e.mode_t >= span:
+		e.mode = 1 - e.mode
+		e.mode_t = 0.0
+		game.fx.ring(e.pos, e.r, e.r * 2.2, 0.25, Pal.foe(0.5 if e.mode == 1 else 0.9, 1.4), 1.5)
+		game.sfx.play("focus" if e.mode == 1 else "spawn", 1.6 if e.mode == 1 else 1.3, -16.0)
+	var want := _steer(e, _route(e, pl))
+	# it closes in while faint, and holds off a little while solid
+	var sp := e.speed * (1.55 if e.mode == 1 else 0.8)
+	e.vel = Pal.damp2(e.vel, want * sp, 3.0, dt)
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-8.0 * dt))
+
+
+# 0 solid .. 1 faint (it flickers across in the last PH_TURN of each state).
+func phase_k(e: E) -> float:
+	var span := PH_SOLID if e.mode == 0 else PH_GONE
+	var tk := clampf((e.mode_t - (span - PH_TURN)) / PH_TURN, 0.0, 1.0)
+	return tk if e.mode == 0 else 1.0 - tk
+
+
+func phased(e: E) -> bool:
+	return phase_k(e) > 0.5
+
+
 func _claimed(b, me: E) -> bool:
 	for o in list:
 		if o != me and o.kind == PROOFREADER and o.anchor == b:
@@ -949,6 +998,8 @@ func _separate(e: E, dt: float) -> void:
 
 
 func _contact(e: E, pl: Vector2) -> void:
+	if e.kind == PHASE and phased(e):
+		return
 	var d := pl - e.pos
 	if d.length() < e.r + Player.R - 3.0:
 		if game.on_player_hit(d.normalized() if d.length() > 0.1 else Vector2.RIGHT, e):
@@ -990,6 +1041,10 @@ func _poly(e: E) -> Array[Vector2]:
 		ESCORT:
 			# a small dart
 			pts = [Vector2(e.r * 1.3, 0), Vector2(-e.r * 0.8, e.r * 0.8), Vector2(-e.r * 0.8, -e.r * 0.8)]
+		PHASE:
+			# a six-pointed star, its points blurring when it goes faint
+			for k in 6:
+				pts.append(Vector2.from_angle(TAU * k / 6.0) * e.r * (1.0 if k % 2 == 0 else 0.62))
 		PROOFREADER:
 			# a pen nib, pointing the way it walks
 			pts = [Vector2(e.r * 1.35, 0), Vector2(e.r * 0.15, e.r * 0.72), Vector2(-e.r * 0.95, e.r * 0.55), Vector2(-e.r * 0.95, -e.r * 0.55), Vector2(e.r * 0.15, -e.r * 0.72)]
@@ -1025,6 +1080,22 @@ func _draw() -> void:
 		var sc := Transform2D(Vector2(1.0 - sq, 0), Vector2(0, 1.0 + sq * 0.7), Vector2.ZERO)
 		var tr := Transform2D(0.0, e.pos + shake) * basis * sc * basis.affine_inverse() * Transform2D(e.rot, Vector2.ZERO) * Transform2D(Vector2(extra, 0), Vector2(0, 1.0 / maxf(extra, 0.5)), Vector2.ZERO)
 		var col := Pal.foe(dim).lerp(Pal.red(dim, 2.4), e.red * 0.85)
+		if e.kind == PHASE and e.state == ALIVE:
+			var pk := phase_k(e)
+			var turning := pk > 0.02 and pk < 0.98
+			var fl := (0.5 + 0.5 * sin(e.t * 50.0)) if turning else 1.0
+			col.a *= lerpf(1.0, 0.22, pk) * lerpf(0.6, 1.0, fl)
+			if pk > 0.3:
+				# out of step with itself: two faint copies either side
+				for sgn: float in [-1.0, 1.0]:
+					var off := Vector2(sin(e.t * 7.0 + e.seed), cos(e.t * 5.0 + e.seed)) * 5.0 * sgn * pk
+					var gt2 := Transform2D(e.rot + 0.2 * sgn, e.pos + off)
+					for k in pts.size() - 1:
+						draw_line(gt2 * pts[k], gt2 * pts[k + 1], Pal.foe(0.22 * pk * dim, 1.2), 1.0)
+			# its clock: an arc counting to the next change
+			var span := PH_SOLID if e.mode == 0 else PH_GONE
+			var ck := clampf(e.mode_t / span, 0.0, 1.0)
+			draw_arc(e.pos, e.r + 7.0, -PI * 0.5, -PI * 0.5 + TAU * (1.0 - ck), 24, Pal.foe((0.55 if e.mode == 0 else 0.25) * dim, 1.2), 1.5)
 		for g in e.ghosts:
 			var gk: float = 1.0 - g[1] / 0.25
 			var gt := Transform2D(g[2], g[0])
@@ -1045,10 +1116,20 @@ func _draw() -> void:
 				_draw_shield(e, dim, Pal.ease_out(clampf((e.t - 0.3) / 0.3, 0.0, 1.0)))
 			continue
 		var whole := _edges_left(e)
+		# a phaser: filled while solid, only a dashed outline while faint
+		var faint_now: bool = e.kind == PHASE and e.state == ALIVE and phased(e)
+		if e.kind == PHASE and e.state == ALIVE and not faint_now:
+			var fp := PackedVector2Array()
+			for k in e.sides:
+				fp.append(tr * pts[k])
+			draw_colored_polygon(fp, Pal.foe(0.24 * dim))
 		for k in e.sides:
 			var a := tr * pts[k]
 			var b := tr * pts[k + 1]
-			if k < whole:
+			if k < whole and faint_now:
+				for j in 3:
+					draw_line(a.lerp(b, j / 3.0), a.lerp(b, j / 3.0 + 0.18), col, 1.5)
+			elif k < whole:
 				draw_line(a, b, col, 2.0)
 			else:
 				var m := (a + b) * 0.5

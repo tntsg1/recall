@@ -203,6 +203,25 @@ func think(game) -> void:
 				move += (p - gq).normalized() * 2.4
 				if bs.gun_t > Peace.GUN_WARN - 0.15 and gq.distance_to(p) < 30.0:
 					bot.dash = true
+	# the observed: off the orbs and out of a marked lane
+	if bs is Observed and bs.state == Observed.RUN:
+		for ob in bs.orbs:
+			var ov: Vector2 = ob[1]
+			var oq := Geometry2D.get_closest_point_to_segment(p, ob[0], (ob[0] as Vector2) + ov * 0.45)
+			if oq.distance_to(p) < 40.0:
+				move += ov.normalized().orthogonal() * (1.0 if (p - oq).dot(ov.normalized().orthogonal()) >= 0.0 else -1.0) * 2.0
+				if oq.distance_to(p) < 18.0:
+					bot.dash = true
+		for st in bs.ss:
+			if st.lane_t >= 0.0:
+				var lq := Geometry2D.get_closest_point_to_segment(p, st.pos, st.lane)
+				if lq.distance_to(p) < Observed.R + 50.0:
+					move += (p - lq).normalized() * 2.6
+					if st.lane_t > Observed.LANE_WARN - 0.12 and lq.distance_to(p) < Observed.R + Player.R:
+						bot.dash = true
+			var sd2: float = st.pos.distance_to(p)
+			if sd2 < 220.0:
+				move += (p - st.pos) / maxf(sd2, 1.0) * (220.0 - sd2) / 70.0
 	# airlocks: keep away from a door that is marked or open
 	if game.vents.active() and game.vents.door >= 0:
 		var dp: Vector2 = game.vents.door_pos(game.vents.door)
@@ -307,6 +326,18 @@ func think(game) -> void:
 					pcp = sc
 		nearest = {"pos": pcp, "vel": Vector2.ZERO}
 		nd = pcp.distance_to(p)
+	elif bs is Observed and bs.state == Observed.RUN:
+		# observed: the real one; else take the states in turn, shooting past them
+		var op2: Vector2 = bs.core_pos()
+		if bs.collapsed <= 0.0 and bs.ss.size() > 0:
+			var live: Array = []
+			for st2 in bs.ss:
+				if st2.popped <= 0.0:
+					live.append(st2)
+			if live.size() > 0:
+				op2 = live[int(frame / 70) % live.size()].pos
+		nearest = {"pos": op2, "vel": Vector2.ZERO}
+		nd = op2.distance_to(p)
 	elif bs is Counterweight and bs.state == Counterweight.RUN and bs.core_open > 0.5:
 		var cwp: Vector2 = bs.core_pos()
 		nearest = {"pos": cwp, "vel": Vector2.ZERO}
@@ -346,7 +377,10 @@ func think(game) -> void:
 	if focus_hold > 0.0:
 		focus_hold -= 1.0 / 60.0
 		bot.focus = focus_hold > 0.0
-	elif emb >= 8 and (game.ammo <= 3 or emb >= 18) and (es.size() > 0 or game.boss.core_open > 0.5 or (game.boss is Lockdown and game.boss.state == Lockdown.RUN) or (game.boss is GridMaster and game.boss.state == GridMaster.RUN)):
+	elif game.boss is Observed and game.boss.state == Observed.RUN and game.boss.collapsed > 0.6 and game.boss.collapsed < 3.0 and emb >= 5:
+		focus_hold = 0.25
+		bot.focus = true
+	elif emb >= 8 and (game.ammo <= 3 or emb >= 18) and (es.size() > 0 or game.boss.core_open > 0.5 or (game.boss is Lockdown and game.boss.state == Lockdown.RUN) or (game.boss is GridMaster and game.boss.state == GridMaster.RUN) or (game.boss is Observed and game.boss.state == Observed.RUN)):
 		focus_hold = 0.25
 		bot.focus = true
 	else:

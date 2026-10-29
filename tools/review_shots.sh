@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Regenerate every still the visual review uses into proofs/review/.
 cd "$(dirname "$0")/.."
-for t in title_shots hud_shots review_shots host_hud_shots possess_shots band_shots resume_shots lockdown_shots lore_shots archive_shot ch2_lore_shots ch3_shots ch4_shots ch5_shots ch6_shots ch7_shots ch8_shots ch9_shots ch10_shots; do
+for t in title_shots hud_shots review_shots host_hud_shots possess_shots band_shots resume_shots lockdown_shots lore_shots archive_shot ch2_lore_shots ch3_shots ch4_shots ch5_shots ch6_shots ch7_shots ch8_shots ch9_shots ch10_shots ch11_shots; do
 	timeout 260 bash tools/run_test.sh tests/$t.gd --fixed-fps 60 > /dev/null 2>&1 || echo "FAILED $t"
 done
 R=proofs/review
