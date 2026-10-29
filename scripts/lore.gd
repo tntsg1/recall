@@ -89,7 +89,7 @@ const WALL := {
 	6: [
 		["ledger", Vector2(80, 700), Vector2(1, 0), "screen", "本月配额：中央区 98.6% · 第十三街 0.02%", "THIS MONTH: CENTRAL 98.6% · 13TH STREET 0.02%"],
 		["cabinet", Vector2(1840, 700), Vector2(-1, 0), "notice", "私接电线者，按窃取国家资产论处", "ANYONE WIRING THEIR OWN LINE WILL BE TREATED AS A THIEF OF STATE ASSETS"],
-		["notice", Vector2(1840, 230), Vector2(-1, 0), "notice", "节约用电是每位股东的美德。今晚 19 点至次日 7 点停电。", "SAVING POWER IS EVERY SHAREHOLDER'S VIRTUE. NO POWER 19:00 TO 07:00 TONIGHT."],
+		["notice", Vector2(1840, 205), Vector2(-1, 0), "notice", "节约用电是每位股东的美德。今晚 19 点至次日 7 点停电。", "SAVING POWER IS EVERY SHAREHOLDER'S VIRTUE. NO POWER 19:00 TO 07:00 TONIGHT."],
 		["scrawl", Vector2(1320, 70), Vector2(0, 1), "scrawl_top", "我们自己接的线，比他们的灯亮。", "THE LINE WE WIRED OURSELVES BURNS BRIGHTER THAN THEIR LIGHTS."],
 	],
 }

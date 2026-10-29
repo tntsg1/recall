@@ -85,10 +85,22 @@ func _run() -> void:
 	var bs = game.boss
 	game.player.pos = Vector2(960, 880)
 	await frames(60)
+	# one cable cut into, so its bar shows
+	bs._hurt_cable(2, 70.0, bs.cable_from(2).lerp(bs.cable_to(2), 0.4))
+	await frames(10)
 	await shot("6_grid")
 	while bs.mode != GridMaster.WARN or bs.mode_t < 0.9:
 		await process_frame
 	await shot("7_zone")
+	# three districts fed at once, you between them
+	bs.phase = 2
+	bs.mode = GridMaster.IDLE
+	bs.zone_cd = 0.0
+	game.player.pos = Vector2(960, 800)
+	while bs.mode != GridMaster.WARN or bs.mode_t < 0.8:
+		await process_frame
+	await shot("9_zones")
+	bs.phase = 0
 	await frames(30)
 	for k in 3:
 		bs.cable_hp[k] = 0.0

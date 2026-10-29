@@ -199,7 +199,7 @@ func _draw() -> void:
 		_draw_cabinets(dim)
 		_draw_terminal(Vector2(80, 700), dim, "w6_ledger")
 		if shows.get("w6_notice", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 230), dim)
+			_draw_wall_notice(Vector2(1840, 205), dim)
 		if shows.get("w6_cabinet", 0.0) <= 0.01:
 			_draw_wall_notice(Vector2(1840, 700), dim)
 		_draw_wired_bulb(dim)
@@ -881,7 +881,7 @@ func _draw_floor_cables(dim: float) -> void:
 	if grid_on:
 		return
 	if game.hud.intro_t >= 0.0:
-		dim *= clampf((game.hud.intro_t - 2.2) / 0.6, 0.2, 1.0)
+		dim *= clampf((game.hud.intro_t - 2.2) / 0.6, 0.0, 1.0)
 	for k in 3:
 		var to: Vector2 = GridMaster.CABINETS[k]
 		var n := Vector2(1, 0) if to.x < 100.0 else (Vector2(-1, 0) if to.x > 1800.0 else Vector2(0, -1))

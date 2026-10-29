@@ -19,6 +19,7 @@ const CABLE_HP := 170.0
 const CABINETS := [Vector2(80, 420), Vector2(1840, 420), Vector2(1500, 1010)]
 const CABLE_KEYS := ["grid_central", "grid_industry", "grid_13th"]
 const CABLE_SHARE := ["100%", "80%", "0.5%"]
+const CABLE_W := [16.0, 10.0, 3.0]     # thick as the share it carries
 const ZONES := [Rect2(80, 70, 587, 470), Rect2(1253, 70, 587, 470), Rect2(80, 600, 587, 410), Rect2(667, 600, 586, 410), Rect2(1253, 600, 587, 410)]
 const ZONE_EVERY := [4.2, 3.4, 2.8]
 const WARN_TIME := 1.15
@@ -47,7 +48,7 @@ var bolts: Array = []                  # [from, to, t]
 var rings: Array = []                  # [t, struck]: surges off the open transformer
 var ring_cd := 1.0
 const RING_TIME := 1.4
-const RING_R := 760.0
+const RING_R := 560.0
 
 
 func _ready() -> void:
@@ -355,6 +356,8 @@ func _run(dt: float) -> void:
 	# open, the transformer surges: a ring rolls out over the floor; dash it
 	if not shielded():
 		ring_cd -= dt
+		if ring_cd > 0.0 and ring_cd < 0.3 and int(ring_cd * 20.0) != int((ring_cd + dt) * 20.0):
+			game.fx.ring(pos, HALF, HALF + 30.0, 0.15, Pal.red(0.8, 2.0), 3.0)
 		if ring_cd <= 0.0:
 			ring_cd = 2.4 - 0.3 * phase
 			rings.append([0.0, false])
@@ -508,8 +511,9 @@ func _draw() -> void:
 	for rg in rings:
 		var kr: float = rg[0] / RING_TIME
 		var rr: float = RING_R * Pal.ease_out(kr)
-		draw_arc(pos, rr, 0.0, TAU, 96, Pal.foe((1.0 - kr) * dim, 2.4), 4.0)
-		draw_arc(pos, rr - 10.0, 0.0, TAU, 96, Pal.foe(0.25 * (1.0 - kr) * dim, 1.4), 10.0)
+		# a red leading edge (it strikes), a dark band trailing it
+		draw_arc(pos, rr - 9.0, 0.0, TAU, 96, Color(0, 0, 0, 0.35 * (1.0 - kr)), 14.0)
+		draw_arc(pos, rr, 0.0, TAU, 96, Pal.red((1.0 - kr) * dim, 2.2), 3.0)
 
 
 func _draw_cable(k: int, dim: float) -> void:
@@ -528,12 +532,13 @@ func _draw_cable(k: int, dim: float) -> void:
 		draw_line(mid + d * 26.0, b, Pal.ink(0.3 * dim), 1.5)
 		return
 	var energ := a.lerp(b, lk)
-	draw_line(a, b, Color(0.08, 0.08, 0.09), 11.0)
+	var cw: float = CABLE_W[k]
+	draw_line(a, b, Color(0.08, 0.08, 0.09), cw * 1.2 + 2.0)
 	draw_line(a, b, Pal.ink(0.35 * dim), 1.5)
 	if lk > 0.0:
 		var c := Pal.foe(0.75 * dim, 1.1 + 1.6 * cable_flash[k])
-		draw_line(a, energ, Pal.foe(0.05 * dim, 1.2), 10.0)
-		draw_line(a, energ, c, 2.0)
+		draw_line(a, energ, Pal.foe(0.05 * dim, 1.2), cw * 1.4 + 2.0)
+		draw_line(a, energ, c, maxf(1.0, cw * 0.45))
 		# pulses run from the cabinet into the transformer
 		var span := a.distance_to(energ)
 		var pl := PackedVector2Array()
@@ -544,13 +549,27 @@ func _draw_cable(k: int, dim: float) -> void:
 			pl.append(q - d * 16.0)
 			s += 70.0
 		if pl.size() > 0:
-			draw_multiline(pl, Pal.foe(0.6 * dim, 2.0), 3.0)
-	# its health: a thin bar along its side, the length of the cable's first stretch
-	var span2 := minf(220.0, a.distance_to(b) * 0.45)
+			draw_multiline(pl, Pal.foe(0.6 * dim, 2.0), maxf(1.0, cw * 0.22))
+	# its health: once it has been cut into, segments laid on the cable itself
 	var hk: float = clampf(cable_hp[k] / CABLE_HP, 0.0, 1.0)
-	var sd := n * (22.0 if n.y <= 0.0 else -22.0)
-	draw_line(a + d * 20.0 + sd, a + d * (20.0 + span2) + sd, Pal.foe(0.18 * dim), 3.0)
-	draw_line(a + d * 20.0 + sd, a + d * (20.0 + span2 * hk) + sd, Pal.foe(0.55 * dim, 1.2), 3.0)
+	if hk < 0.999:
+		var segs := 8
+		var left := int(ceil(hk * segs))
+		var bl := PackedVector2Array()
+		var dl := PackedVector2Array()
+		for j in segs:
+			var q0 := a + d * (24.0 + j * 18.0)
+			var arr := bl if j < left else dl
+			arr.append(q0)
+			arr.append(q0 + d * 12.0)
+			if j < left:
+				bl = arr
+			else:
+				dl = arr
+		if bl.size() > 0:
+			draw_multiline(bl, Pal.foe(0.95 * dim, 2.0), cw + 4.0)
+		if dl.size() > 0:
+			draw_multiline(dl, Pal.ink(0.15 * dim), cw + 4.0)
 
 
 func _draw_zones(dim: float) -> void:

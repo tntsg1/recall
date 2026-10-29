@@ -865,7 +865,7 @@ func _draw() -> void:
 			draw_polyline(PackedVector2Array([bp + Vector2(-3, 2), bp + Vector2(-1.5, -2), bp + Vector2(0, 1), bp + Vector2(1.5, -2), bp + Vector2(3, 2)]), Pal.foe(0.8 * dim, 1.3), 1.2)
 			draw_rect(Rect2(bp + Vector2(-4, 6), Vector2(8, 5)), Pal.foe(0.7 * dim), false, 1.2)
 			draw_line(bp + Vector2(-10, -10), bp + Vector2(10, 12), Pal.red(0.85 * dim, 1.4), 2.0)
-			draw_arc(e.pos, DIM_R, 0.0, TAU, 32, Pal.foe(0.12 * dim), 1.0)
+			draw_arc(e.pos, DIM_R, 0.0, TAU, 40, Pal.foe(0.28 * dim), 1.5)
 		if e.kind == CHARGER and e.mode == STUN:
 			for k in 3:
 				var a3 := e.t * 5.0 + TAU * k / 3.0
