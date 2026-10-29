@@ -110,6 +110,8 @@ func _cut() -> void:
 
 
 func _draw() -> void:
+	if not on or game == null or game.bullets == null:
+		return
 	var f: float = game.focus
 	var dim := 1.0 - 0.4 * f
 	var marks := PackedVector2Array()

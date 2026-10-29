@@ -1,0 +1,118 @@
+class_name ScanRings
+extends Node2D
+# The bureau of thought's floor (chapter 7): mood-scan rings set in the floor,
+# lit in pairs that trade on every beat of the music. The beat a ring lights,
+# whoever stands in it is "found to be unhappy" and struck (a dash goes
+# through) — so you move on the beat. A round of yours that crosses a lit ring
+# is made happy: its damage doubles, once a flight. Laying your lines across
+# the rings pays.
+
+const R := 92.0
+const SPOTS := [Vector2(520, 600), Vector2(760, 330), Vector2(1400, 600), Vector2(1160, 330)]
+
+var on := false
+var last_beat := -1
+var lit := [false, false, false, false]
+var flash := [0.0, 0.0, 0.0, 0.0]
+var t := 0.0
+var game
+
+
+func _init() -> void:
+	z_index = 2
+	z_as_relative = false
+
+
+func setup(story: int) -> void:
+	on = story == 7
+	last_beat = -1
+	lit = [false, false, false, false]
+	visible = on
+	queue_redraw()
+
+
+func active() -> bool:
+	return on
+
+
+# which pair lights on beat b
+func lit_on(i: int, b: int) -> bool:
+	return (b + i) % 2 == 0
+
+
+func step(dt: float) -> void:
+	if not on:
+		return
+	t += dt
+	for i in 4:
+		flash[i] = maxf(0.0, flash[i] - dt / 0.3)
+	var bi := int(floor(game.sfx.beat()))
+	if bi != last_beat:
+		last_beat = bi
+		for i in 4:
+			var now := lit_on(i, bi)
+			if now and not lit[i]:
+				flash[i] = 1.0
+				_scan(i)
+			lit[i] = now
+	queue_redraw()
+
+
+# the beat a ring lights: anyone standing in it is found unhappy
+func _scan(i: int) -> void:
+	if game.wave_ctl.phase != Waves.FIGHT:
+		return
+	var p: Vector2 = game.player.pos
+	var c: Vector2 = SPOTS[i]
+	if p.distance_to(c) < R and game.player.dash_t <= 0.0:
+		if game.on_player_hit((p - c).normalized() if p.distance_to(c) > 1.0 else Vector2.DOWN, null):
+			game.fx.ring(c, R * 0.5, R * 1.3, 0.3, Pal.red(0.9, 2.4), 3.0)
+
+
+# A round crossing a lit ring: doubled, once a flight.
+func cross(a: Vector2, b: Vector2, bullet) -> bool:
+	if bullet.hit.has("joy"):
+		return false
+	for i in 4:
+		if not lit[i]:
+			continue
+		var c: Vector2 = SPOTS[i]
+		if a.distance_to(c) < R or Geometry2D.segment_intersects_circle(a, b, c, R) >= 0.0:
+			bullet.hit["joy"] = true
+			bullet.dmg *= 2.0
+			flash[i] = maxf(flash[i], 0.6)
+			game.fx.flash(a, 20.0, 0.12, Pal.foe(0.6, 2.0))
+			return true
+	return false
+
+
+func _draw() -> void:
+	var f: float = game.focus
+	var dim := 1.0 - 0.45 * f
+	var frac: float = game.sfx.beat_frac()
+	var nb := last_beat + 1
+	for i in 4:
+		var c: Vector2 = SPOTS[i]
+		var is_lit: bool = lit[i]
+		var next := lit_on(i, nb) and not is_lit
+		# the floor ring itself: a double band with ticks round it
+		draw_arc(c, R, 0.0, TAU, 64, Pal.ink(0.22 * dim), 2.0)
+		draw_arc(c, R - 10.0, 0.0, TAU, 64, Pal.ink(0.1 * dim), 1.0)
+		var ticks := PackedVector2Array()
+		for j in 24:
+			var a := TAU * j / 24.0 + t * 0.2
+			ticks.append(c + Vector2.from_angle(a) * (R + 3.0))
+			ticks.append(c + Vector2.from_angle(a) * (R + 9.0))
+		draw_multiline(ticks, Pal.ink(0.18 * dim), 1.5)
+		if is_lit:
+			# lit: the scan is on — a filled disc, a bright rim, a sweep line
+			draw_arc(c, R, 0.0, TAU, 64, Pal.foe((0.7 + 0.3 * flash[i]) * dim, 1.8 + flash[i]), 3.0)
+			var sa := t * 5.0 + i
+			draw_line(c, c + Vector2.from_angle(sa) * R, Pal.foe(0.6 * dim, 1.6), 2.0)
+			draw_arc(c, R - 4.0, sa - 0.6, sa, 12, Pal.foe(0.35 * dim, 1.4), 6.0)
+		elif next:
+			# about to light: a ring closing in to the rim over the beat
+			var k := Pal.ease_in(frac)
+			draw_arc(c, R + 60.0 * (1.0 - k), 0.0, TAU, 64, Pal.red((0.2 + 0.6 * k) * dim, 1.6), 2.0)
+		if flash[i] > 0.0:
+			draw_arc(c, R + 14.0 * (1.0 - flash[i]), 0.0, TAU, 64, Pal.foe(flash[i] * dim, 2.4), 2.0)

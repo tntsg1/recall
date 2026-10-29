@@ -168,6 +168,13 @@ func think(game) -> void:
 			var gap: float = p.distance_to(bs.pos) - rr
 			if gap > 0.0 and gap < 60.0:
 				bot.dash = true
+	if game.scan_rings.active():
+		var nb: int = game.scan_rings.last_beat + 1
+		for ri in 4:
+			var rc: Vector2 = ScanRings.SPOTS[ri]
+			var rd: float = rc.distance_to(p)
+			if rd < ScanRings.R + 30.0 and (game.scan_rings.lit[ri] or game.scan_rings.lit_on(ri, nb)):
+				move += (p - rc) / maxf(rd, 1.0) * 2.0
 	if game.arcs.active():
 		for ac in game.arcs.arcs:
 			var q5 := Geometry2D.get_closest_point_to_segment(p, ac[0], ac[1])

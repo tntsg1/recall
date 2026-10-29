@@ -203,6 +203,10 @@ func _draw() -> void:
 		if shows.get("w6_cabinet", 0.0) <= 0.01:
 			_draw_wall_notice(Vector2(1840, 700), dim)
 		_draw_wired_bulb(dim)
+	elif story == 7:
+		_draw_chairs(dim)
+		_draw_lightboards(dim)
+		_draw_terminal(Vector2(80, 560), dim, "w7_monitor")
 	elif story == 4:
 		_draw_stations(dim)
 		_draw_presses(dim)
@@ -516,7 +520,7 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 			yy += step
 	elif id != "" or int(t * 2.0) % 3 != 0:
 		var dots := ".".repeat(int(t * 2.0) % 4)
-		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output", 5: "term_timetable", 6: "term_power"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
+		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output", 5: "term_timetable", 6: "term_power", 7: "term_mood"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
 
 
 # The queue: posts with a rope slung between them, and the waiting line.
@@ -870,6 +874,61 @@ func _draw_floor_notice(c: Vector2, dim: float) -> void:
 	draw_line(tc + Vector2(0, -5), tc + Vector2(0, 2), Pal.ink(0.6 * dim), 2.0)
 	for j in 3:
 		draw_line(r.position + Vector2(44, 16 + j * 11), r.position + Vector2(108 - (j % 2) * 20, 16 + j * 11), Pal.ink(0.25 * dim), 1.0)
+
+
+# ---------------------------------------------------------------- the bureau of thought
+
+# Neural-interface chairs along the bottom wall: a seat, a helmet on an arm,
+# cables to the wall, a number on the back. Their lamps pulse on the beat.
+func _draw_chairs(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.3, 0.0, 1.0)
+	var n := 0
+	for x: float in [380.0, 540.0, 1240.0, 1400.0]:
+		n += 1
+		var c := Vector2(x, 950.0)
+		var seat := Rect2(c - Vector2(30, 22), Vector2(60, 44))
+		draw_rect(seat, Color(0.06, 0.06, 0.065))
+		draw_rect(seat, Pal.ink(0.5 * dim), false, 1.5)
+		draw_rect(Rect2(seat.position + Vector2(0, 30), Vector2(60, 14)), Pal.ink(0.3 * dim), false, 1.0)
+		# the helmet on its arm, over where a head would be
+		var hm := c + Vector2(0, -36)
+		draw_line(c + Vector2(26, 10), c + Vector2(26, -36), Pal.ink(0.4 * dim), 2.0)
+		draw_line(c + Vector2(26, -36), hm + Vector2(14, 0), Pal.ink(0.4 * dim), 2.0)
+		draw_arc(hm, 14.0, PI, TAU, 14, Pal.ink(0.7 * dim, 1.2), 2.5)
+		draw_line(hm + Vector2(-14, 0), hm + Vector2(14, 0), Pal.ink(0.5 * dim), 1.5)
+		draw_circle(hm + Vector2(0, -6), 2.5, Pal.foe((0.3 + 0.7 * beat_k) * dim, 1.4 + 1.2 * beat_k))
+		# the cable down to the wall
+		draw_polyline(PackedVector2Array([c + Vector2(-26, 18), c + Vector2(-34, 40), c + Vector2(-20, 58)]), Pal.ink(0.35 * dim), 2.0)
+		draw_string(sf, seat.position + Vector2(6, 16), "NI-%02d" % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+
+
+# Light boards along the top wall: the slogan, and a row of faces from the
+# mood monitor, every one smiling but one.
+func _draw_lightboards(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.3, 0.0, 1.0)
+	if shows.get("w7_slogan", 0.0) <= 0.01:
+		var r := Rect2(230, 146, 240, 46)
+		draw_rect(r, Color(0.03, 0.03, 0.035))
+		draw_rect(r, Pal.foe(0.5 * dim), false, 1.5)
+		var tx := Txt.t("slogan_happy")
+		var tw := sf.get_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+		draw_string(sf, Vector2(r.get_center().x - tw / 2.0, r.position.y + 31.0), tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Pal.foe((0.65 + 0.35 * beat_k) * dim, 1.4 + 1.0 * beat_k))
+	var fr := Rect2(1450, 80, 290, 46)
+	draw_rect(fr, Color(0.03, 0.03, 0.035))
+	draw_rect(fr, Pal.ink(0.45 * dim), false, 1.5)
+	for j in 8:
+		var fc := fr.position + Vector2(22.0 + j * 35.0, 23.0)
+		draw_arc(fc, 12.0, 0.0, TAU, 16, Pal.ink(0.55 * dim), 1.5)
+		draw_circle(fc + Vector2(-4, -3), 1.6, Pal.ink(0.7 * dim))
+		draw_circle(fc + Vector2(4, -3), 1.6, Pal.ink(0.7 * dim))
+		if j == 5:
+			# this one is not smiling; a tear runs down
+			draw_arc(fc + Vector2(0, 8), 5.0, PI * 1.15, PI * 1.85, 6, Pal.red(0.8 * dim, 1.4), 1.5)
+			draw_line(fc + Vector2(5, -1), fc + Vector2(5, 5), Pal.ink(0.7 * dim, 1.3), 1.5)
+		else:
+			draw_arc(fc + Vector2(0, 1), 5.0, PI * 0.15, PI * 0.85, 6, Pal.ink(0.7 * dim), 1.5)
 
 
 # ---------------------------------------------------------------- the energy bureau

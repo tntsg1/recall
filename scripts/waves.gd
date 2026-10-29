@@ -19,7 +19,7 @@ const BOSS := 6
 const COST := {C: 1, G: 5, H: 4, P: 3, L: 3, U: 4, E: 3, I: 3}
 const BUDGET := [16, 22, 28, 32, 40, 48]
 # the waves' own notes, by enemy pool (the boss wave's note comes from Chapters)
-const NOTES := [{2: "note_guard", 3: "note_charger"}, {0: "note_mirror", 1: "note_prism"}, {0: "note_arms", 1: "note_leech"}, {1: "note_pulse"}, {}, {0: "note_rails"}, {0: "note_lasers", 1: "note_echo"}, {0: "note_arcs", 1: "note_inspector"}]
+const NOTES := [{2: "note_guard", 3: "note_charger"}, {0: "note_mirror", 1: "note_prism"}, {0: "note_arms", 1: "note_leech"}, {0: "note_rings", 1: "note_pulse"}, {}, {0: "note_rails"}, {0: "note_lasers", 1: "note_echo"}, {0: "note_arcs", 1: "note_inspector"}]
 const SIDES := ["T", "B", "L", "R"]
 
 var game

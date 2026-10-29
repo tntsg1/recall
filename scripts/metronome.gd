@@ -1,7 +1,10 @@
 class_name Metronome
 extends Node2D
-# 节拍器 THE METRONOME: a great arm hung from the top of the room that sweeps
-# across it in time with the music. The bob at its end is the core: it takes
+# 情绪同步器 THE MOOD SYNCHRONISER (chapter 7; it was the Metronome): a great
+# arm hung from the top of the room that sweeps across it in time with the
+# music the bureau plays to keep everyone happy. A national happiness index
+# over it ticks up with every beat; in its last phase it raises the music to
+# 140 BPM, and the index goes past a hundred. The bob at its end is the core: it takes
 # ×1.5 on the beat window and ×0.4 off it. The rod turns rounds away; the
 # weights are what hurt.
 # Phase 2 (66%): it swings every beat, and each downbeat sends a shock ring.
@@ -39,6 +42,8 @@ var bob_prev := Vector2.ZERO
 var rings: Array = []       # shock rings [center, age]
 var last_beat := -1
 var fall_v := Vector2.ZERO
+var joy := 97.0             # the happiness index on its screen
+var fast_said := false
 
 
 func _ready() -> void:
@@ -70,11 +75,16 @@ func start() -> void:
 	phase = 0
 	rings.clear()
 	arm2_k = 0.0
+	joy = 97.0
+	fast_said = false
 	game.sfx.play("horn", 0.9, -2.0)
 	game.cam.add_trauma(0.3)
+	game.hud.radio(Txt.t("radio_sync"))
 
 
 func reset() -> void:
+	if game and game.sfx.tempo != 1.0:
+		game.sfx.set_tempo(1.0)
 	state = OFF
 	t = 0.0
 	hp = HP
@@ -172,6 +182,9 @@ func damage(dmg: float, ret: bool, at_p: Vector2, d: Vector2, _frame_k: int = -1
 		game.cam.add_trauma(0.6)
 		game.cam.punch(0.04)
 		game.hud.boss_phase()
+		if phase == 2 and not fast_said:
+			fast_said = true
+			game.hud.radio(Txt.t("radio_sync_fast"))
 	if hp <= 0.0:
 		state = DYING
 		dying_t = 0.0
@@ -214,9 +227,14 @@ func step(dt: float) -> void:
 	if phase >= 2:
 		arm2_k = minf(1.0, arm2_k + dt / 1.2)
 		theta2 = -target
+		# 140 BPM of happiness
+		var want_t: float = 140.0 / game.sfx.bpm()
+		if game.sfx.tempo < want_t:
+			game.sfx.set_tempo(minf(want_t, game.sfx.tempo + dt * 0.2))
 	var bi := int(floor(beat))
 	if bi != last_beat:
 		last_beat = bi
+		joy = minf(99.9 if phase < 2 else 140.0, joy + (0.1 if phase < 2 else 0.4))
 		if state == RUN:
 			game.fx.ring(bob, BOB_R * 0.6, BOB_R * 1.4, 0.3, Pal.foe(0.5, 1.4), 1.5)
 			if phase >= 1 and bi % 4 == 0:
@@ -312,3 +330,34 @@ func _draw() -> void:
 	for r in rings:
 		var e := Pal.ease_out(r[1] / 0.9)
 		draw_arc(r[0], e * 300.0, 0.0, TAU, 96, Pal.foe(0.9 * (1.0 - e) * dim, 1.4), 3.0, false)
+	# its face: the shell smiles, whatever it does
+	if state != DYING:
+		var fd := Vector2.from_angle(theta + PI * 0.5)
+		var fs := fd.orthogonal()
+		var fc := bob + fd * BOB_R * 0.55
+		draw_circle(fc - fs * 12.0 - fd * 8.0, 3.5, Pal.foe(dim, 2.0))
+		draw_circle(fc + fs * 12.0 - fd * 8.0, 3.5, Pal.foe(dim, 2.0))
+		var sm := PackedVector2Array()
+		for j in 9:
+			var u := lerpf(-1.0, 1.0, j / 8.0)
+			sm.append(fc + fs * u * 18.0 + fd * (6.0 - 6.0 * u * u))
+		draw_polyline(sm, Pal.foe(dim, 2.0), 2.5)
+	_draw_index(dim)
+
+
+# The national happiness index, over the pivot: it only goes up.
+func _draw_index(dim: float) -> void:
+	var font := Fonts.get_font("SemiBold")
+	var r := Rect2(PIVOT + Vector2(-150, 74), Vector2(300, 64))
+	draw_rect(r, Color(0.02, 0.025, 0.03))
+	draw_rect(r, Pal.foe(0.55 * dim), false, 1.5)
+	var fast := phase >= 2 and state == RUN
+	var head: String = Txt.t("sync_index")
+	draw_string(font, r.position + Vector2(12, 24), head, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.foe(0.7 * dim))
+	var val := "%.1f%%" % joy
+	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.25, 0.0, 1.0)
+	var vc := Pal.red(dim, 2.2) if joy > 100.0 else Pal.foe(dim, 1.4 + 0.8 * beat_k)
+	draw_string(font, r.position + Vector2(12, 54), val, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, vc)
+	var bpm_t := "%d BPM" % int(round(game.sfx.bpm() * game.sfx.tempo))
+	var bw := font.get_string_size(bpm_t, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+	draw_string(font, Vector2(r.end.x - bw - 12.0, r.position.y + 52.0), bpm_t, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.red(dim, 2.0) if fast else Pal.foe(0.6 * dim))

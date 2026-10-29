@@ -11,7 +11,7 @@ const LIST := {
 	"boss_1": ["终点站", "LAST STOP", "击毁中央直达专列", "Destroy the Central Express"],
 	"boss_2": ["碎镜", "BROKEN GLASS", "击碎镜面守卫", "Shatter the Mirror Warden"],
 	"boss_3": ["反刍", "SPAT OUT", "击败战略储备回收机", "Defeat the Reserve Intake"],
-	"boss_4": ["停摆", "STOPPED CLOCK", "击败节拍器", "Stop the Metronome"],
+	"boss_4": ["停摆", "STOPPED CLOCK", "击败情绪同步器", "Stop the Mood Synchroniser"],
 	"boss_5": ["归零", "ZEROED", "击败归零", "Defeat Zero"],
 	"win": ["一局", "A FULL RUN", "通关一局", "Finish a run"],
 	"win_stake4": ["铁一般", "IRON NERVE", "在“铁”或更高难度通关", "Finish on Iron or higher"],

@@ -23,6 +23,7 @@ var lasers: Lasers           # the laser range's fences (chapter 3)
 var arms: Arms               # the production floor's robot arms and reserve crate (chapter 4)
 var maglev: Maglev           # the superconducting line's guide rails (chapter 5)
 var arcs: Arcs               # the energy bureau's live current between your rounds (chapter 6)
+var scan_rings: ScanRings    # the bureau of thought's mood-scan rings (chapter 7)
 var radio_n := 0
 var wave_ctl: Waves
 var fx: Fx
@@ -187,6 +188,9 @@ func _ready() -> void:
 	arcs = Arcs.new()
 	arcs.game = self
 	add_child(arcs)
+	scan_rings = ScanRings.new()
+	scan_rings.game = self
+	add_child(scan_rings)
 	player = Player.new()
 	player.game = self
 	add_child(player)
@@ -997,6 +1001,7 @@ func _run_frame(dt: float) -> void:
 	arms.step(sdt)
 	maglev.step(sdt)
 	arcs.step(sdt)
+	scan_rings.step(sdt)
 	if prof_on:
 		_lap("player+possess")
 	trail.append([sim_time, player.pos])
@@ -1759,6 +1764,7 @@ func next_chapter() -> void:
 	arms.setup(Chapters.room(chapter))
 	maglev.setup(Chapters.room(chapter), Chapters.story(chapter))
 	arcs.setup(Chapters.story(chapter))
+	scan_rings.setup(Chapters.story(chapter))
 	lore.start_chapter(chapter)
 	sfx.start_chapter(Chapters.music(chapter))
 	sfx.play("chapter", 1.0, -2.0)

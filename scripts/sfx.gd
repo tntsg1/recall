@@ -26,6 +26,9 @@ var key_ratio := 440.0 / 660.0   # pierce sample (E5) to the chapter's root
 const ROOTS := [440.0, 329.63, 293.66, 392.0, 261.63]
 const BPMS := [90.0, 96.0, 84.0, 100.0, 92.0]
 var music_t := 0.0
+var tempo := 1.0                # the loops play this much faster (the music's pitch held)
+var pitch_fx: AudioEffectPitchShift
+var pitch_fx_i := -1
 var chapter := 0
 
 
@@ -41,6 +44,16 @@ func _ready() -> void:
 		lowpass.cutoff_hz = 20000.0
 		lowpass.resonance = 0.6
 		AudioServer.add_bus_effect(music_bus, lowpass)
+	pitch_fx_i = -1
+	for e in AudioServer.get_bus_effect_count(music_bus):
+		if AudioServer.get_bus_effect(music_bus, e) is AudioEffectPitchShift:
+			pitch_fx = AudioServer.get_bus_effect(music_bus, e)
+			pitch_fx_i = e
+	if pitch_fx == null:
+		pitch_fx = AudioEffectPitchShift.new()
+		AudioServer.add_bus_effect(music_bus, pitch_fx)
+		pitch_fx_i = AudioServer.get_bus_effect_count(music_bus) - 1
+	AudioServer.set_bus_effect_enabled(music_bus, pitch_fx_i, false)
 	for n in NAMES:
 		var p := "res://assets/audio/%s.ogg" % n
 		if ResourceLoader.exists(p):
@@ -57,6 +70,7 @@ func _ready() -> void:
 func start_chapter(ch: int) -> void:
 	chapter = ch
 	music_t = 0.0
+	set_tempo(1.0)
 	key_ratio = ROOTS[mini(ch, ROOTS.size() - 1)] / 660.0
 	for k in layers:
 		layers[k].queue_free()
@@ -143,7 +157,7 @@ func beat_frac() -> float:
 
 
 func step(dt: float, focus: float) -> void:
-	music_t += dt
+	music_t += dt * tempo
 	muffle = Pal.damp(muffle, focus, 10.0, dt)
 	lowpass.cutoff_hz = lerpf(20000.0, 380.0, Pal.ease_out(muffle))
 	duck = maxf(0.0, duck - dt / 0.5)
@@ -154,6 +168,16 @@ func step(dt: float, focus: float) -> void:
 		# layers come in over a bar or so, and leave a little faster
 		level[k] = Pal.damp(level[k], want, 1.2 if want > level[k] else 1.8, dt)
 		layers[k].volume_db = linear_to_db(maxf(level[k], 0.0001)) + LAYER_DB[k]
+
+
+# Faster loops at the same pitch: the players speed up, the bus shifts back down.
+func set_tempo(k: float) -> void:
+	tempo = k
+	for l in layers:
+		layers[l].pitch_scale = k
+	if pitch_fx != null and pitch_fx_i >= 0:
+		pitch_fx.pitch_scale = 1.0 / k
+		AudioServer.set_bus_effect_enabled(music_bus, pitch_fx_i, k > 1.01)
 
 
 func drop() -> void:

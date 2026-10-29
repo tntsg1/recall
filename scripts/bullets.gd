@@ -670,6 +670,8 @@ func _fly(b: B, dt: float) -> void:
 		b.set_head(b.pos)
 		game.enemies.on_shield(sh.e, sh.point, b.dir, false)
 		return
+	if game.scan_rings.active():
+		game.scan_rings.cross(a, end, b)
 	var mg: Dictionary = game.maglev.cross(a, end, b)
 	if mg:
 		# a powered guide rail grips the round and turns it along the rail
@@ -794,6 +796,8 @@ func _return(b: B, dt: float) -> void:
 			b.t = 0.0
 		return
 	for k in pts.size() - 1:
+		if game.scan_rings.active():
+			game.scan_rings.cross(pts[k], pts[k + 1], b)
 		var sh: Dictionary = {} if b.piercer else game.enemies.shield_hit(pts[k], pts[k + 1])
 		if sh:
 			# blocked on the way back: the round still comes home, from here

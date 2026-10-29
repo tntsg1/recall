@@ -52,6 +52,14 @@ const SEIZE := {
 		Enemies.LEECH: [["我把多余的电收回来，再卖回给他们。", "I TAKE BACK THE SPARE POWER AND SELL IT TO THEM AGAIN."]],
 		Enemies.INSPECTOR: [["我关掉每一盏不该亮的灯。今天关了三千盏。", "I PUT OUT EVERY LIGHT THAT SHOULD NOT BE ON. THREE THOUSAND TODAY."]],
 	},
+	7: {
+		Enemies.CHASER: [["我负责检查每个人有没有在笑。今天有三个没笑。", "I CHECK THAT EVERYONE IS SMILING. TODAY THREE WERE NOT."],
+			["他们说音乐让人快乐。我从来没被允许关掉它。", "THEY SAY THE MUSIC MAKES PEOPLE HAPPY. I HAVE NEVER BEEN ALLOWED TO TURN IT OFF."]],
+		Enemies.GUARD: [["哭的人要先戴上耳机，再进来。", "THOSE WHO CRY PUT ON HEADPHONES BEFORE THEY COME IN."]],
+		Enemies.CHARGER: [["节拍每年提速一次。心跳跟不上的，按故障处理。", "THE TEMPO RISES EVERY YEAR. HEARTS THAT CAN'T KEEP UP ARE TREATED AS FAULTS."]],
+		Enemies.LEECH: [["我把走神的念头吸走，存进档案。", "I DRAW OFF THE WANDERING THOUGHTS AND FILE THEM."]],
+		Enemies.PULSE: [["一拍，一动。不在拍上的动作，不算数。", "ONE BEAT, ONE MOVE. A MOVE OFF THE BEAT DOES NOT COUNT."]],
+	},
 }
 
 # remnants: [id, wall point, inward normal, kind of mark, zh, en]
@@ -92,6 +100,12 @@ const WALL := {
 		["notice", Vector2(1840, 205), Vector2(-1, 0), "notice", "节约用电是每位股东的美德。今晚 19 点至次日 7 点停电。", "SAVING POWER IS EVERY SHAREHOLDER'S VIRTUE. NO POWER 19:00 TO 07:00 TONIGHT."],
 		["scrawl", Vector2(1320, 70), Vector2(0, 1), "scrawl_top", "我们自己接的线，比他们的灯亮。", "THE LINE WE WIRED OURSELVES BURNS BRIGHTER THAN THEIR LIGHTS."],
 	],
+	7: [
+		["monitor", Vector2(80, 560), Vector2(1, 0), "screen", "本区快乐达标率 99.3% · 未达标者已安排加时聆听", "HAPPINESS COMPLIANCE 99.3% · NON-COMPLIANT CITIZENS BOOKED FOR EXTRA LISTENING"],
+		["chair", Vector2(1500, 1010), Vector2(0, -1), "notice", "请放松。抵抗会降低同步效率。", "PLEASE RELAX. RESISTANCE LOWERS SYNCHRONISATION EFFICIENCY."],
+		["slogan", Vector2(350, 70), Vector2(0, 1), "plaque", "请保持愉快 · 愉快是公民的义务", "STAY HAPPY · HAPPINESS IS A CIVIC DUTY"],
+		["scrawl", Vector2(1840, 380), Vector2(-1, 0), "scrawl", "我的心跳，不是你们的节拍。", "MY HEARTBEAT IS NOT YOUR TEMPO."],
+	],
 }
 
 const RADIO := {
@@ -124,6 +138,11 @@ const RADIO := {
 		"wave": [["全国电网运行平稳。停电区域居民请早点休息。", "THE NATIONAL GRID IS STABLE. RESIDENTS OF BLACKOUT DISTRICTS, PLEASE SLEEP EARLY."],
 			["近期发现私接电线行为。私接者的积分已全部冻结。", "UNAUTHORISED WIRING HAS BEEN FOUND. THE OFFENDERS' CREDITS ARE FROZEN."]],
 		"boss": [["配电总闸进入检修。检修期间第十三街恢复供电——此为临时措施。", "THE GRID MASTER IS UNDER REPAIR. 13TH STREET HAS POWER MEANWHILE — A TEMPORARY MEASURE."]],
+	},
+	7: {
+		"wave": [["思想与意识管理局今日同步市民 48 万人次，零情绪事故。", "THE BUREAU OF THOUGHT SYNCHRONISED 480,000 CITIZENS TODAY. ZERO MOOD INCIDENTS."],
+			["请勿在公共场所表现出疲惫，以免影响他人幸福。", "DO NOT LOOK TIRED IN PUBLIC. IT AFFECTS OTHERS' HAPPINESS."]],
+		"boss": [["同步装置暂停。请市民自行保持愉快，直至恢复。", "THE SYNCHRONISER IS PAUSED. CITIZENS, STAY HAPPY ON YOUR OWN UNTIL IT RETURNS."]],
 	},
 }
 
