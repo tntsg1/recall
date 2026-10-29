@@ -99,6 +99,7 @@ const S := {
 	"note_rings": ["情绪扫描环 · 拍点上站在亮环里会被检测扣血 · 子弹穿过亮环伤害翻倍", "MOOD-SCAN RINGS · STAND IN A LIT RING ON THE BEAT AND YOU ARE SCANNED · ROUNDS THROUGH A LIT RING DOUBLE"],
 	"term_mood": ["情绪监测", "MOOD MONITOR"],
 	"slogan_happy": ["请保持愉快", "STAY HAPPY"],
+	"mood_sample": ["情绪样本", "MOOD SAMPLES"],
 	"boss_5": ["归零", "ZERO"],
 	"note_boss_5": ["它也会射击和回收 · 它的回收会割伤你 · 按住 Q 把它的子弹也收回来，让它们飞进它体内", "IT SHOOTS AND RECALLS TOO — ITS RETURN CUTS YOU · HOLD Q: TAKE ITS ROUNDS, SEND THEM INTO IT"],
 	"note_echo": ["回声 · 沿着你几秒前走过的路追来", "ECHO · WALKS THE PATH YOU TOOK A FEW SECONDS AGO"],

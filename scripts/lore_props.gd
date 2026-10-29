@@ -204,6 +204,7 @@ func _draw() -> void:
 			_draw_wall_notice(Vector2(1840, 700), dim)
 		_draw_wired_bulb(dim)
 	elif story == 7:
+		_draw_samples(dim)
 		_draw_chairs(dim)
 		_draw_lightboards(dim)
 		_draw_terminal(Vector2(80, 560), dim, "w7_monitor")
@@ -359,7 +360,7 @@ func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float)
 	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
 	draw_string(font, r.position + Vector2(15, 54), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * dim, 1.2))
 	var on_top := (w[2] as Vector2).y > 0.5
-	var sc := Vector2(r.end.x - 20.0, r.position.y + 20.0)
+	var sc := Vector2(r.end.x - 26.0, r.position.y + 24.0)
 	var sr := 17.0
 	draw_arc(sc, sr, 0.0, TAU, 28, Pal.red(0.75 * k * dim, 1.4), 2.5 if on_top else 1.5, false)
 	draw_set_transform(sc, -0.3, Vector2.ONE)
@@ -884,23 +885,51 @@ func _draw_chairs(dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
 	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.3, 0.0, 1.0)
 	var n := 0
-	for x: float in [380.0, 540.0, 1240.0, 1400.0]:
+	for x: float in [360.0, 560.0, 1300.0, 1500.0]:
 		n += 1
-		var c := Vector2(x, 950.0)
-		var seat := Rect2(c - Vector2(30, 22), Vector2(60, 44))
+		var c := Vector2(x, 920.0)
+		# from above: the seat, a backrest toward the wall, two armrests with straps
+		var seat := Rect2(c - Vector2(38, 30), Vector2(76, 60))
 		draw_rect(seat, Color(0.06, 0.06, 0.065))
-		draw_rect(seat, Pal.ink(0.5 * dim), false, 1.5)
-		draw_rect(Rect2(seat.position + Vector2(0, 30), Vector2(60, 14)), Pal.ink(0.3 * dim), false, 1.0)
-		# the helmet on its arm, over where a head would be
-		var hm := c + Vector2(0, -36)
-		draw_line(c + Vector2(26, 10), c + Vector2(26, -36), Pal.ink(0.4 * dim), 2.0)
-		draw_line(c + Vector2(26, -36), hm + Vector2(14, 0), Pal.ink(0.4 * dim), 2.0)
-		draw_arc(hm, 14.0, PI, TAU, 14, Pal.ink(0.7 * dim, 1.2), 2.5)
-		draw_line(hm + Vector2(-14, 0), hm + Vector2(14, 0), Pal.ink(0.5 * dim), 1.5)
-		draw_circle(hm + Vector2(0, -6), 2.5, Pal.foe((0.3 + 0.7 * beat_k) * dim, 1.4 + 1.2 * beat_k))
-		# the cable down to the wall
-		draw_polyline(PackedVector2Array([c + Vector2(-26, 18), c + Vector2(-34, 40), c + Vector2(-20, 58)]), Pal.ink(0.35 * dim), 2.0)
-		draw_string(sf, seat.position + Vector2(6, 16), "NI-%02d" % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+		draw_rect(seat, Pal.ink(0.55 * dim), false, 1.5)
+		var back := Rect2(Vector2(seat.position.x - 4.0, seat.end.y - 4.0), Vector2(84, 22))
+		draw_rect(back, Color(0.08, 0.08, 0.085))
+		draw_rect(back, Pal.ink(0.5 * dim), false, 1.5)
+		for sx: float in [-1.0, 1.0]:
+			var arm := Rect2(Vector2(c.x + sx * 46.0 - 6.0, seat.position.y + 6.0), Vector2(12, 46))
+			draw_rect(arm, Color(0.08, 0.08, 0.085))
+			draw_rect(arm, Pal.ink(0.45 * dim), false, 1.2)
+			draw_line(arm.position + Vector2(-2, 18), arm.position + Vector2(14, 18), Pal.ink(0.6 * dim), 2.0)
+		# the helmet on its arm, held over where a head would rest
+		var hm := c + Vector2(0, 8)
+		draw_line(Vector2(seat.end.x + 4.0, back.get_center().y), Vector2(seat.end.x + 4.0, c.y - 40.0), Pal.ink(0.45 * dim), 3.0)
+		draw_line(Vector2(seat.end.x + 4.0, c.y - 40.0), hm + Vector2(16, -24), Pal.ink(0.45 * dim), 3.0)
+		draw_circle(hm, 18.0, Color(0.05, 0.05, 0.055))
+		draw_arc(hm, 18.0, 0.0, TAU, 20, Pal.ink(0.8 * dim, 1.2), 2.5)
+		for k in 6:
+			var a := TAU * k / 6.0
+			draw_circle(hm + Vector2.from_angle(a) * 11.0, 1.8, Pal.ink(0.5 * dim))
+		draw_circle(hm, 4.0, Pal.foe((0.3 + 0.7 * beat_k) * dim, 1.4 + 1.6 * beat_k))
+		draw_string(sf, seat.position + Vector2(5, 14), "NI-%02d" % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.55 * dim))
+
+
+# The pillars are crates of mood samples; the bar at the bottom is the amplifier.
+func _draw_samples(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.3, 0.0, 1.0)
+	for r: Rect2 in game.arena.inner:
+		var ins := r.grow(-6.0)
+		if r.size.x > 100.0:
+			# the amplifier: speaker grilles that pump on the beat
+			for k in 4:
+				var gc := Vector2(lerpf(ins.position.x + 16.0, ins.end.x - 16.0, k / 3.0), ins.get_center().y)
+				draw_circle(gc, 6.0 + 2.0 * beat_k, Pal.ink((0.3 + 0.4 * beat_k) * dim))
+			continue
+		var tx := Txt.t("mood_sample")
+		var tw := sf.get_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
+		draw_string(sf, Vector2(ins.get_center().x - tw / 2.0, ins.get_center().y + 4.0), tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.5 * dim))
+		draw_line(ins.position + Vector2(4, 10), Vector2(ins.end.x - 4.0, ins.position.y + 10.0), Pal.ink(0.2 * dim), 1.0)
+		draw_line(Vector2(ins.position.x + 4.0, ins.end.y - 10.0), ins.end - Vector2(4, 10), Pal.ink(0.2 * dim), 1.0)
 
 
 # Light boards along the top wall: the slogan, and a row of faces from the
@@ -908,13 +937,22 @@ func _draw_chairs(dim: float) -> void:
 func _draw_lightboards(dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
 	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.3, 0.0, 1.0)
-	if shows.get("w7_slogan", 0.0) <= 0.01:
-		var r := Rect2(230, 146, 240, 46)
-		draw_rect(r, Color(0.03, 0.03, 0.035))
-		draw_rect(r, Pal.foe(0.5 * dim), false, 1.5)
-		var tx := Txt.t("slogan_happy")
-		var tw := sf.get_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
-		draw_string(sf, Vector2(r.get_center().x - tw / 2.0, r.position.y + 31.0), tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Pal.foe((0.65 + 0.35 * beat_k) * dim, 1.4 + 1.0 * beat_k))
+	# the slogan board; woken by a recall it runs the slogan in full
+	var wake: float = shows.get("w7_slogan", 0.0)
+	var r := Rect2(230, 120, 240, 46 + 26.0 * Pal.ease_out(wake))
+	draw_rect(r, Color(0.03, 0.03, 0.035))
+	draw_rect(r, Pal.foe(0.5 * dim), false, 1.5)
+	var tx := Txt.t("slogan_happy")
+	var tw := sf.get_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+	draw_string(sf, Vector2(r.get_center().x - tw / 2.0, r.position.y + 31.0), tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Pal.foe((0.65 + 0.35 * beat_k) * dim, 1.4 + 1.0 * beat_k))
+	if wake > 0.01:
+		var full := ""
+		for w in Lore.walls(7):
+			if w[0] == "slogan":
+				full = (w[4] if Txt.zh else w[5]).split(" · ")[1]
+		var n := int(ceil(full.length() * clampf(wake * 1.6, 0.0, 1.0)))
+		var fw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+		draw_string(sf, Vector2(r.get_center().x - fw / 2.0, r.position.y + 60.0), full.substr(0, n), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.9 * wake * dim, 1.3))
 	var fr := Rect2(1450, 80, 290, 46)
 	draw_rect(fr, Color(0.03, 0.03, 0.035))
 	draw_rect(fr, Pal.ink(0.45 * dim), false, 1.5)

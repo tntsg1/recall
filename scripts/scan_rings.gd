@@ -80,8 +80,10 @@ func cross(a: Vector2, b: Vector2, bullet) -> bool:
 		if a.distance_to(c) < R or Geometry2D.segment_intersects_circle(a, b, c, R) >= 0.0:
 			bullet.hit["joy"] = true
 			bullet.dmg *= 2.0
-			flash[i] = maxf(flash[i], 0.6)
-			game.fx.flash(a, 20.0, 0.12, Pal.foe(0.6, 2.0))
+			flash[i] = maxf(flash[i], 0.8)
+			game.fx.flash(a, 28.0, 0.14, Pal.foe(0.7, 2.2))
+			game.fx.ring(a, 6.0, 30.0, 0.25, Pal.foe(0.9, 2.2), 2.0)
+			game.sfx.play("lit", 1.5, -10.0)
 			return true
 	return false
 
@@ -89,6 +91,15 @@ func cross(a: Vector2, b: Vector2, bullet) -> bool:
 func _draw() -> void:
 	var f: float = game.focus
 	var dim := 1.0 - 0.45 * f
+	if game.hud.intro_t >= 0.0:
+		dim *= clampf((game.hud.intro_t - 2.2) / 0.6, 0.15, 1.0)
+	# made happy: a round that crossed a lit ring flies with a halo and a smile
+	for b in game.bullets.list:
+		if b.hit.has("joy") and (b.state == Bullets.FLY or b.state == Bullets.RETURN):
+			var p: Vector2 = b.pos
+			draw_circle(p, 11.0, Pal.foe(0.12 * dim, 1.6))
+			draw_arc(p, 11.0, 0.0, TAU, 14, Pal.foe(0.9 * dim, 2.2), 1.5)
+			draw_arc(p + Vector2(0, 1), 5.0, PI * 0.15, PI * 0.85, 6, Pal.foe(dim, 2.4), 1.5)
 	var frac: float = game.sfx.beat_frac()
 	var nb := last_beat + 1
 	for i in 4:
@@ -110,7 +121,7 @@ func _draw() -> void:
 			var sa := t * 5.0 + i
 			draw_line(c, c + Vector2.from_angle(sa) * R, Pal.foe(0.6 * dim, 1.6), 2.0)
 			draw_arc(c, R - 4.0, sa - 0.6, sa, 12, Pal.foe(0.35 * dim, 1.4), 6.0)
-		elif next:
+		elif next and (game.hud.intro_t < 0.0):
 			# about to light: a ring closing in to the rim over the beat
 			var k := Pal.ease_in(frac)
 			draw_arc(c, R + 60.0 * (1.0 - k), 0.0, TAU, 64, Pal.red((0.2 + 0.6 * k) * dim, 1.6), 2.0)

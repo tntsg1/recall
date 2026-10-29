@@ -13,12 +13,12 @@ extends Node2D
 
 enum { OFF, ENTER, RUN, DYING, DEAD }
 
-const HP := 700.0
-const PIVOT := Vector2(960, 40)
-const PIVOT2 := Vector2(960, 1040)
-const LEN := 820.0
-const LEN2 := 640.0
-const BOB_R := 54.0
+const HP := 860.0
+const PIVOT := Vector2(960, 150)
+const PIVOT2 := Vector2(960, 990)
+const LEN := 700.0
+const LEN2 := 600.0
+const BOB_R := 70.0
 const AMP := 1.0
 const ARM_W := 9.0
 
@@ -297,6 +297,12 @@ func _draw() -> void:
 	var open := on_beat_window() and state == RUN
 	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.35, 0.0, 1.0)
 	# the pivot and its gear
+	# the mount: a plate bolted to the ceiling, the gear on it
+	var mp := Rect2(PIVOT + Vector2(-46, -26), Vector2(92, 30))
+	draw_rect(mp, Color(0.06, 0.06, 0.065))
+	draw_rect(mp, Pal.foe(0.6 * dim), false, 1.5)
+	for bx: float in [-36.0, 36.0]:
+		draw_circle(PIVOT + Vector2(bx, -11), 3.0, Pal.foe(0.5 * dim))
 	draw_circle(PIVOT, 18.0, Pal.WALL)
 	draw_arc(PIVOT, 18.0, 0.0, TAU, 24, Pal.foe(0.9 * dim), 2.0, false)
 	for k in 6:
@@ -315,8 +321,10 @@ func _draw() -> void:
 				draw_line(p - n * 1.6, p + n * 1.6, Pal.foe(0.25 * dim), 1.0)
 	if arm2_k > 0.05:
 		var b2 := _bob_of(PIVOT2, LEN2 * arm2_k, theta2, -1.0)
-		draw_circle(b2, 22.0, Pal.WALL)
-		draw_arc(b2, 22.0, 0.0, TAU, 24, Pal.foe(0.8 * dim), 2.0, false)
+		draw_circle(b2, 46.0, Color(0.05, 0.05, 0.055))
+		draw_arc(b2, 46.0, 0.0, TAU, 32, Pal.foe(0.85 * dim), 2.5, false)
+		draw_circle(b2, 13.0, Pal.foe(0.6 * dim, 1.4))
+		_smile(b2, 46.0, dim * arm2_k)
 	# the bob: shell plates part on the beat to show the core
 	var col := Pal.foe(dim, 1.0 + 0.8 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
 	draw_circle(bob, BOB_R, Color(0.05, 0.05, 0.055))
@@ -330,25 +338,28 @@ func _draw() -> void:
 	for r in rings:
 		var e := Pal.ease_out(r[1] / 0.9)
 		draw_arc(r[0], e * 300.0, 0.0, TAU, 96, Pal.foe(0.9 * (1.0 - e) * dim, 1.4), 3.0, false)
-	# its face: the shell smiles, whatever it does
+	# its face: the shell smiles, upright, whatever the arm does
 	if state != DYING:
-		var fd := Vector2.from_angle(theta + PI * 0.5)
-		var fs := fd.orthogonal()
-		var fc := bob + fd * BOB_R * 0.55
-		draw_circle(fc - fs * 12.0 - fd * 8.0, 3.5, Pal.foe(dim, 2.0))
-		draw_circle(fc + fs * 12.0 - fd * 8.0, 3.5, Pal.foe(dim, 2.0))
-		var sm := PackedVector2Array()
-		for j in 9:
-			var u := lerpf(-1.0, 1.0, j / 8.0)
-			sm.append(fc + fs * u * 18.0 + fd * (6.0 - 6.0 * u * u))
-		draw_polyline(sm, Pal.foe(dim, 2.0), 2.5)
+		_smile(bob, BOB_R, dim)
 	_draw_index(dim)
+
+
+func _smile(c: Vector2, r: float, dim: float) -> void:
+	var fc := c + Vector2(0, -r * 0.62)
+	var s := r / 70.0
+	draw_circle(fc + Vector2(-14, -2) * s, 4.0 * s, Pal.foe(dim, 2.2))
+	draw_circle(fc + Vector2(14, -2) * s, 4.0 * s, Pal.foe(dim, 2.2))
+	var sm := PackedVector2Array()
+	for j in 11:
+		var u := lerpf(-1.0, 1.0, j / 10.0)
+		sm.append(fc + Vector2(u * 22.0, 6.0 + 9.0 * (1.0 - u * u)) * s)
+	draw_polyline(sm, Pal.foe(dim, 2.2), 3.0 * s)
 
 
 # The national happiness index, over the pivot: it only goes up.
 func _draw_index(dim: float) -> void:
 	var font := Fonts.get_font("SemiBold")
-	var r := Rect2(PIVOT + Vector2(-150, 74), Vector2(300, 64))
+	var r := Rect2(Vector2(1130, 128), Vector2(290, 64))
 	draw_rect(r, Color(0.02, 0.025, 0.03))
 	draw_rect(r, Pal.foe(0.55 * dim), false, 1.5)
 	var fast := phase >= 2 and state == RUN

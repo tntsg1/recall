@@ -49,10 +49,14 @@ func _run() -> void:
 	var anchor = game.enemies.spawn(Enemies.GUARD, Arena.ROOM.position + Vector2(1600, 60))
 	anchor.state = Enemies.ALIVE
 	anchor.hp = 1e9
-	game.player.pos = Vector2(960, 700)
+	# after the wave card, wait for the left-hand pair to light, then fire a fan through it
+	await frames(150)
+	while not game.scan_rings.lit[0]:
+		await process_frame
+	game.player.pos = Vector2(820, 600)
 	for k in 6:
-		game.bullets.fire(game.player.pos, Vector2.from_angle(PI + 0.35 + (k - 2.5) * 0.06))
-	await frames(20)
+		game.bullets.fire(game.player.pos, Vector2.from_angle(PI + (k - 2.5) * 0.08))
+	await frames(9)
 	await shot("2_rings")
 	for w in Lore.walls(7):
 		game.lore.hold["w7_%s" % w[0]] = 9.0
