@@ -343,16 +343,37 @@ func _draw_sector(arm: Dictionary, dim: float) -> void:
 	var n := 24
 	for j in n + 1:
 		pts.append(base + Vector2.from_angle(lerpf(a0, a1, j / float(n))) * L)
-	draw_colored_polygon(pts, Pal.foe(0.004 + 0.01 * k))
-	var rim := pts.slice(1)
-	draw_polyline(rim, Pal.foe((0.3 + 0.6 * k) * dim, 1.6), 2.0)
+	# in a generated room the reach is a dark field inside the room, its rim
+	# the one bright line, so the crate, your lines and the arm read over it
+	var quiet: bool = game != null and game.arena.generated
+	if quiet:
+		var rp := Arena.ROOM
+		var box := PackedVector2Array([rp.position, Vector2(rp.end.x, rp.position.y), rp.end, Vector2(rp.position.x, rp.end.y)])
+		for poly: PackedVector2Array in Geometry2D.intersect_polygons(pts, box):
+			draw_colored_polygon(poly, Color(0, 0, 0, 0.18 + 0.12 * k))
+			draw_colored_polygon(poly, Pal.foe(0.01 + 0.02 * k))
+		var rim2 := PackedVector2Array()
+		for q in pts.slice(1):
+			if rp.grow(1.0).has_point(q):
+				rim2.append(q)
+		if rim2.size() >= 2:
+			draw_polyline(rim2, Pal.foe((0.25 + 0.45 * k) * dim, 1.4), 2.0)
+	else:
+		draw_colored_polygon(pts, Pal.foe(0.004 + 0.01 * k))
+		var rim := pts.slice(1)
+		draw_polyline(rim, Pal.foe((0.3 + 0.6 * k) * dim, 1.6), 2.0)
 	# hatch lines across the slice, thickening as the sweep nears
 	var hatch := PackedVector2Array()
 	for j in 9:
 		var aj := lerpf(a0, a1, (j + 0.5) / 9.0)
-		hatch.append(base + Vector2.from_angle(aj) * 40.0)
-		hatch.append(base + Vector2.from_angle(aj) * L * (0.35 + 0.65 * k))
-	draw_multiline(hatch, Pal.foe(0.2 * k * dim, 1.2), 1.0 + k)
+		var h0 := base + Vector2.from_angle(aj) * 40.0
+		var h1 := base + Vector2.from_angle(aj) * L * (0.35 + 0.65 * k)
+		if quiet and not Arena.ROOM.has_point(h1):
+			continue
+		hatch.append(h0)
+		hatch.append(h1)
+	if hatch.size() > 0:
+		draw_multiline(hatch, Pal.foe((0.08 if quiet else 0.2) * k * dim, 1.1), 1.0 + k * (0.5 if quiet else 1.0))
 	if arm.mode == SWEEP:
 		# the swept part goes dark behind the arm
 		var done := PackedVector2Array([base])

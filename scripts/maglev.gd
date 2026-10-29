@@ -41,6 +41,17 @@ func setup(room: int, story: int) -> void:
 	queue_redraw()
 
 
+# A generated room's guide rails ([a, b, group]); the groups take turns as ever.
+func set_rails(list: Array) -> void:
+	rails = list.duplicate(true)
+	bend_flash.clear()
+	t = 0.0
+	live = [false, false]
+	warn = [0.0, 0.0]
+	visible = not rails.is_empty()
+	queue_redraw()
+
+
 func active() -> bool:
 	return not rails.is_empty()
 

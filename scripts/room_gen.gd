@@ -26,7 +26,7 @@ const EXIT_APART := 480.0                     # two ways on: this far apart, the
 const FROM_ENTRY := 700.0                     # a way on this far from the way in: the room is crossed
 
 # The chapters that walk room to room; the rest keep their one hand-made room.
-const ON := [1, 2, 3]
+const ON := [1, 2, 3, 4]
 const ARM_W := 200.0       # an arm's footing on its wall
 const POST := 48.0
 
@@ -119,6 +119,7 @@ const STYLE := {
 		"shapes": {"hall": 3, "bays": 2, "twin": 2, "corner": 2, "neck": 1},
 		"pieces": [
 			[3, [Rect2(0, 0, 68, 68)], "press"],
+			[2, [Rect2(0, 0, 80, 80)], "press"],
 			[2, [Rect2(0, 0, 92, 92)], "press"],
 			[3, [Rect2(0, 0, 80, 80)], "rations"],
 			[2, [Rect2(0, 0, 80, 80), Rect2(80, 0, 80, 80)], "rations"],
@@ -136,6 +137,29 @@ const STYLE := {
 		"themes": [["press"], ["rations"], ["station", "rations"]],
 		"props": {"board": [220.0, 180.0], "crate": [0.0, 0.0], "notice": [180.0, 130.0], "scrawl": [220.0, 130.0]},
 		"on_cover": {"crate": "reserve"},
+	},
+	5: {
+		# the superconducting line's concourse: freight containers, ticket
+		# barriers, station pillars; the chapter's own are its maglev guide
+		# rails set in the floor, one in the first room and three by the last
+		"shapes": {"hall": 3, "twin": 2, "corner": 2, "neck": 2, "bays": 1},
+		"pieces": [
+			[3, [Rect2(0, 0, 160, 60)], "cargo"],
+			[2, [Rect2(0, 0, 160, 60), Rect2(0, 60, 160, 60)], "cargo"],
+			[2, [Rect2(0, 0, 120, 34)], "barrier"],
+			[2, [Rect2(0, 0, 70, 70)], "pillar5"],
+		],
+		"landmarks": [
+			[3, [Rect2(0, 0, 300, 70)], "cargo"],                                # a long container
+			[2, [Rect2(0, 0, 160, 60), Rect2(160, 30, 160, 60)], "cargo"],      # two, staggered
+			[2, [Rect2(0, 0, 120, 120)], "signal"],                             # a signal box
+		],
+		"maglev": [1, 1, 2, 2, 3, 3],
+		# the hand-made station (the yard's floor): six blocks
+		"count": 6, "area": 50000.0,
+		"themes": [["cargo"], ["barrier", "pillar5"], ["cargo", "barrier"]],
+		"props": {"timetable": [220.0, 180.0], "yellow": [760.0, 90.0], "manifest": [0.0, 0.0], "scrawl": [220.0, 130.0]},
+		"on_cover": {"manifest": "cargo"},
 	},
 }
 
@@ -227,15 +251,33 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		_shuffle(sides_a, rng)
 		for k in want_a:
 			var got := {}
-			for tries in 12:
+			for tries in 32:
 				got = _door_on(sides_a[(k + tries) % 4], walls, taken, rng, ARM_W)
-				if not got.is_empty() and (got.pos as Vector2).distance_to(lay.start) > 420.0:
-					break
+				if not got.is_empty() and (got.pos as Vector2).distance_to(lay.start) > 360.0:
+					var zone := arm_zone(got.pos, got.n)
+					var clear := true
+					# its folded reach: not over a door's label, the HUD, or out past a corner
+					var gp: Vector2 = got.pos
+					var tan := Vector2(absf((got.n as Vector2).y), absf((got.n as Vector2).x))
+					var u := gp.dot(tan)
+					var lo := (ROOM.position.x if tan.x > 0.5 else ROOM.position.y) + 210.0
+					var hi := (ROOM.end.x if tan.x > 0.5 else ROOM.end.y) - 210.0
+					if u < lo or u > hi:
+						clear = false
+					for z: Rect2 in [HUD_STRIP, HUD_TOP, HUD_LORE, HUD_FOOT]:
+						if zone.intersects(z):
+							clear = false
+					for d: Dictionary in lay.exits:
+						if zone.intersects((d.label as Rect2).grow(20.0)):
+							clear = false
+					if clear:
+						break
 				got = {}
 			if got.is_empty():
 				last_why = "arms"
 				return {}
 			got["arm"] = true
+			lay["arm_zones"] = lay.get("arm_zones", []) + [arm_zone(got.pos, got.n)]
 			taken.append(got)
 			lay.arms.append([got.pos, got.n, 3.0 * k])
 	# spawn gates: one on each wall that has room for one, two on the long walls
@@ -293,6 +335,12 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		pid += want_f
 		for ci in range(before, (lay.cover as Array).size()):
 			area += (lay.cover[ci] as Rect2).get_area()
+	lay["maglev"] = []
+	if st.has("maglev"):
+		var want_m: int = (st.maglev as Array)[mini(index, (st.maglev as Array).size() - 1)]
+		if not _rails_down(lay, taken, rng, want_m):
+			last_why = "maglev"
+			return {}
 	var mech: Dictionary = st.get("mech", {})
 	var mech_left: int = (mech.count as Array)[mini(index, (mech.count as Array).size() - 1)] if not mech.is_empty() else 0
 	for tries in 500:
@@ -350,7 +398,7 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 			if NORMAL[entry] == w[2]:
 				spot = [e.pos, e.n]
 		else:
-			spot = _spot_for(w[2], need, lay, taken, rng)
+			spot = _spot_for(w[2], need, lay, taken, rng, w[3] == "scrawl" or w[3] == "scrawl_top")
 		if spot.is_empty() and spare:
 			continue
 		if spot.is_empty():
@@ -372,9 +420,37 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		_paint_range(lay, taken, rng)
 	elif story == 4:
 		_paint_union(lay, taken, rng)
+	elif story == 5:
+		_paint_station(lay, taken, rng)
 	else:
 		_paint(lay, taken, rng)
 	return lay
+
+
+# The concourse floor: painted way-arrows for the line, the tactile strip by
+# the platform's edge is the platform's own; worn patches where crowds stood.
+static func _paint_station(lay: Dictionary, taken: Array, rng: RandomNumberGenerator) -> void:
+	lay["quiet"] = _quiet(lay)
+	var solid: Array = lay.walls + lay.cover
+	var arrows: Array = []
+	for tries in 30:
+		if arrows.size() >= rng.randi_range(2, 3):
+			break
+		var at := Vector2(rng.randf_range(ROOM.position.x + 160.0, ROOM.end.x - 160.0), rng.randf_range(ROOM.position.y + 160.0, ROOM.end.y - 160.0))
+		var box := Rect2(at - Vector2(110, 40), Vector2(220, 80))
+		var ok := true
+		for r: Rect2 in solid + lay.quiet:
+			if r.grow(20.0).intersects(box):
+				ok = false
+		for f: Array in lay.get("maglev", []):
+			if _seg_hits(f[0], f[1], box.grow(30.0)):
+				ok = false
+		for o: Array in arrows:
+			if (o[0] as Vector2).distance_to(at) < 300.0:
+				ok = false
+		if ok:
+			arrows.append([at, [-1.0, 1.0][rng.randi() % 2]])
+	lay["arrows"] = arrows
 
 
 # The union's floor: a conveyor belt or two across open floor (cut where
@@ -383,8 +459,9 @@ static func _paint_union(lay: Dictionary, taken: Array, rng: RandomNumberGenerat
 	lay["quiet"] = _quiet(lay)
 	var cuts: Array = []
 	for r: Rect2 in lay.walls + lay.cover:
-		cuts.append(r.grow(20.0))
+		cuts.append(r.grow(40.0))
 	cuts.append_array(lay.quiet)
+	cuts.append_array(lay.get("arm_zones", []))
 	for d: Dictionary in taken:
 		cuts.append(Rect2((d.pos as Vector2) - Vector2(120, 120), Vector2(240, 240)))
 	var belts: Array = []
@@ -771,15 +848,25 @@ static func label_rect(d: Dictionary) -> Rect2:
 	return Rect2(at - Vector2(150, 40), Vector2(300, 130))
 
 
+# Where an arm folds against its wall and its claw hangs: kept clear of
+# cover, belts and words.
+static func arm_zone(base: Vector2, n: Vector2) -> Rect2:
+	var tan := Vector2(absf(n.y), absf(n.x))
+	return Rect2(base - tan * 200.0, Vector2.ZERO).expand(base + tan * 200.0 + n * 110.0).abs()
+
+
 static func _fits(placed: Array[Rect2], lay: Dictionary, taken: Array) -> bool:
 	var inside := ROOM.grow(-GAP)
 	# nothing under the wave's title (a gantry's beam spans the gap between its legs)
 	if _bounds(placed).intersects(BANNER.grow(30.0)):
 		return false
+	for z: Rect2 in lay.get("arm_zones", []):
+		if _bounds(placed).intersects(z):
+			return false
 	for d: Dictionary in lay.exits:
 		if _bounds(placed).intersects((d.label as Rect2).grow(20.0)):
 			return false
-	for f: Array in lay.get("fences", []):
+	for f: Array in lay.get("fences", []) + lay.get("maglev", []):
 		for r in placed:
 			if _seg_hits(f[0], f[1], r.grow(34.0)):
 				return false
@@ -803,7 +890,8 @@ static func _fits(placed: Array[Rect2], lay: Dictionary, taken: Array) -> bool:
 # A place for a remnant's prop: on a wall (the room's or a wall block's face)
 # whose face looks the way the words were written to be read, with the length
 # of wall and the floor in front of it the prop needs.
-static func _spot_for(n: Vector2, need: Array, lay: Dictionary, taken: Array, rng: RandomNumberGenerator) -> Array:
+# (`outer`: the room's own walls only: graffiti is sprayed on a wall, not on a stub)
+static func _spot_for(n: Vector2, need: Array, lay: Dictionary, taken: Array, rng: RandomNumberGenerator, outer := false) -> Array:
 	var faces: Array = []    # [a, b] segments facing n
 	if n == Vector2(1, 0):
 		faces.append([ROOM.position, Vector2(ROOM.position.x, ROOM.end.y)])
@@ -813,7 +901,7 @@ static func _spot_for(n: Vector2, need: Array, lay: Dictionary, taken: Array, rn
 		faces.append([ROOM.position, Vector2(ROOM.end.x, ROOM.position.y)])
 	else:
 		faces.append([Vector2(ROOM.position.x, ROOM.end.y), ROOM.end])
-	for r: Rect2 in lay.walls:
+	for r: Rect2 in ([] if outer else lay.walls):
 		if n == Vector2(1, 0):
 			faces.append([Vector2(r.end.x, r.position.y), r.end])
 		elif n == Vector2(-1, 0):
@@ -1084,6 +1172,45 @@ static func _fence_up(lay: Dictionary, taken: Array, rng: RandomNumberGenerator,
 				lay.piece.append(pid + k)
 				lay.kinds.append("post")
 			lay.fences.append([a, b, k % 2])
+			done = true
+			break
+		if not done:
+			return false
+	return true
+
+
+# Maglev guide rails: `n` straight runs set in open floor (clear of every
+# solid, doors, gates, where you start and the words), the two groups taking
+# turns (Maglev). Floor only: nothing stands on them.
+static func _rails_down(lay: Dictionary, taken: Array, rng: RandomNumberGenerator, n: int) -> bool:
+	for k in n:
+		var done := false
+		for tries in 80:
+			var horiz := rng.randf() < 0.6
+			var len := rng.randf_range(200.0, 520.0)
+			var a := Vector2(rng.randf_range(ROOM.position.x + 160.0, ROOM.end.x - 160.0 - (len if horiz else 0.0)), rng.randf_range(ROOM.position.y + 160.0, ROOM.end.y - 160.0 - (0.0 if horiz else len)))
+			var b := a + (Vector2(len, 0) if horiz else Vector2(0, len))
+			var ok := true
+			for r: Rect2 in lay.walls + lay.cover:
+				if _seg_hits(a, b, r.grow(40.0)):
+					ok = false
+			for d: Dictionary in taken:
+				if Geometry2D.get_closest_point_to_segment(d.pos, a, b).distance_to(d.pos) < 160.0:
+					ok = false
+			if Geometry2D.get_closest_point_to_segment(lay.start, a, b).distance_to(lay.start) < 180.0:
+				ok = false
+			for z: Rect2 in [HUD_STRIP.grow(20.0), HUD_TOP, BANNER.grow(20.0)]:
+				if _seg_hits(a, b, z):
+					ok = false
+			for d: Dictionary in lay.exits:
+				if _seg_hits(a, b, (d.label as Rect2).grow(24.0)):
+					ok = false
+			for f: Array in lay.maglev:
+				if Geometry2D.segment_intersects_segment(a, b, f[0], f[1]) != null or Geometry2D.get_closest_point_to_segment(a, f[0], f[1]).distance_to(a) < 120.0:
+					ok = false
+			if not ok:
+				continue
+			lay.maglev.append([a, b, k % 2])
 			done = true
 			break
 		if not done:

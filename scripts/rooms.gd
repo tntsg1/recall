@@ -97,8 +97,10 @@ func build(i: int, entry: String, risky: bool) -> void:
 	if lay.is_empty():
 		game.lasers.setup(hand)
 		game.arms.setup(hand)
+		game.maglev.setup(hand, Chapters.story(game.chapter))
 	else:
 		game.lasers.set_fences(lay.get("fences", []))
+		game.maglev.set_rails(lay.get("maglev", []))
 		var crate_at := Rect2()
 		for ci in (lay.cover as Array).size():
 			if lay.kinds[ci] == "reserve":

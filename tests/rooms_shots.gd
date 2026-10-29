@@ -129,6 +129,31 @@ func _run() -> void:
 		game.rooms.open_doors()
 		await frames(50)
 		await shot("08_shape_%s" % sh)
+	# the production floor's arms at work: marking, sweeping, plucking rounds
+	if story == 4 and game.arms.active():
+		game.rooms.cseed = 31000
+		game.rooms.build(3, "L", false)
+		game.player.pos = game.rooms.start_pos()
+		var arm: Dictionary = game.arms.arms[0]
+		var base: Vector2 = arm.base
+		var face: Vector2 = arm.face
+		game.player.pos = (base + face * 420.0).clamp(Arena.ROOM.position + Vector2(60, 60), Arena.ROOM.end - Vector2(60, 60))
+		var tan := Vector2(face.y, -face.x)
+		for j in 6:
+			game.bullets.fire(game.player.pos, ((base + tan * (j - 2.5) * 70.0) - game.player.pos).normalized())
+			await frames(3)
+		await frames(40)
+		game.wave_ctl.phase = Waves.FIGHT
+		arm.mode = Arms.RISE
+		arm.t = 0.0
+		await frames(30)
+		await shot("08_arm_mark")
+		while arm.mode != Arms.SWEEP:
+			await frames(1)
+		await frames(20)
+		await shot("08_arm_sweep")
+		await frames(14)
+		await shot("08_arm_pluck")
 	# freight of every kind: a room holding a forced-open crate and a tarp
 	for k2 in 400:
 		game.rooms.cseed = 20000 + k2

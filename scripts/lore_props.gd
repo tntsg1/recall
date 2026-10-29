@@ -235,9 +235,20 @@ func _draw() -> void:
 		if safe_at != null and shows.get("w3_safety", 0.0) <= 0.01:
 			_draw_floor_notice(safe_at, dim)
 	elif story == 5:
-		_draw_platform(dim)
-		_draw_containers(dim)
-		_draw_terminal(Vector2(80, 300), dim, "w5_timetable")
+		var gen5: bool = game.arena.generated
+		var plat_at = game.rooms.spot("yellow", Vector2(960, 1010))
+		if plat_at != null:
+			draw_set_transform(plat_at - Vector2(960, 1010), 0.0, Vector2.ONE)
+			_draw_platform(dim)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		if gen5:
+			_draw_station_paint(dim)
+			_draw_station_cover(dim)
+		else:
+			_draw_containers(dim)
+		var tt_at = game.rooms.spot("timetable", Vector2(80, 300))
+		if tt_at != null:
+			_draw_terminal(tt_at, dim, "w5_timetable")
 	elif story == 6:
 		_draw_floor_cables(dim)
 		_draw_cabinets(dim)
@@ -752,13 +763,17 @@ func _draw_union_cover(dim: float) -> void:
 					hz.append(Vector2(x + 8.0, ins.end.y - 12.0))
 					x += 10.0
 				draw_multiline(hz, Pal.ink(0.3 * dim), 2.0)
-				draw_string(sf, ins.position + Vector2(4, 16), "PR-%02d" % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
-				# the ram, beating on its own clock
+				# the ram, beating on its own clock inside the frame's lower part
+				var bed := Rect2(ins.position + Vector2(8, 22), ins.size - Vector2(16, 36))
 				var ph := fmod(t * (2.5 if _full() else 0.6) + i * 0.37, 1.0)
 				var ram := 1.0 - Pal.ease_out(ph) if ph < 0.5 else (ph - 0.5) * 2.0
-				var rr := ins.grow(-ins.size.x * 0.2 - 8.0 * (1.0 - ram))
+				var rr := bed.grow(-bed.size.x * 0.12 - 5.0 * (1.0 - ram))
 				draw_rect(rr, Color(0.07, 0.07, 0.08))
 				draw_rect(rr, Pal.ink((0.8 if ph < 0.1 else 0.3) * dim, 1.4 if ph < 0.1 else 1.0), false, 2.0)
+				# its number on a dark strip across the top of the frame
+				var pn := "PR-%02d" % n
+				draw_rect(Rect2(ins.position + Vector2(2, 2), Vector2(sf.get_string_size(pn, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 6.0, 15)), Color(0, 0, 0, 0.45))
+				draw_string(sf, ins.position + Vector2(5, 13), pn, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.75 * dim))
 			"rations":
 				# a pallet of ration boxes: four to a layer, the stencil on top
 				for k in 4:
@@ -766,25 +781,115 @@ func _draw_union_cover(dim: float) -> void:
 					draw_rect(q, Pal.ink(0.22 * dim), false, 1.0)
 				draw_string(sf, ins.get_center() + Vector2(-14, 5), Txt.t("ration"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.5 * dim))
 			"station":
-				# a work station: its bench, the operator's mark, its lamp
-				draw_line(ins.position + Vector2(0, ins.size.y * 0.6), Vector2(ins.end.x, ins.position.y + ins.size.y * 0.6) if long_x else ins.position + Vector2(ins.size.x * 0.6, ins.size.y), Pal.ink(0.3 * dim), 1.0)
-				draw_circle(Vector2(ins.end.x - 6.0, ins.position.y + 6.0), 4.0, Pal.red(dim, 2.0) if _full() else Pal.ink(0.25 * dim))
-				draw_string(sf, ins.position + Vector2(4, 14), Txt.t("station") % (i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.45 * dim))
+				# a work station, and what its worker left on it: a lunch box half
+				# eaten (four minutes was not enough), chopsticks across it, a cup
+				draw_string(sf, r.position + Vector2(0, -6), Txt.t("station") % (i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+				draw_circle(Vector2(ins.end.x - 6.0, ins.end.y - 6.0), 3.5, Pal.red(dim, 2.0) if _full() else Pal.ink(0.25 * dim))
+				var lb := ins.get_center() + (Vector2(-14, 6) if long_x else Vector2(0, -4))
+				var box := Rect2(lb - Vector2(14, 8), Vector2(28, 16))
+				draw_rect(box, Color(0.08, 0.08, 0.085))
+				draw_rect(box, Pal.ink(0.6 * dim, 1.2), false, 1.5)
+				draw_line(box.position + Vector2(14, 0), box.position + Vector2(14, 16), Pal.ink(0.4 * dim), 1.0)
+				draw_circle(box.position + Vector2(7, 8), 4.0, Pal.ink(0.45 * dim))
+				draw_line(box.position + Vector2(-4, 20), box.position + Vector2(32, 15), Pal.ink(0.5 * dim), 1.0)
+				var cp := lb + (Vector2(34, 0) if long_x else Vector2(0, 26))
+				draw_arc(cp, 6.0, 0.0, TAU, 14, Pal.ink(0.6 * dim, 1.2), 1.5)
+				draw_arc(cp + Vector2(7, 0), 3.0, -PI / 2.0, PI / 2.0, 6, Pal.ink(0.5 * dim), 1.0)
 			"silo":
 				# a flour silo seen from above: its rings, the hatch
 				var c := r.get_center()
-				for k in 3:
-					draw_arc(c, r.size.x * (0.42 - 0.12 * k), 0.0, TAU, 32, Pal.ink((0.35 - 0.08 * k) * dim), 1.5)
-				draw_rect(Rect2(c - Vector2(10, 10), Vector2(20, 20)), Pal.ink(0.5 * dim), false, 1.5)
+				var rad := r.size.x * 0.42
+				draw_arc(c, rad, 0.0, TAU, 32, Pal.ink(0.45 * dim), 2.0)
+				# its roof's ribs, the hatch, the ladder up its side, the feed pipe out
+				for k in 8:
+					var a := TAU * k / 8.0
+					draw_line(c + Vector2.from_angle(a) * 14.0, c + Vector2.from_angle(a) * rad, Pal.ink(0.18 * dim), 1.0)
+				draw_rect(Rect2(c - Vector2(11, 11), Vector2(22, 22)), Pal.ink(0.55 * dim), false, 1.5)
+				draw_line(c + Vector2(-6, -4), c + Vector2(6, -4), Pal.ink(0.55 * dim), 2.0)
+				var l0 := c + Vector2(rad - 4.0, -18.0)
+				draw_line(l0, l0 + Vector2(0, 36), Pal.ink(0.5 * dim), 1.5)
+				draw_line(l0 + Vector2(8, 0), l0 + Vector2(8, 36), Pal.ink(0.5 * dim), 1.5)
+				for k in 5:
+					draw_line(l0 + Vector2(0, 4 + k * 7), l0 + Vector2(8, 4 + k * 7), Pal.ink(0.45 * dim), 1.0)
+				draw_line(c + Vector2(-rad * 0.7, rad * 0.7), r.position + Vector2(-6, r.size.y + 6), Pal.ink(0.4 * dim), 4.0)
+				draw_string(sf, r.position + Vector2(0, -6), Txt.t("silo"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
 			"machine":
-				# a packing machine: its rollers and the bag it seals
+				# a packing machine: its rollers turning, the belt over them, its name
 				var span := r.size.x if long_x else r.size.y
-				var nr := int(span / 30.0)
+				var nr := int(span / 34.0)
 				for k in nr:
 					var u := (k + 0.5) / nr
-					var cc := Vector2(lerpf(ins.position.x, ins.end.x, u), ins.get_center().y) if long_x else Vector2(ins.get_center().x, lerpf(ins.position.y, ins.end.y, u))
-					draw_arc(cc, 9.0, t * 4.0, t * 4.0 + PI * 1.5, 8, Pal.ink(0.45 * dim), 2.0)
-				draw_string(sf, ins.position + Vector2(4, 14), "PK-1", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+					var cc := Vector2(lerpf(ins.position.x, ins.end.x, u), ins.end.y - 14.0) if long_x else Vector2(ins.end.x - 14.0, lerpf(ins.position.y + 24.0, ins.end.y, u))
+					draw_arc(cc, 9.0, 0.0, TAU, 14, Pal.ink(0.4 * dim), 1.5)
+					var sp := Vector2.from_angle(t * 4.0 + k) * 9.0
+					draw_line(cc, cc + sp, Pal.ink(0.55 * dim), 2.0)
+				var pk := Txt.t("packer")
+				draw_rect(Rect2(ins.position + Vector2(2, 2), Vector2(sf.get_string_size(pk, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 6.0, 16)), Color(0, 0, 0, 0.7))
+				draw_string(sf, ins.position + Vector2(5, 14), pk, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.6 * dim))
+
+
+# A generated concourse floor: way-arrows for the line.
+func _draw_station_paint(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	for ar: Array in game.rooms.lay.get("arrows", []):
+		var c: Vector2 = ar[0]
+		var dirx: float = ar[1]
+		var col := Color(1, 1, 1, 0.05 * dim)
+		var tip := c + Vector2(90.0 * dirx, 0)
+		draw_line(c - Vector2(90.0 * dirx, 0), tip, col, 10.0)
+		draw_colored_polygon(PackedVector2Array([tip + Vector2(22.0 * dirx, 0), tip + Vector2(-10.0 * dirx, -22), tip + Vector2(-10.0 * dirx, 22)]), col)
+		draw_string(sf, c + Vector2(-60, 40), Txt.t("line_name"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(1, 1, 1, 0.06 * dim))
+
+
+# A generated concourse's things by kind: freight containers (as the
+# hand-made platform has them), ticket barriers, station pillars, a signal box.
+func _draw_station_cover(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var kinds: Array = lay.get("kinds", [])
+	var cover: Array = lay.get("cover", [])
+	var sf := Fonts.get_font("SemiBold")
+	for i in cover.size():
+		var rr: Rect2 = cover[i]
+		var kind: String = kinds[i] if i < kinds.size() else "cargo"
+		var long_x := rr.size.x >= rr.size.y
+		var ins := rr.grow(-6.0)
+		match kind:
+			"cargo":
+				var ribs := PackedVector2Array()
+				if long_x:
+					var x := ins.position.x + 8.0
+					while x < ins.end.x - 4.0:
+						ribs.append(Vector2(x, ins.position.y))
+						ribs.append(Vector2(x, ins.end.y))
+						x += 9.0
+				else:
+					var y := ins.position.y + 8.0
+					while y < ins.end.y - 4.0:
+						ribs.append(Vector2(ins.position.x, y))
+						ribs.append(Vector2(ins.end.x, y))
+						y += 9.0
+				draw_multiline(ribs, Pal.ink(0.12 * dim), 1.0)
+				draw_string(sf, ins.position + Vector2(4, 14), "CX-%04d" % ((i + 1) * 4127 % 9973), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.55 * dim))
+				if long_x:
+					draw_string(sf, Vector2(ins.position.x + 4, ins.end.y - 6), Txt.t("cx_dest"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.4 * dim))
+			"barrier":
+				# a ticket barrier: two flaps meeting, the reader lit red
+				var c := ins.get_center()
+				var half := Vector2(ins.size.x * 0.5, 0) if long_x else Vector2(0, ins.size.y * 0.5)
+				draw_line(c - half, c - half * 0.1, Pal.ink(0.5 * dim), 4.0)
+				draw_line(c + half, c + half * 0.1, Pal.ink(0.5 * dim), 4.0)
+				draw_circle(c - half * 0.8, 3.0, Pal.red(0.8 * dim, 1.8))
+			"pillar5":
+				# a station pillar: the line's roundel on it
+				var c2 := rr.get_center()
+				draw_arc(c2, 18.0, 0.0, TAU, 20, Pal.ink(0.5 * dim), 3.0)
+				draw_line(c2 - Vector2(24, 0), c2 + Vector2(24, 0), Pal.ink(0.5 * dim), 5.0)
+			"signal":
+				# a signal box: its panel of lamps, one red
+				for k in 6:
+					var lp := ins.position + Vector2(18.0 + (k % 3) * 34.0, 30.0 + (k / 3) * 34.0)
+					draw_circle(lp, 7.0, Pal.red(0.8 * dim, 1.8) if k == int(t * 0.7) % 6 else Pal.ink(0.25 * dim))
+				draw_string(sf, ins.position + Vector2(4, 14), "SIG-5", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
 
 
 # The parts of axis-aligned line a-b outside every rect, as [from, to].
@@ -2058,6 +2163,11 @@ func _draw_presses(dim: float) -> void:
 func _draw_reserve(dim: float) -> void:
 	var r: Rect2 = game.arms.crate_r
 	var sf := Fonts.get_font("SemiBold")
+	# stood on end: drawn turned, so its bands, its name and its lock stay square to it
+	var turned := r.size.y > r.size.x
+	if turned:
+		draw_set_transform(r.get_center(), PI / 2.0, Vector2.ONE)
+		r = Rect2(-Vector2(r.size.y, r.size.x) / 2.0, Vector2(r.size.y, r.size.x))
 	var ins := r.grow(-8.0)
 	draw_rect(ins, Pal.ink(0.2 * dim), false, 1.0)
 	for bx: float in [r.position.x + 46.0, r.end.x - 46.0]:
@@ -2073,6 +2183,8 @@ func _draw_reserve(dim: float) -> void:
 	draw_arc(lk - Vector2(0, 6), 6.0, PI, TAU, 10, Pal.ink(0.6 * dim), 1.5)
 	var fl: float = game.arms.crate_flash
 	draw_line(Vector2(r.position.x + 10.0, r.position.y + 18.0), Vector2(r.end.x - 10.0, r.position.y + 30.0), Pal.ink(0.35 * dim).lerp(Pal.red(dim, 1.8), fl), 3.0)
+	if turned:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 # The maintenance worker: by the door as the chapter opens, then back inside.

@@ -566,6 +566,10 @@ func _draw_stamp(vp: Vector2) -> void:
 		var u := t - 0.16
 		k = 1.0 - 0.1 * exp(-8.0 * u) * cos(u * 34.0)
 	var a := clampf(t / 0.08, 0.0, 1.0) * (1.0 - Pal.ease_in(clampf((t - 2.0) / 0.5, 0.0, 1.0)))
+	# the room steps back while the grade stands: a soft dark pool behind the card
+	var pool := Rect2(c - Vector2(260, 190), Vector2(520, 380))
+	view.draw_rect(pool, Color(0, 0, 0, 0.42 * a))
+	view.draw_rect(pool.grow(40.0), Color(0, 0, 0, 0.16 * a))
 	var rot := lerpf(-0.35, -0.06, land)
 	var bright := 1.0
 	if t > 0.16:
