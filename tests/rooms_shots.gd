@@ -136,6 +136,9 @@ func _run() -> void:
 		var best_n := -1
 		var best_seed := 52000
 		for k3 in 240:
+			# (a room that can't fit one hands it on to the next: put them all back)
+			for id in game.rooms.homes:
+				game.rooms.homes[id] = 2
 			game.rooms.cseed = 52000 + k3
 			game.rooms.build(2, ["L", "R", "T", "B"][k3 % 4], false)
 			var sp: Dictionary = game.rooms.lay.get("spots", {})
@@ -149,6 +152,8 @@ func _run() -> void:
 				best_seed = k3
 			if sp.has("yellow") and sp.size() >= 3:
 				break
+		for id in game.rooms.homes:
+			game.rooms.homes[id] = 2
 		game.rooms.cseed = 52000 + best_seed
 		game.rooms.build(2, ["L", "R", "T", "B"][best_seed % 4], false)
 		print("remnants in the room: ", game.rooms.lay.get("spots", {}).keys())
@@ -157,6 +162,25 @@ func _run() -> void:
 			game.lore.hold["w%d_%s" % [story, w[0]]] = 9.0
 		await frames(50)
 		await shot("08_remnants")
+	# the bureau of thought's rings at work: standing in one as it lights
+	if story == 7 and game.scan_rings.active():
+		game.rooms.cseed = 71000
+		game.rooms.build(3, "L", false)
+		game.wave_ctl.phase = Waves.FIGHT
+		game.dev_god = false
+		game.player.invuln = 0.0
+		var ring: Vector2 = game.scan_rings.spots[0]
+		game.player.pos = ring + Vector2(20, 10)
+		game.fx.numbers.clear()
+		var c0: int = game.cracks
+		for k6 in 240:
+			await frames(1)
+			game.player.pos = ring + Vector2(20, 10)
+			if game.cracks < c0:
+				break
+		await frames(2)
+		await shot("08_ring_hit")
+		game.dev_god = true
 	# the bureau's current at work: rounds in the walls arced together, an enemy crossing an arc
 	if story == 6:
 		game.rooms.cseed = 61000

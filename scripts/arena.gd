@@ -129,7 +129,7 @@ func setup(ch: int, lay := {}) -> void:
 			mirrors.append(Rect2(520, 797, 220, 28))
 	rects.append_array(inner)
 	mover_from = rects.size()
-	movers = Shelves.initial(ch)
+	movers = Shelves.initial(ch) if not generated else Shelves.rects_for(lay.get("banks", []))
 	movers.append_array(Plates.initial(ch))
 	rects.append_array(movers)
 	mirror_from = rects.size()

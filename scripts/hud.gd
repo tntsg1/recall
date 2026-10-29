@@ -532,7 +532,8 @@ func _draw_title(vp: Vector2) -> void:
 	var top := cy - size * 0.86 - 16.0
 	var bot := cy + 18.0
 	# a soft plate behind, so the label reads over whatever the arena has there
-	view.draw_rect(Rect2(cx - half - 14.0, top, (half + 14.0) * 2.0, bot - top), Color(0, 0, 0, 0.55 * a))
+	# (darker in a generated room, whose walls may run right under it)
+	view.draw_rect(Rect2(cx - half - 14.0, top, (half + 14.0) * 2.0, bot - top), Color(0, 0, 0, (0.85 if game.arena.generated else 0.55) * a))
 	view.draw_line(Vector2(cx - half + shift, top), Vector2(cx + half * (1.0 - out) + shift, top), Pal.ink(0.5 * a), 1.0)
 	view.draw_line(Vector2(cx - half * (1.0 - out) - shift, bot), Vector2(cx + half - shift, bot), Pal.ink(0.5 * a), 1.0)
 	var label := Txt.t("wave") % (title_i + 1)

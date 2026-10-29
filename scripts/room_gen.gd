@@ -26,9 +26,10 @@ const EXIT_APART := 480.0                     # two ways on: this far apart, the
 const FROM_ENTRY := 700.0                     # a way on this far from the way in: the room is crossed
 
 # The chapters that walk room to room; the rest keep their one hand-made room.
-const ON := [1, 2, 3, 4, 5, 6]
+const ON := [1, 2, 3, 4, 5, 6, 7]
 const ARM_W := 200.0       # an arm's footing on its wall
 const RING_R := 92.0       # a mood-scan ring's radius (ScanRings.R)
+const RING_WARN := 66.0    # how far past it the red warning closes in from
 const POST := 48.0
 
 # Per chapter: room shapes (weights), its pieces of cover (weight, rects,
@@ -194,17 +195,39 @@ const STYLE := {
 			[2, [Rect2(0, 0, 130, 50)], "amp"],
 			[2, [Rect2(0, 0, 90, 90)], "chair"],
 			[2, [Rect2(0, 0, 110, 60)], "console"],
+			[2, [Rect2(0, 0, 54, 54)], "sample"],
+			[1, [Rect2(0, 0, 90, 90), Rect2(90, 0, 90, 90)], "chair"],
 		],
 		"landmarks": [
 			[3, [Rect2(0, 0, 90, 90), Rect2(90, 0, 90, 90), Rect2(180, 0, 90, 90)], "chair"],   # a row of chairs
-			[2, [Rect2(0, 0, 130, 50), Rect2(0, 50, 130, 50)], "amp"],                            # a stack of amps
-			[2, [Rect2(0, 0, 240, 60)], "console"],                                               # the operators' desk
+			[2, [Rect2(0, 0, 150, 56), Rect2(0, 56, 150, 56), Rect2(0, 112, 150, 56)], "amp"],     # a stack of amps
+			[2, [Rect2(0, 0, 320, 72)], "console"],                                               # the operators' desk
 		],
 		"rings": [2, 2, 3, 3, 4, 4],
 		# the hand-made room: four corner pillars and a bar
 		"count": 5, "area": 25500.0,
 		"themes": [["sample"], ["chair"], ["amp", "console"]],
 		"props": {"monitor": [220.0, 180.0], "chair": [160.0, 150.0], "slogan": [320.0, 200.0], "scrawl": [220.0, 150.0]},
+	},
+	8: {
+		# the deep archive: card-index cabinets, reading desks, book trolleys;
+		# the chapter's own are its banks of mobile shelving on floor rails,
+		# one bank in the first rooms and two by the last
+		"shapes": {"hall": 4, "twin": 2, "corner": 2, "bays": 1},
+		"pieces": [
+			[3, [Rect2(0, 0, 70, 70)], "catalog"],
+			[2, [Rect2(0, 0, 150, 60)], "desk8"],
+			[2, [Rect2(0, 0, 90, 46)], "trolley"],
+		],
+		"landmarks": [
+			[3, [Rect2(0, 0, 70, 70), Rect2(70, 0, 70, 70)], "catalog"],
+			[2, [Rect2(0, 0, 220, 64)], "desk8"],
+		],
+		"banks": [1, 1, 1, 2, 2, 2],
+		# (the hand-made archive is nothing but shelving: the rest is held to a little cover)
+		"count": 4, "area": 22000.0,
+		"themes": [["catalog"], ["desk8", "trolley"]],
+		"props": {"index": [220.0, 180.0], "plate": [440.0, 90.0], "rules": [160.0, 150.0], "scrawl": [220.0, 150.0]},
 	},
 }
 
@@ -393,11 +416,15 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 			for tries in 80:
 				var c := Vector2(rng.randf_range(ROOM.position.x + RING_R + 40.0, ROOM.end.x - RING_R - 40.0), rng.randf_range(ROOM.position.y + RING_R + 40.0, ROOM.end.y - RING_R - 40.0))
 				var ok := true
+				# (its warning, closing in from well outside it, overlies nothing either)
 				for r: Rect2 in lay.walls + lay.cover:
-					if _dist(r, c) < RING_R + 30.0:
+					if _dist(r, c) < RING_R + RING_WARN:
 						ok = false
 				for d: Dictionary in taken:
 					if (d.pos as Vector2).distance_to(c) < RING_R + 130.0:
+						ok = false
+					var fr: Rect2 = d.get("front", Rect2())
+					if fr.size.x > 0.0 and _dist(fr, c) < RING_R + RING_WARN:
 						ok = false
 				if c.distance_to(lay.start) < RING_R + 140.0:
 					ok = false
@@ -405,7 +432,7 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 					if _dist(z, c) < RING_R + 10.0:
 						ok = false
 				for d: Dictionary in lay.exits:
-					if _dist(d.label, c) < RING_R + 10.0:
+					if _dist(d.label, c) < RING_R + RING_WARN:
 						ok = false
 				for o: Vector2 in lay.rings:
 					if o.distance_to(c) < RING_R * 2.0 + 90.0:
@@ -416,6 +443,41 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 					break
 			if not done:
 				last_why = "rings"
+				return {}
+	lay["banks"] = []
+	if st.has("banks"):
+		var want_b: int = (st.banks as Array)[mini(index, (st.banks as Array).size() - 1)]
+		var foot_w := Shelves.span() + 24.0
+		for k in want_b:
+			var done := false
+			for tries in 80:
+				var x0 := rng.randf_range(ROOM.position.x + 110.0, ROOM.end.x - 110.0 - foot_w)
+				var top := rng.randf_range(ROOM.position.y + 120.0, ROOM.end.y - 120.0 - Shelves.H)
+				var foot := Rect2(x0 - 12.0, top - 24.0, foot_w, Shelves.H + 48.0)
+				var ok := ROOM.grow(-60.0).encloses(foot)
+				for r: Rect2 in lay.walls + lay.cover:
+					if r.grow(GAP).intersects(foot):
+						ok = false
+				for d: Dictionary in taken:
+					if _dist(foot, d.pos) < 170.0:
+						ok = false
+				if _dist(foot, lay.start) < 200.0:
+					ok = false
+				for o: Rect2 in lay.get("bank_feet", []):
+					if o.grow(140.0).intersects(foot):
+						ok = false
+				if HUD_TOP.intersects(foot):
+					ok = false
+				for d: Dictionary in lay.exits:
+					if (d.label as Rect2).intersects(foot):
+						ok = false
+				if ok:
+					lay.banks.append([x0, top])
+					lay["bank_feet"] = lay.get("bank_feet", []) + [foot]
+					done = true
+					break
+			if not done:
+				last_why = "banks"
 				return {}
 	lay["maglev"] = []
 	if st.has("maglev"):
@@ -479,6 +541,8 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		_paint_station(lay, taken, rng)
 	elif story == 6:
 		_paint_bureau(lay, taken, rng)
+	elif story == 8:
+		_paint_archive(lay, taken, rng)
 	elif story == 1:
 		_paint(lay, taken, rng)
 	else:
@@ -556,6 +620,35 @@ static func _paint_bureau(lay: Dictionary, taken: Array, rng: RandomNumberGenera
 		if ok:
 			lay.stencil = [at, "▲ 380 kV"]
 			break
+
+
+# The archive's floor: a viewport onto the black water in open floor, the
+# depth gauge by a wall.
+static func _paint_archive(lay: Dictionary, taken: Array, rng: RandomNumberGenerator) -> void:
+	lay["quiet"] = _quiet(lay)
+	var solid: Array = lay.walls + lay.cover + Shelves.rects_for(lay.get("banks", []))
+	lay["viewport"] = Vector2(-1, -1)
+	for tries in 40:
+		var c := Vector2(rng.randf_range(ROOM.position.x + 140.0, ROOM.end.x - 140.0), rng.randf_range(ROOM.position.y + 140.0, ROOM.end.y - 140.0))
+		var ok := true
+		for r: Rect2 in solid + lay.quiet:
+			if _dist(r, c) < 90.0:
+				ok = false
+		for foot: Rect2 in lay.get("bank_feet", []):
+			if _dist(foot, c) < 90.0:
+				ok = false
+		for d: Dictionary in taken:
+			if (d.pos as Vector2).distance_to(c) < 160.0:
+				ok = false
+		if ok:
+			lay.viewport = c
+			taken.append({"pos": c, "n": Vector2.ZERO, "w": 160.0})
+			break
+	lay["gauge"] = []
+	var sp := _spot_for(Vector2(0, -1), [300.0, 80.0], lay, taken, rng, true)
+	if not sp.is_empty():
+		lay.gauge = sp
+		taken.append({"pos": sp[0], "n": sp[1], "w": 300.0})
 
 
 # The concourse floor: painted way-arrows for the line, the tactile strip by
@@ -1045,7 +1138,11 @@ static func _fits(placed: Array[Rect2], lay: Dictionary, taken: Array) -> bool:
 			return false
 	for c: Vector2 in lay.get("rings", []):
 		for r in placed:
-			if _dist(r, c) < RING_R + 30.0:
+			if _dist(r, c) < RING_R + RING_WARN:
+				return false
+	for foot: Rect2 in lay.get("bank_feet", []):
+		for r in placed:
+			if foot.grow(GAP).intersects(r):
 				return false
 	for d: Dictionary in lay.exits:
 		if _bounds(placed).intersects((d.label as Rect2).grow(20.0)):
@@ -1134,6 +1231,7 @@ static func check(lay: Dictionary) -> Dictionary:
 	var solids: Array[Rect2] = []
 	solids.append_array(lay.walls)
 	solids.append_array(lay.cover)
+	solids.append_array(Shelves.rects_for(lay.get("banks", [])))
 	var nx := int(ROOM.size.x / CELL)
 	var ny := int(ROOM.size.y / CELL)
 	var reach := PackedByteArray()

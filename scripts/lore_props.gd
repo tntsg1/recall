@@ -283,7 +283,14 @@ func _draw() -> void:
 			_draw_chairs(dim)
 		var slogan_at = game.rooms.spot("slogan", Vector2(350, 70))
 		if slogan_at != null:
-			draw_set_transform(slogan_at - Vector2(350, 70), 0.0, Vector2.ONE)
+			var shift: Vector2 = slogan_at - Vector2(350, 70)
+			if gen7:
+				# hung on its wall: the board (240 x 46, centred at 498, 203 as
+				# drawn) just off the wall, on the room's side
+				var sn: Vector2 = game.rooms.lay.spots.slogan[1]
+				var off := 23.0 + 14.0 if absf(sn.y) > 0.5 else 120.0 + 14.0
+				shift = (slogan_at as Vector2) + sn * off - Vector2(498, 203)
+			draw_set_transform(shift, 0.0, Vector2.ONE)
 			_draw_lightboards(dim, gen7)
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		var mon_at = game.rooms.spot("monitor", Vector2(80, 560))
@@ -316,10 +323,19 @@ func _draw() -> void:
 		if shows.get("w9_rail", 0.0) <= 0.01:
 			_draw_wall_notice(Vector2(1840, 545), dim)
 	elif story == 8:
-		_draw_deep(dim)
-		_draw_terminal(Vector2(80, 300), dim, "w8_index")
-		if shows.get("w8_rules", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 476), dim)
+		var gen8: bool = game.arena.generated
+		if gen8:
+			_draw_archive_cover(dim)
+		_draw_deep(dim, gen8)
+		var idx_at = game.rooms.spot("index", Vector2(80, 300))
+		if idx_at != null:
+			_draw_terminal(idx_at, dim, "w8_index")
+		var rules_at = game.rooms.spot("rules", Vector2(1840, 476))
+		if rules_at != null and shows.get("w8_rules", 0.0) <= 0.01:
+			_draw_wall_notice(rules_at, dim)
+		var sc8 = game.rooms.spot("scrawl", Vector2(1840, 900))
+		if gen8 and sc8 != null:
+			_draw_scrawl(sc8, dim)
 	elif story == 4:
 		var gen4: bool = game.arena.generated
 		if gen4:
@@ -860,6 +876,50 @@ func _draw_union_cover(dim: float) -> void:
 				draw_string(sf, ins.position + Vector2(5, 14), pk, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.6 * dim))
 
 
+# A generated archive's furniture by kind: card-index cabinets (drawers and
+# their brass pulls), reading desks (a lamp, an open volume with lines struck
+# through), book trolleys.
+func _draw_archive_cover(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var kinds: Array = lay.get("kinds", [])
+	var cover: Array = lay.get("cover", [])
+	for i in cover.size():
+		var r: Rect2 = cover[i]
+		var kind: String = kinds[i] if i < kinds.size() else "catalog"
+		var long_x := r.size.x >= r.size.y
+		var ins := r.grow(-6.0)
+		match kind:
+			"catalog":
+				# a card-index cabinet: a grid of small drawers, each with its pull
+				for row in 3:
+					for col in 3:
+						var cell := Rect2(ins.position + ins.size * Vector2(col / 3.0, row / 3.0), ins.size / 3.0).grow(-2.0)
+						draw_rect(cell, Pal.ink(0.25 * dim), false, 1.0)
+						draw_line(cell.get_center() + Vector2(-3, 2), cell.get_center() + Vector2(3, 2), Pal.ink(0.55 * dim), 1.5)
+			"desk8":
+				# a reading desk: its lamp's pool, an open volume, its lines struck out
+				var lamp := ins.position + Vector2(14, 14)
+				draw_texture_rect(Fx.make_glow_texture(), Rect2(lamp - Vector2(40, 40), Vector2(80, 80)), false, Color(1, 1, 1, 0.08 * dim))
+				draw_circle(lamp, 5.0, Pal.ink(0.7 * dim, 1.4))
+				var book := Rect2(ins.get_center() - Vector2(26, 14), Vector2(52, 28))
+				draw_rect(book, Pal.ink(0.12 * dim))
+				draw_line(Vector2(book.get_center().x, book.position.y), Vector2(book.get_center().x, book.end.y), Pal.ink(0.4 * dim), 1.0)
+				for k in 4:
+					var y := book.position.y + 5.0 + k * 6.0
+					draw_line(Vector2(book.position.x + 4.0, y), Vector2(book.end.x - 4.0, y), Color(0, 0, 0, 0.9), 3.0)
+			"trolley":
+				# a book trolley: its spines in a row, wheels at the corners
+				var span := r.size.x if long_x else r.size.y
+				var nb := int(span / 9.0)
+				for k in nb:
+					var u := (k + 0.5) / nb
+					var a := Vector2(lerpf(ins.position.x, ins.end.x, u), ins.position.y + 4.0) if long_x else Vector2(ins.position.x + 4.0, lerpf(ins.position.y, ins.end.y, u))
+					var b := a + (Vector2(0, ins.size.y - 8.0 - (k % 3) * 4.0) if long_x else Vector2(ins.size.x - 8.0 - (k % 3) * 4.0, 0))
+					draw_line(a, b, Pal.ink(0.3 * dim), 2.0)
+				for q: Vector2 in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
+					draw_circle(q, 3.0, Pal.ink(0.5 * dim))
+
+
 # A generated room of the bureau of thought by kind: mood-sample cabinets,
 # amps pumping on the beat, synchronisation chairs (helmet over the seat,
 # a fixed smile under it where someone sits), the operators' console.
@@ -908,16 +968,18 @@ func _draw_thought_cover(dim: float) -> void:
 					draw_arc(hm + Vector2(0, 6), 7.0, PI * 0.2, PI * 0.8, 8, Pal.foe((0.6 + 0.4 * beat_k) * dim, 1.6), 2.0)
 				draw_string(sf, r.position + Vector2(0, -5), "NI-%02d" % (i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
 			"console":
-				# the operators' console: a tempo readout, faders all pushed to "happy"
-				draw_string(sf, ins.position + Vector2(6, 16), "140 BPM", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.foe((0.6 + 0.3 * beat_k) * dim, 1.3))
+				# the operators' console: its tempo on a strip outside it, faders
+				# down its length all pushed to "happy"
+				draw_string(sf, r.position + Vector2(0, -6), "140 BPM", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.foe((0.6 + 0.3 * beat_k) * dim, 1.3))
 				var span2 := r.size.x if long_x else r.size.y
-				var nf := int(span2 / 22.0) - 2
-				for k in maxi(nf, 2):
-					var x := ins.position.x + 70.0 + k * 18.0 if long_x else ins.get_center().x
-					if long_x and x > ins.end.x - 8.0:
-						break
-					draw_line(Vector2(x, ins.position.y + 8.0), Vector2(x, ins.end.y - 8.0), Pal.ink(0.25 * dim), 1.0)
-					draw_rect(Rect2(Vector2(x - 4.0, ins.position.y + 8.0), Vector2(8, 5)), Pal.ink(0.6 * dim))
+				var nf := int((span2 - 20.0) / 18.0)
+				for k in nf:
+					var u := 10.0 + k * 18.0 + 9.0
+					var f0 := Vector2(ins.position.x + u, ins.position.y + 8.0) if long_x else Vector2(ins.position.x + 8.0, ins.position.y + u)
+					var f1 := Vector2(ins.position.x + u, ins.end.y - 8.0) if long_x else Vector2(ins.end.x - 8.0, ins.position.y + u)
+					draw_line(f0, f1, Pal.ink(0.25 * dim), 1.0)
+					var knob := f0.lerp(f1, 0.12)
+					draw_rect(Rect2(knob - Vector2(4, 2) if long_x else knob - Vector2(2, 4), Vector2(8, 4) if long_x else Vector2(4, 8)), Pal.ink(0.6 * dim))
 
 
 # A generated bureau floor: the cables feeding its cover, a voltage stencil.
@@ -2511,11 +2573,18 @@ func _draw_memory() -> void:
 
 # Portholes in the top wall onto the black water, marine snow drifting past;
 # a pressure gauge by the floor's corner; the plaque set in the floor.
-func _draw_deep(dim: float) -> void:
+# (`gen`: a generated room: its viewport, its gauge and the plaque where the
+# room put them, or not at all)
+func _draw_deep(dim: float, gen := false) -> void:
 	var sf := Fonts.get_font("SemiBold")
+	var lay: Dictionary = game.rooms.lay
+	var vps: Array = [[Vector2(470, 250), 62.0, 0.0]]
+	if gen:
+		var vc: Vector2 = lay.get("viewport", Vector2(-1, -1))
+		vps = [] if vc.x < 0.0 else [[vc, 62.0, 0.0]]
 	# viewports in the floor onto the black water: marine snow rising past,
 	# now and then something large and slow crossing under the glass
-	for vp: Array in [[Vector2(470, 250), 62.0, 0.0]]:
+	for vp: Array in vps:
 		var c: Vector2 = vp[0]
 		var rr: float = vp[1]
 		draw_circle(c, rr, Color(0.012, 0.016, 0.02))
@@ -2546,8 +2615,23 @@ func _draw_deep(dim: float) -> void:
 		for b in 12:
 			var a := TAU * b / 12.0
 			draw_circle(c + Vector2.from_angle(a) * (rr + 4.0), 1.6, Pal.ink(0.3 * dim))
-	# the gauge
+	# the gauge (a generated room: on the stretch of bottom wall it was given)
 	var g := Vector2(140.0, 950.0)
+	if gen:
+		var gs: Array = lay.get("gauge", [])
+		if gs.is_empty():
+			g = Vector2(-1000, -1000)
+		else:
+			g = (gs[0] as Vector2) + Vector2(-130, -50)
+	var gauge_on := g.x > -500.0
+	if gauge_on:
+		_draw_gauge(g, sf, dim)
+	# the plaque in the floor, before a sweep wakes its words
+	_draw_plate(dim)
+
+
+# the depth gauge at `g`, its reading beside it
+func _draw_gauge(g: Vector2, sf: Font, dim: float) -> void:
 	draw_circle(g, 30.0, Color(0.04, 0.04, 0.045))
 	draw_arc(g, 30.0, 0.0, TAU, 32, Pal.ink(0.55 * dim), 2.0)
 	var ticks := PackedVector2Array()
@@ -2559,10 +2643,13 @@ func _draw_deep(dim: float) -> void:
 	var na := PI * 0.75 + PI * 1.5 * (0.82 + 0.01 * sin(t * 1.3))
 	draw_line(g, g + Vector2.from_angle(na) * 18.0, Pal.red(0.85 * dim, 1.5), 2.0)
 	draw_circle(g, 3.0, Pal.ink(0.6 * dim))
-	draw_string(sf, Vector2(182.0, 957.0), Txt.t("depth_gauge"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.5 * dim))
-	# the plaque in the floor, before a sweep wakes its words
-	if shows.get("w8_plate", 0.0) <= 0.01 and not _archivist_up():
-		var pr := Rect2(760.0, 950.0, 400.0, 34.0)
+	draw_string(sf, g + Vector2(42.0, 7.0), Txt.t("depth_gauge"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.5 * dim))
+
+
+func _draw_plate(dim: float) -> void:
+	var plate_at = game.rooms.spot("plate", Vector2(960, 1010))
+	if plate_at != null and shows.get("w8_plate", 0.0) <= 0.01 and not _archivist_up():
+		var pr := Rect2((plate_at as Vector2) + Vector2(-200.0, -60.0), Vector2(400.0, 34.0))
 		draw_rect(pr, Color(0.05, 0.05, 0.055))
 		draw_rect(pr, Pal.ink(0.3 * dim), false, 1.5)
 		for k in 4:

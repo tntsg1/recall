@@ -135,13 +135,18 @@ func _draw() -> void:
 		draw_multiline(ticks, Pal.ink(0.18 * dim), 1.5)
 		if is_lit:
 			# lit: the scan is on — a filled disc, a bright rim, a sweep line
-			draw_arc(c, R, 0.0, TAU, 64, Pal.foe((0.7 + 0.3 * flash[i]) * dim, 1.8 + flash[i]), 3.0)
+			# (in a generated room: a pale fill inside and a rim with no bloom
+			# round it, so what stands beside it still reads)
+			var calm: bool = game.arena.generated
+			if calm:
+				draw_circle(c, R, Color(Pal.INK.r, Pal.INK.g, Pal.INK.b, 0.016 * dim))   # (linear: about 13% on screen)
+			draw_arc(c, R, 0.0, TAU, 64, Pal.foe((0.7 + 0.3 * flash[i]) * dim, (1.15 if calm else 1.8) + (0.3 if calm else 1.0) * flash[i]), 3.0)
 			var sa := t * 5.0 + i
 			draw_line(c, c + Vector2.from_angle(sa) * R, Pal.foe(0.6 * dim, 1.6), 2.0)
 			draw_arc(c, R - 4.0, sa - 0.6, sa, 12, Pal.foe(0.35 * dim, 1.4), 6.0)
 		elif next and (game.hud.intro_t < 0.0):
 			# about to light: a ring closing in to the rim over the beat
 			var k := Pal.ease_in(frac)
-			draw_arc(c, R + 60.0 * (1.0 - k), 0.0, TAU, 64, Pal.red((0.2 + 0.6 * k) * dim, 1.6), 2.0)
+			draw_arc(c, R + 60.0 * (1.0 - k), 0.0, TAU, 64, Pal.red((0.2 + 0.6 * k) * dim, 1.6), 3.0 if game.arena.generated else 2.0)
 		if flash[i] > 0.0:
-			draw_arc(c, R + 14.0 * (1.0 - flash[i]), 0.0, TAU, 64, Pal.foe(flash[i] * dim, 2.4), 2.0)
+			draw_arc(c, R + 14.0 * (1.0 - flash[i]), 0.0, TAU, 64, Pal.foe(flash[i] * dim, 1.3 if game.arena.generated else 2.4), 2.0)

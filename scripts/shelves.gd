@@ -23,6 +23,7 @@ const VOLUMES := ["001–054", "055–108", "109–161", "162–214"]
 
 var on := false
 var game
+var banks: Array = [[STARTS[0], TOP], [STARTS[1], TOP]]   # each bank's track: [left end, top]
 var t := 0.0
 var aisle := [1, 3]            # each bank's open gap (0..4)
 var from_aisle := [1, 3]
@@ -44,15 +45,34 @@ static func initial(room: int) -> Array[Rect2]:
 	if room != 7:
 		return out
 	for bank in 2:
-		var x0 := _xs_for(bank, [1, 3][bank])
+		var x0 := _xs_at(STARTS[bank], [1, 3][bank])
 		for j in N:
 			out.append(Rect2(x0[j], TOP, W, H))
 	return out
 
 
-static func _xs_for(bank: int, gap: int) -> Array:
+# A generated room's banks ([left end, top] each) as rects, aisles as they start.
+static func rects_for(list: Array) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for bank in list.size():
+		var x0 := _xs_at(list[bank][0], [1, 3][bank % 2])
+		for j in N:
+			out.append(Rect2(x0[j], list[bank][1], W, H))
+	return out
+
+
+# how wide a bank's track runs
+static func span() -> float:
+	return N * W + (N - 1) * SMALL + BIG
+
+
+func _xs_for(bank: int, gap: int) -> Array:
+	return _xs_at(banks[bank][0], gap)
+
+
+static func _xs_at(start: float, gap: int) -> Array:
 	var out := []
-	var x: float = STARTS[bank]
+	var x: float = start
 	for j in N:
 		x += BIG if j == gap else SMALL
 		out.append(x)
@@ -62,14 +82,26 @@ static func _xs_for(bank: int, gap: int) -> Array:
 
 func setup(story: int) -> void:
 	on = story == 8
-	visible = on
+	set_banks([[STARTS[0], TOP], [STARTS[1], TOP]])
+
+
+# The banks this room has (the hand-made archive: two, at STARTS).
+func set_banks(list: Array) -> void:
+	banks = list.duplicate(true)
+	visible = on and not banks.is_empty()
 	t = 0.0
-	aisle = [1, 3]
-	from_aisle = [1, 3]
-	clock = [0.0, PERIOD * 0.5]
-	move_t = [-1.0, -1.0]
+	aisle.clear()
+	from_aisle.clear()
+	clock.clear()
+	move_t.clear()
+	wheel.clear()
 	xs.clear()
-	for bank in 2:
+	for bank in banks.size():
+		aisle.append([1, 3][bank % 2])
+		from_aisle.append(aisle[bank])
+		clock.append(PERIOD * 0.5 * bank)
+		move_t.append(-1.0)
+		wheel.append(0.0)
 		xs.append_array(_xs_for(bank, aisle[bank]))
 	queue_redraw()
 
@@ -83,11 +115,15 @@ func shelf_of(rect_i: int) -> int:
 	if not on or rect_i < 0:
 		return -1
 	var k: int = rect_i - game.arena.mover_from
-	return k if k >= 0 and k < N * 2 else -1
+	return k if k >= 0 and k < N * banks.size() else -1
 
 
 func rect(k: int) -> Rect2:
-	return Rect2(xs[k], TOP, W, H)
+	return Rect2(xs[k], top_of(k / N), W, H)
+
+
+func top_of(bank: int) -> float:
+	return banks[bank][1]
 
 
 # 0..1 how far along a bank's move is (0 while it waits or warns)
@@ -113,7 +149,7 @@ func step(dt: float) -> void:
 		return
 	t += dt
 	crushed_t = maxf(0.0, crushed_t - dt)
-	for bank in 2:
+	for bank in banks.size():
 		clock[bank] += dt
 		if move_t[bank] < 0.0 and clock[bank] >= PERIOD:
 			clock[bank] = 0.0
@@ -162,6 +198,7 @@ func _carry(i: int, dx: float) -> void:
 func _crush(bank: int) -> void:
 	if _move_k(bank) <= 0.0:
 		return
+	var TOP: float = top_of(bank)
 	for j in N - 1:
 		var i: int = bank * N + j
 		var lo: float = xs[i] + W
@@ -194,16 +231,17 @@ func _draw() -> void:
 	var dim := 1.0 - 0.45 * f
 	if game.hud.intro_t >= 0.0:
 		dim *= clampf((game.hud.intro_t - 2.2) / 0.6, 0.25, 1.0)
-	for bank in 2:
+	for bank in banks.size():
 		_draw_rails(bank, dim)
 		_draw_warning(bank, dim)
-	for i in N * 2:
+	for i in N * banks.size():
 		_draw_shelf(i, dim)
 
 
 # Two rails in the floor under each bank, with stops at the track's ends.
 func _draw_rails(bank: int, dim: float) -> void:
-	var x0: float = STARTS[bank]
+	var TOP: float = top_of(bank)
+	var x0: float = banks[bank][0]
 	var x1: float = x0 + N * W + N * SMALL + BIG
 	for y: float in [TOP + 46.0, TOP + H - 46.0]:
 		draw_line(Vector2(x0 - 6.0, y - 3.0), Vector2(x1 + 6.0, y - 3.0), Pal.ink(0.16 * dim), 1.5)
@@ -225,6 +263,7 @@ func _draw_rails(bank: int, dim: float) -> void:
 # The gap about to close: red hatching on its floor and a red edge on both
 # faces; the one about to open, a faint outline where it will be.
 func _draw_warning(bank: int, dim: float) -> void:
+	var TOP: float = top_of(bank)
 	var g := closing(bank)
 	if g < 0 or g == 0 or g == N:
 		return
@@ -302,7 +341,12 @@ func _draw_shelf(i: int, dim: float) -> void:
 		var a: float = wheel[bank] + TAU * s / 3.0
 		draw_line(wc, wc + Vector2.from_angle(a) * 8.0, Pal.ink(0.45 * dim), 1.2)
 	# its volumes, stencilled down the divider
-	var lab := Txt.t("shelf_tag") % VOLUMES[i % N]
+	# (a second bank carries the numbering on from where the first left off)
+	var vol: String = VOLUMES[i % N]
+	if bank > 0:
+		var ends := vol.split("–")
+		vol = "%03d–%03d" % [int(ends[0]) + 214 * bank, int(ends[1]) + 214 * bank]
+	var lab := Txt.t("shelf_tag") % vol
 	var fs := 12
 	var sf := Fonts.get_font("SemiBold")
 	var lw := sf.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
