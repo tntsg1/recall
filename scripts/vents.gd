@@ -1,0 +1,259 @@
+class_name Vents
+extends Node2D
+# The orbital lift's car (chapter 9): airlock doors in the side walls. In
+# turn one is marked (red hazard stripes, its warning lit), then opens, and
+# the air rushes out through it: you, the enemies and every round in flight
+# are drawn toward the gap; an enemy drawn into it is gone. Rounds lying in
+# the walls near an open door are torn loose and fly to it, so the rounds a
+# door has gathered come home from one place.
+
+const DOORS := [[Vector2(80, 330), Vector2(1, 0)], [Vector2(1840, 760), Vector2(-1, 0)], [Vector2(80, 760), Vector2(1, 0)], [Vector2(1840, 330), Vector2(-1, 0)]]
+const HALF := 62.0           # half the door's width along the wall
+const PERIOD := 6.5
+const WARN := 1.3
+const OPEN := 2.8
+const R := 560.0             # how far the draught reaches
+const PULL := 300.0          # px/s at the door
+const LOOSE_R := 300.0       # rounds in the walls this near an open door tear loose
+const MOUTH := 44.0
+
+var on := false
+var game
+var t := 0.0
+var clock := 0.0
+var door := -1               # the door marked or open, -1 none
+var door_t := 0.0            # 0..WARN warning, WARN..WARN+OPEN open
+var turn := 0
+var streaks: Array = []      # [pos, life]: air rushing to the door
+
+
+func _init() -> void:
+	z_index = 2
+	z_as_relative = false
+
+
+func setup(story: int) -> void:
+	on = story == 9
+	visible = on
+	t = 0.0
+	clock = 2.0
+	door = -1
+	door_t = 0.0
+	turn = 0
+	streaks.clear()
+	queue_redraw()
+
+
+func active() -> bool:
+	return on
+
+
+func open_k() -> float:
+	if door < 0 or door_t < WARN:
+		return 0.0
+	var k := door_t - WARN
+	return clampf(k / 0.3, 0.0, 1.0) * clampf((OPEN - k) / 0.4, 0.0, 1.0)
+
+
+func door_pos(i: int) -> Vector2:
+	return DOORS[i][0]
+
+
+# The draught at a point, as a velocity toward the open door.
+func force_at(p: Vector2) -> Vector2:
+	var k := open_k()
+	if k <= 0.0:
+		return Vector2.ZERO
+	var d: Vector2 = door_pos(door) - p
+	var l := d.length()
+	if l >= R or l < 0.001:
+		return Vector2.ZERO
+	return d / l * PULL * pow(1.0 - l / R, 1.2) * k
+
+
+# A round in flight bends into the draught; its path takes a new point each
+# time it has turned a little, so the way home follows the curve.
+func pull_round(b, dt: float) -> void:
+	var f := force_at(b.pos)
+	if f == Vector2.ZERO:
+		return
+	var want: Vector2 = (b.dir * Bullets.SPEED + f * 15.0 * dt).normalized()
+	var ang: float = absf(b.dir.angle_to(want))
+	if ang < 0.0005:
+		return
+	b.curve_acc += ang
+	if b.curve_acc > 0.06 and b.path.size() < 40:
+		b.curve_acc = 0.0
+		b.set_head(b.pos)
+		b.path.append(b.pos)
+		b.cum.append(b.cum[b.cum.size() - 1])
+		b.set_head(b.pos)
+	b.dir = want
+
+
+func step(dt: float) -> void:
+	if not on:
+		return
+	t += dt
+	var fighting: bool = game.wave_ctl.phase == Waves.FIGHT and game.hud.intro_t < 0.0
+	if door < 0:
+		if fighting:
+			clock += dt
+		if clock >= PERIOD:
+			clock = 0.0
+			# the doors take turns, but never the one you stand by
+			door = turn % DOORS.size()
+			turn += 1
+			if door_pos(door).distance_to(game.player.pos) < 260.0:
+				door = turn % DOORS.size()
+				turn += 1
+			door_t = 0.0
+			game.sfx.play("windup", 0.45, -6.0)
+	else:
+		var was := door_t
+		door_t += dt
+		if was < WARN and door_t >= WARN:
+			game.sfx.play("release", 0.4, -2.0)
+			game.cam.add_trauma(0.25)
+		if door_t >= WARN + OPEN:
+			door = -1
+			game.sfx.play("slam", 0.55, -6.0)
+	var k := open_k()
+	if k > 0.0:
+		_draught(dt, k)
+	var i := 0
+	while i < streaks.size():
+		streaks[i][1] -= dt
+		var p: Vector2 = streaks[i][0]
+		var f := force_at(p)
+		streaks[i][0] = p + f * dt * 3.2
+		if streaks[i][1] <= 0.0 or (door >= 0 and p.distance_to(door_pos(door)) < 30.0):
+			streaks.remove_at(i)
+		else:
+			i += 1
+	queue_redraw()
+
+
+func _draught(dt: float, k: float) -> void:
+	var dp: Vector2 = door_pos(door)
+	var n: Vector2 = DOORS[door][1]
+	# you lean against it
+	var pl: Vector2 = game.player.pos
+	if not game.possess.hosting():
+		var np: Vector2 = game.arena.push_circle(pl + force_at(pl) * dt, Player.R)
+		game.player.pos = np
+		if np.distance_to(dp) < MOUTH + Player.R and game.player.dash_t <= 0.0:
+			game.on_player_hit(n, null)
+			game.player.pos = dp + n * 140.0
+	# enemies are drawn out through it
+	for e in game.enemies.list:
+		if e.state != Enemies.ALIVE:
+			continue
+		e.pos = game.arena.push_circle(e.pos + force_at(e.pos) * dt * 1.3, e.r)
+		if e.pos.distance_to(dp) < MOUTH + e.r:
+			game.fx.sparks(e.pos, -n, 8, Pal.foe(1.0, 1.8), 520.0, 0.3, 0.6)
+			game.enemies.blast_hit(e, -n, 9999.0)
+	# rounds in the walls near it tear loose and fly to it
+	for b in game.bullets.list:
+		if b.state != Bullets.EMBED or b.foe:
+			continue
+		var d: float = b.pos.distance_to(dp)
+		if d < LOOSE_R and d > HALF + 20.0 and randf() < dt * 2.2 * k:
+			# off the wall first, so its way to the door crosses the floor
+			var wn: Vector2 = (Arena.ROOM.get_center() - b.pos).normalized()
+			var off: Vector2 = b.pos + wn * 16.0
+			b.set_head(b.pos)
+			b.path.append(off)
+			b.cum.append(b.cum[b.cum.size() - 1])
+			b.set_head(off)
+			b.pos = off
+			var aim: Vector2 = dp + Vector2(absf(n.y), absf(n.x)) * randf_range(-0.6, 0.6) * HALF
+			b.dir = (aim - b.pos).normalized()
+			b.state = Bullets.FLY
+			b.bounces = 0
+			b.t = 0.0
+			b.shelf = -1
+			b.settled = false
+			game.bullets.faint_dirty = true
+	# streaks of air along the floor
+	if randf() < dt * 40.0 * k:
+		var a := randf() * TAU
+		var q: Vector2 = dp + Vector2.from_angle(a) * randf_range(120.0, R)
+		if Arena.ROOM.grow(-10.0).has_point(q):
+			streaks.append([q, randf_range(0.5, 0.9)])
+
+
+# ---------------------------------------------------------------- drawing
+
+func _draw() -> void:
+	if not on:
+		return
+	var f: float = game.focus
+	var dim := 1.0 - 0.45 * f
+	if game.hud.intro_t >= 0.0:
+		dim *= clampf((game.hud.intro_t - 2.2) / 0.6, 0.25, 1.0)
+	for i in DOORS.size():
+		_draw_door(i, dim)
+	# air rushing to the door
+	var seg := PackedVector2Array()
+	for s in streaks:
+		var p: Vector2 = s[0]
+		var fv := force_at(p)
+		if fv.length() < 1.0:
+			continue
+		seg.append(p)
+		seg.append(p - fv.normalized() * minf(46.0, fv.length() * 0.25))
+	if seg.size() > 0:
+		draw_multiline(seg, Pal.ink(0.22 * dim), 1.5)
+
+
+func _draw_door(i: int, dim: float) -> void:
+	var c: Vector2 = DOORS[i][0]
+	var n: Vector2 = DOORS[i][1]
+	var along := Vector2(absf(n.y), absf(n.x))
+	var marked := door == i
+	var warn_k := clampf(door_t / WARN, 0.0, 1.0) if marked else 0.0
+	var ok := open_k() if marked else 0.0
+	# the frame set in the wall
+	var frame := Rect2(c - along * (HALF + 10.0) - n * 10.0, Vector2.ZERO)
+	frame = frame.expand(c + along * (HALF + 10.0) + n * 16.0)
+	draw_rect(frame, Color(0.05, 0.05, 0.055))
+	draw_rect(frame, Pal.ink(0.55 * dim), false, 2.0)
+	# open: the gap, and space beyond it with stars rushing past
+	var gap := HALF * ok
+	if ok > 0.0:
+		var hole := Rect2(c - along * gap - n * 9.0, Vector2.ZERO).expand(c + along * gap + n * 4.0)
+		draw_rect(hole, Color(0.0, 0.0, 0.0, 1.0))
+		for s in 6:
+			var u := fmod(t * 3.0 + s * 0.37, 1.0)
+			var q := c + along * (sin(s * 2.3) * gap * 0.8) - n * (4.0 + 70.0 * u)
+			draw_line(q, q - n * 18.0, Pal.ink(0.5 * (1.0 - u) * dim), 1.5)
+	# the two panels, sliding apart
+	for sd: float in [-1.0, 1.0]:
+		var inner := c + along * sd * gap
+		var outer := c + along * sd * (HALF + gap)
+		var pr := Rect2(inner - n * 6.0, Vector2.ZERO).expand(outer + n * 8.0)
+		draw_rect(pr, Color(0.08, 0.08, 0.085))
+		draw_rect(pr, Pal.ink(0.6 * dim), false, 1.5)
+		var mid := (inner + outer) * 0.5
+		draw_line(mid - n * 3.0, mid + n * 5.0, Pal.ink(0.35 * dim), 3.0)
+	if marked and door_t < WARN + OPEN:
+		# hazard stripes on the floor before it, flashing; the reach of the draught
+		var fl := 0.55 + 0.45 * sin(t * (12.0 + 16.0 * warn_k))
+		var a := (0.35 + 0.5 * warn_k) * fl * dim if ok <= 0.0 else 0.6 * dim
+		var hatch := PackedVector2Array()
+		for j in 7:
+			var q0 := c + along * (-HALF + j * HALF * 2.0 / 6.0) + n * 24.0
+			hatch.append(q0)
+			hatch.append(q0 + n * 22.0 + along * 14.0)
+		draw_multiline(hatch, Pal.red(a, 1.5), 3.0)
+		draw_arc(c, R * (0.98 if ok > 0.0 else 0.4 + 0.58 * warn_k), (-n).angle() + PI * 0.5 + 0.05, (-n).angle() + PI * 1.5 - 0.05, 48, Pal.red(0.25 * fl * dim, 1.2), 1.5)
+		if ok <= 0.0:
+			var font := Fonts.get_font("SemiBold")
+			var lab := Txt.t("vent_warn")
+			var fs := 18
+			var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			var at := c + n * 80.0 + Vector2(0 if n.x > 0.0 else -lw, 6.0)
+			draw_rect(Rect2(at + Vector2(-8, -fs - 2.0), Vector2(lw + 16, fs + 12)), Color(0.05, 0.0, 0.0, 0.85))
+			draw_rect(Rect2(at + Vector2(-8, -fs - 2.0), Vector2(lw + 16, fs + 12)), Pal.red(0.5 * dim, 1.3), false, 1.0)
+			draw_string(font, at, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.red((0.6 + 0.4 * fl) * dim, 1.6))

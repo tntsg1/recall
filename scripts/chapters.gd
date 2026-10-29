@@ -13,6 +13,7 @@ const LIST := [
 	{"story": 6, "room": 6, "pool": 7, "music": 2, "boss": "grid", "note": "note_boss_grid", "par": [90.0, 130.0]},
 	{"story": 7, "room": 3, "pool": 3, "music": 3, "boss": "metronome", "note": "note_boss_4", "par": [55.0, 90.0]},
 	{"story": 8, "room": 7, "pool": 8, "music": 1, "boss": "archivist", "note": "note_boss_archivist", "par": [72.0, 108.0]},
+	{"story": 9, "room": 8, "pool": 9, "music": 2, "boss": "counterweight", "note": "note_boss_counterweight", "par": [50.0, 80.0]},
 	{"story": 12, "room": 4, "pool": 4, "music": 4, "boss": "zero", "note": "note_boss_5", "par": [60.0, 90.0]},
 ]
 

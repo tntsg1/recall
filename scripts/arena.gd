@@ -67,6 +67,12 @@ func setup(ch: int) -> void:
 		7:
 			# the deep archive: nothing fixed to hide behind but the shelving
 			pass
+		8:
+			# the lift car: two rows of bolted seats, a pillar either side
+			inner.append(Rect2(560, 600, 180, 44))
+			inner.append(Rect2(1180, 600, 180, 44))
+			inner.append(Rect2(420, 860, 56, 56))
+			inner.append(Rect2(1444, 860, 56, 56))
 		2:
 			# the Maw: six blocks in a ring, the middle left for what lives there
 			for k in 6:

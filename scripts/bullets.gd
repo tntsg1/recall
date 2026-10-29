@@ -69,6 +69,7 @@ class B:
 	var dark_by := 0            # the inspector who put it out (0: lit); it cannot be recalled
 	var shelf := -1             # the archive shelf it is embedded in (it rides along)
 	var corrected := false      # a proofreader moved it; it stays where it was put
+	var curve_acc := 0.0        # turning in an airlock's draught since its last path point
 
 	func total() -> float:
 		return cum[cum.size() - 1]
@@ -639,6 +640,8 @@ func step(dt: float, real_dt: float) -> void:
 
 
 func _fly(b: B, dt: float) -> void:
+	if not b.foe and game.vents.active():
+		game.vents.pull_round(b, dt)
 	var a := b.pos
 	var to := a + b.dir * SPEED * (1.3 if game.has("long_barrel") and not b.foe else 1.0) * (2.0 if Loadout.gun == "rail" and not b.foe else 1.0) * dt
 	if b.foe:

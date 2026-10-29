@@ -69,6 +69,16 @@ const SEIZE := {
 		Enemies.LEECH: [["我把多余的历史吸走。剩下的刚好够用。", "I DRAW OFF THE SURPLUS HISTORY. WHAT IS LEFT IS JUST ENOUGH."]],
 		Enemies.PROOFREADER: [["错字要改，错的人也要改。这是同一份工作。", "WRONG WORDS ARE CORRECTED. WRONG PEOPLE TOO. IT IS THE SAME JOB."]],
 	},
+	9: {
+		Enemies.CHASER: [["电梯维护员 4410。我修了它十九年，一次也没上去过。", "LIFT MAINTAINER 4410. NINETEEN YEARS REPAIRING IT. NEVER ONCE BEEN UP."],
+			["观景层的玻璃是我擦的。从那里看得见第十三街。", "I CLEAN THE VIEWING DECK'S GLASS. YOU CAN SEE 13TH STREET FROM THERE."]],
+		Enemies.GUARD: [["人人都是股东。登梯另需董事资格。", "EVERYONE IS A SHAREHOLDER. BOARDING ALSO REQUIRES A DIRECTORSHIP."]],
+		Enemies.CHARGER: [["电梯每升一千米，票价翻一倍。", "EVERY THOUSAND METRES UP, THE FARE DOUBLES."]],
+		Enemies.PRISM: [["我把窗外的光调暖，让地球看起来不那么远。", "I WARM THE LIGHT IN THE WINDOWS SO THE EARTH LOOKS LESS FAR."]],
+		Enemies.LEECH: [["我回收舱里漏出去的空气。空气按升计费。", "I RECOVER THE AIR THAT LEAKS FROM THE CAR. AIR IS BILLED BY THE LITRE."]],
+		Enemies.PULSE: [["气压每降一格，我报一次平安。", "EACH TIME THE PRESSURE DROPS A NOTCH, I REPORT ALL IS WELL."]],
+		Enemies.ECHO: [["每个上去的人我都记得。没有一个下来过。", "I REMEMBER EVERYONE WHO WENT UP. NOT ONE HAS COME DOWN."]],
+	},
 }
 
 # remnants: [id, wall point, inward normal, kind of mark, zh, en]
@@ -121,6 +131,12 @@ const WALL := {
 		["rules", Vector2(1840, 476), Vector2(-1, 0), "notice", "借阅须知：只可阅读现行版本。旧版本从未存在。", "READERS MAY CONSULT THE CURRENT EDITION ONLY. OLD EDITIONS NEVER EXISTED."],
 		["scrawl", Vector2(1840, 900), Vector2(-1, 0), "scrawl", "他们改了所有的书。没改我们记得的。", "THEY REWROTE EVERY BOOK. NOT WHAT WE REMEMBER."],
 	],
+	9: [
+		["altitude", Vector2(80, 545), Vector2(1, 0), "screen", "当前高度 31,200 米 · 观景层到此为止", "ALTITUDE 31,200 M · THE VIEWING DECK ENDS HERE"],
+		["deck", Vector2(700, 1010), Vector2(0, -1), "floor", "观景层 · 第十三街居民止步于此", "VIEWING DECK · 13TH STREET RESIDENTS GO NO FURTHER"],
+		["rail", Vector2(1840, 545), Vector2(-1, 0), "notice", "舱门开启时请抓紧扶手。扶手按分钟计费。", "HOLD THE HANDRAIL WHEN THE DOORS OPEN. HANDRAILS ARE BILLED BY THE MINUTE."],
+		["scrawl", Vector2(1840, 900), Vector2(-1, 0), "scrawl", "我们把它修到了天上。他们不让我们上去。", "WE BUILT IT TO THE SKY. THEY WON'T LET US UP."],
+	],
 }
 
 const RADIO := {
@@ -163,6 +179,11 @@ const RADIO := {
 		"wave": [["深海历史档案库今日修订 1.2 万页，历史更加准确。", "THE DEEP ARCHIVE REVISED 12,000 PAGES TODAY. HISTORY IS MORE ACCURATE THAN EVER."],
 			["请勿私自保存旧版本资料。旧版本已不再真实。", "DO NOT KEEP OLD EDITIONS. OLD EDITIONS ARE NO LONGER TRUE."]],
 		"boss": [["档案修订机暂停工作。在此期间，历史以昨日版本为准。", "THE ARCHIVIST IS PAUSED. UNTIL IT RETURNS, YESTERDAY'S EDITION OF HISTORY APPLIES."]],
+	},
+	9: {
+		"wave": [["天穹轨道电梯今日运送董事 12 人、货物 3000 吨，一切正常。", "THE SKY LIFT CARRIED 12 DIRECTORS AND 3,000 TONNES OF CARGO TODAY. ALL NORMAL."],
+			["观景层每年开放一天。请珍惜。", "THE VIEWING DECK OPENS ONE DAY A YEAR. PLEASE CHERISH IT."]],
+		"boss": [["配重系统进入检修。电梯暂停在当前高度，请保持冷静。", "THE COUNTERWEIGHT IS UNDER REPAIR. THE LIFT HOLDS AT ITS PRESENT HEIGHT. PLEASE STAY CALM."]],
 	},
 }
 

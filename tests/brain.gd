@@ -181,6 +181,34 @@ func think(game) -> void:
 			var ad2: float = q5.distance_to(p)
 			if ad2 < 40.0:
 				move += (p - q5) / maxf(ad2, 1.0) * 1.5
+	# airlocks: keep away from a door that is marked or open
+	if game.vents.active() and game.vents.door >= 0:
+		var dp: Vector2 = game.vents.door_pos(game.vents.door)
+		var dd2: float = dp.distance_to(p)
+		if dd2 < 420.0:
+			move += (p - dp) / maxf(dd2, 1.0) * (420.0 - dd2) / 80.0
+	# the counterweight: off its shadow before it drops; through its shocks
+	if bs is Counterweight and bs.state == Counterweight.RUN:
+		for w in bs.ws:
+			if not w.on:
+				continue
+			if w.mode == Counterweight.AIM:
+				var sr := Rect2(w.target - Vector2(w.half, w.half), Vector2(w.half, w.half) * 2.0)
+				if sr.grow(50.0).has_point(p):
+					move += (p - w.target).normalized() * 3.0
+					if w.mode_t > Counterweight.AIM_TIME[bs.phase] - 0.15 and sr.grow(Player.R).has_point(p):
+						bot.dash = true
+			elif w.mode == Counterweight.DOWN:
+				var wd: float = w.pos.distance_to(p)
+				if wd < w.half + 140.0:
+					move += (p - w.pos) / maxf(wd, 1.0) * 1.2
+		for sh in bs.shocks:
+			if sh[1] < 0.0:
+				continue
+			var rr2: float = Counterweight.SHOCK_R * Pal.ease_out(sh[1] / Counterweight.SHOCK_TIME)
+			var g2: float = p.distance_to(sh[0]) - rr2
+			if g2 > 0.0 and g2 < 60.0:
+				bot.dash = true
 	# archive shelving: leave an aisle that is about to close by its nearer end
 	if game.shelves.active():
 		for bank in 2:
@@ -245,6 +273,10 @@ func think(game) -> void:
 				break
 		nearest = {"pos": gt, "vel": Vector2.ZERO}
 		nd = gt.distance_to(p)
+	elif bs is Counterweight and bs.state == Counterweight.RUN and bs.core_open > 0.5:
+		var cwp: Vector2 = bs.core_pos()
+		nearest = {"pos": cwp, "vel": Vector2.ZERO}
+		nd = cwp.distance_to(p)
 	elif bs is Archivist and bs.state == Archivist.RUN and bs.drawer_k > 0.3:
 		var ap: Vector2 = bs.core_pos()
 		nearest = {"pos": ap, "vel": Vector2.ZERO}

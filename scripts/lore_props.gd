@@ -213,6 +213,11 @@ func _draw() -> void:
 		_draw_chairs(dim)
 		_draw_lightboards(dim)
 		_draw_terminal(Vector2(80, 560), dim, "w7_monitor")
+	elif story == 9:
+		_draw_lift(dim)
+		_draw_terminal(Vector2(80, 545), dim, "w9_altitude")
+		if shows.get("w9_rail", 0.0) <= 0.01:
+			_draw_wall_notice(Vector2(1840, 545), dim)
 	elif story == 8:
 		_draw_deep(dim)
 		_draw_terminal(Vector2(80, 300), dim, "w8_index")
@@ -535,6 +540,11 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 			yy += step
 	elif id != "" or int(t * 2.0) % 3 != 0:
 		var dots := ".".repeat(int(t * 2.0) % 4)
+		if story == 9:
+			# the lift's altimeter, climbing
+			draw_string(font, scr.position + Vector2(8, 26), Txt.t("term_altitude"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.4 * dim))
+			draw_string(Fonts.get_font("SemiBold"), scr.position + Vector2(8, 56), Txt.t("altitude") % _alt_str(), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.75 * dim, 1.2))
+			return
 		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output", 5: "term_timetable", 6: "term_power", 7: "term_mood", 8: "term_archive"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
 
 
@@ -1495,3 +1505,60 @@ func _draw_deep(dim: float) -> void:
 
 func _archivist_up() -> bool:
 	return game.boss is Archivist and game.boss.alive()
+
+
+# ---------------------------------------------------------------- the sky lift
+
+func _alt() -> float:
+	return 28000.0 + t * 42.0
+
+
+func _alt_str() -> String:
+	var n := int(_alt())
+	return "%d,%03d" % [n / 1000, n % 1000]
+
+
+# Windows along the top wall onto the sky: the earth's rim below, curving
+# more as the car climbs, a few city lights under it; handrails along the
+# side walls; the viewing deck's limit painted across the floor.
+func _draw_lift(dim: float) -> void:
+	var top := Arena.ROOM.position.y
+	# (to the right of the boss bar, clear of the broadcast on the left)
+	var panes := 3
+	var x0 := 1272.0
+	var pw := 170.0
+	var gap := 12.0
+	var rr := lerpf(9000.0, 2600.0, clampf((_alt() - 28000.0) / 20000.0, 0.0, 1.0))
+	var cc := Vector2(1540.0, top + 44.0 + rr)
+	for i in panes:
+		var r := Rect2(x0 + i * (pw + gap), top + 10.0, pw, 46.0)
+		draw_rect(r, Color(0.015, 0.018, 0.024))
+		# the rim of the earth, where it crosses this pane
+		var pts := PackedVector2Array()
+		for j in 21:
+			var x := r.position.x + r.size.x * j / 20.0
+			var dy := rr - sqrt(maxf(0.0, rr * rr - pow(x - cc.x, 2.0)))
+			var y := top + 44.0 + dy
+			pts.append(Vector2(x, clampf(y, r.position.y, r.end.y)))
+		draw_polyline(pts, Pal.ink(0.32 * dim, 1.2), 1.5)
+		for k in 4:
+			var lx := r.position.x + fmod(i * 61.0 + k * 47.0, r.size.x - 10.0) + 5.0
+			var ldy := rr - sqrt(maxf(0.0, rr * rr - pow(lx - cc.x, 2.0)))
+			var ly := top + 44.0 + ldy + 4.0 + k % 2 * 3.0
+			if ly < r.end.y - 2.0:
+				draw_circle(Vector2(lx, ly), 1.0, Pal.ink(0.35 * dim, 1.3))
+		draw_rect(r, Pal.ink(0.45 * dim), false, 2.0)
+	# handrails along the side walls, broken where the doors are
+	for side: float in [96.0, 1824.0]:
+		var segs := [[110.0, 250.0], [410.0, 680.0], [840.0, 990.0]]
+		for sg: Array in segs:
+			draw_line(Vector2(side, sg[0]), Vector2(side, sg[1]), Pal.ink(0.4 * dim), 3.0)
+			var y: float = sg[0]
+			while y <= float(sg[1]):
+				draw_line(Vector2(side, y), Vector2(side + (-12.0 if side < 960.0 else 12.0), y), Pal.ink(0.3 * dim), 2.0)
+				y += 70.0
+	# the viewing deck's limit
+	var dx := 120.0
+	while dx < 1800.0:
+		draw_line(Vector2(dx, 940.0), Vector2(dx + 30.0, 940.0), Pal.ink(0.12 * dim), 4.0)
+		dx += 52.0
