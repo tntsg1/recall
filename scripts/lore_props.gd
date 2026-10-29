@@ -506,10 +506,11 @@ func _draw_scan(o: Vector2, dim: float) -> void:
 # A registration terminal on the left wall: a kiosk with a screen that
 # shows its remnant when a recall sweeps it, "REGISTERING..." otherwise.
 func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
-	var body := Rect2(c.x + 4.0, c.y - 80.0, 130.0, 160.0)
+	var wide := 40.0 if story == 9 else 0.0
+	var body := Rect2(c.x + 4.0, c.y - 80.0, 130.0 + wide, 160.0)
 	draw_rect(body, Color(0.05, 0.05, 0.055, 1.0))
 	draw_rect(body, Pal.ink(0.55 * dim), false, 2.0)
-	var scr := Rect2(body.position + Vector2(10, 12), Vector2(110, 86))
+	var scr := Rect2(body.position + Vector2(10, 12), Vector2(110 + wide, 86))
 	# the screen's glow on the wall around it
 	draw_texture_rect(Fx.make_glow_texture(), scr.grow(40.0), false, Color(1, 1, 1, 0.07 * dim))
 	draw_rect(scr, Color(0.03, 0.03, 0.035, 1.0))
@@ -1518,36 +1519,73 @@ func _alt_str() -> String:
 	return "%d,%03d" % [n / 1000, n % 1000]
 
 
-# Windows along the top wall onto the sky: the earth's rim below, curving
-# more as the car climbs, a few city lights under it; handrails along the
-# side walls; the viewing deck's limit painted across the floor.
+# Two great windows in the floor: the earth far below, its rim curving more
+# as the car climbs, the lit cities on it and, off on its own, the faint few
+# lights of 13th Street. Seats with their backs and belts; numbered pillars;
+# handrails along the side walls; the viewing deck's limit across the floor.
+const LIFT_WINDOWS := [Rect2(250, 160, 400, 200), Rect2(1270, 160, 400, 200)]
+
+
 func _draw_lift(dim: float) -> void:
-	var top := Arena.ROOM.position.y
-	# (to the right of the boss bar, clear of the broadcast on the left)
-	var panes := 3
-	var x0 := 1272.0
-	var pw := 170.0
-	var gap := 12.0
-	var rr := lerpf(9000.0, 2600.0, clampf((_alt() - 28000.0) / 20000.0, 0.0, 1.0))
-	var cc := Vector2(1540.0, top + 44.0 + rr)
-	for i in panes:
-		var r := Rect2(x0 + i * (pw + gap), top + 10.0, pw, 46.0)
-		draw_rect(r, Color(0.015, 0.018, 0.024))
-		# the rim of the earth, where it crosses this pane
-		var pts := PackedVector2Array()
-		for j in 21:
-			var x := r.position.x + r.size.x * j / 20.0
+	var climb := clampf((_alt() - 28000.0) / 16000.0, 0.0, 1.0)
+	for wi in 2:
+		var r: Rect2 = LIFT_WINDOWS[wi]
+		draw_rect(r.grow(10.0), Color(0.05, 0.05, 0.055))
+		draw_rect(r, Color(0.006, 0.008, 0.014))
+		# stars over the rim
+		for j in 18:
+			var sp := r.position + Vector2(fmod(j * 83.0 + wi * 37.0, r.size.x - 8.0) + 4.0, fmod(j * 29.0, r.size.y * 0.45) + 4.0)
+			draw_circle(sp, 0.8 + (j % 3) * 0.4, Pal.ink(0.22 * dim))
+		# the earth: a great circle below, curving more as we rise
+		var rr := lerpf(2600.0, 760.0, climb)
+		var cc := Vector2(r.get_center().x + (wi * 2 - 1) * 120.0, r.position.y + r.size.y * 0.42 + rr)
+		var rim := PackedVector2Array()
+		var ground := PackedVector2Array()
+		for j in 41:
+			var x := r.position.x + r.size.x * j / 40.0
 			var dy := rr - sqrt(maxf(0.0, rr * rr - pow(x - cc.x, 2.0)))
-			var y := top + 44.0 + dy
-			pts.append(Vector2(x, clampf(y, r.position.y, r.end.y)))
-		draw_polyline(pts, Pal.ink(0.32 * dim, 1.2), 1.5)
+			var y := clampf(cc.y - rr + dy, r.position.y, r.end.y)
+			rim.append(Vector2(x, y))
+			ground.append(Vector2(x, y))
+		ground.append(r.end)
+		ground.append(Vector2(r.position.x, r.end.y))
+		draw_colored_polygon(ground, Color(0.03, 0.04, 0.055))
+		draw_polyline(rim, Pal.ink(0.12 * dim, 1.2), 9.0)
+		draw_polyline(rim, Pal.ink(0.55 * dim, 1.3), 2.0)
+		# city lights: clusters on the night side
+		for k in 5:
+			var cx := r.position.x + 40.0 + fmod(k * 97.0 + wi * 53.0, r.size.x - 80.0)
+			var dy2 := rr - sqrt(maxf(0.0, rr * rr - pow(cx - cc.x, 2.0)))
+			var cy := cc.y - rr + dy2 + 26.0 + fmod(k * 31.0, 60.0)
+			for m in 7:
+				var q := Vector2(cx + sin(m * 2.1 + k) * 14.0, cy + cos(m * 1.7 + k) * 8.0)
+				if r.has_point(q):
+					draw_circle(q, 1.1, Pal.ink(0.5 * dim, 1.4))
+		if wi == 0:
+			# 13th Street: three dim lights, far from the rest
+			var tq := Vector2(r.position.x + 52.0, r.end.y - 30.0)
+			for m in 3:
+				draw_circle(tq + Vector2(m * 5.0, (m % 2) * 3.0), 0.9, Pal.ink(0.22 * dim))
+		# the frame, its bolts and the glass's glint
+		draw_rect(r, Pal.ink(0.45 * dim), false, 2.5)
+		draw_rect(r.grow(10.0), Pal.ink(0.2 * dim), false, 1.5)
+		for k in 6:
+			var bx := r.position.x + r.size.x * k / 5.0
+			draw_circle(Vector2(bx, r.position.y - 5.0), 1.6, Pal.ink(0.35 * dim))
+			draw_circle(Vector2(bx, r.end.y + 5.0), 1.6, Pal.ink(0.35 * dim))
+		draw_line(r.position + Vector2(18, 14), r.position + Vector2(70, 14), Pal.ink(0.12 * dim, 1.2), 2.0)
+	# the seats on their two benches: backs, arms, belts
+	for b in [Rect2(560, 600, 180, 44), Rect2(1180, 600, 180, 44)]:
+		var br: Rect2 = b
 		for k in 4:
-			var lx := r.position.x + fmod(i * 61.0 + k * 47.0, r.size.x - 10.0) + 5.0
-			var ldy := rr - sqrt(maxf(0.0, rr * rr - pow(lx - cc.x, 2.0)))
-			var ly := top + 44.0 + ldy + 4.0 + k % 2 * 3.0
-			if ly < r.end.y - 2.0:
-				draw_circle(Vector2(lx, ly), 1.0, Pal.ink(0.35 * dim, 1.3))
-		draw_rect(r, Pal.ink(0.45 * dim), false, 2.0)
+			var sr := Rect2(br.position.x + 6.0 + k * 43.0, br.position.y + 6.0, 38.0, 32.0)
+			draw_rect(sr, Pal.ink(0.35 * dim), false, 1.5)
+			draw_line(Vector2(sr.position.x + 3.0, sr.position.y + 5.0), Vector2(sr.end.x - 3.0, sr.position.y + 5.0), Pal.ink(0.5 * dim), 3.0)
+			draw_line(sr.position + Vector2(8, 10), sr.end - Vector2(8, 4), Pal.ink(0.22 * dim), 1.5)
+	var sf := Fonts.get_font("SemiBold")
+	for pi in 2:
+		var pc: Vector2 = [Vector2(448, 888), Vector2(1472, 888)][pi]
+		draw_string(sf, pc + Vector2(-9, 6), "%02d" % (17 + pi), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.5 * dim))
 	# handrails along the side walls, broken where the doors are
 	for side: float in [96.0, 1824.0]:
 		var segs := [[110.0, 250.0], [410.0, 680.0], [840.0, 990.0]]
@@ -1557,8 +1595,9 @@ func _draw_lift(dim: float) -> void:
 			while y <= float(sg[1]):
 				draw_line(Vector2(side, y), Vector2(side + (-12.0 if side < 960.0 else 12.0), y), Pal.ink(0.3 * dim), 2.0)
 				y += 70.0
-	# the viewing deck's limit
+	# the viewing deck's limit, and a hazard line before it
 	var dx := 120.0
 	while dx < 1800.0:
-		draw_line(Vector2(dx, 940.0), Vector2(dx + 30.0, 940.0), Pal.ink(0.12 * dim), 4.0)
+		draw_line(Vector2(dx, 940.0), Vector2(dx + 30.0, 940.0), Pal.ink(0.14 * dim), 4.0)
+		draw_line(Vector2(dx + 10.0, 924.0), Vector2(dx + 22.0, 916.0), Pal.ink(0.08 * dim), 3.0)
 		dx += 52.0

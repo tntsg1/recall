@@ -305,12 +305,12 @@ func _step_w(w: W, k: int, dt: float) -> void:
 			if w.hang_t <= 0.0 and turn_ok and _other_down(w) == false:
 				w.mode = AIM
 				w.mode_t = 0.0
-				w.target = _clamp(p + game.player.vel * 0.25)
+				w.target = _clear_of_cover(_clamp(p + game.player.vel * 0.25), w.half)
 				game.sfx.play("windup", 0.5 if not w.spare else 0.62, -4.0)
 		AIM:
 			var lock: float = AIM_TIME[phase] - LOCK
 			if w.mode_t < lock:
-				w.target = w.target.lerp(_clamp(p + game.player.vel * 0.2), 1.0 - exp(-5.0 * dt))
+				w.target = w.target.lerp(_clear_of_cover(_clamp(p + game.player.vel * 0.2), w.half), 1.0 - exp(-5.0 * dt))
 			w.pos = w.pos.lerp(w.target, 1.0 - exp(-8.0 * dt))
 			if w.mode_t >= AIM_TIME[phase]:
 				w.pos = w.target
@@ -341,6 +341,21 @@ func _clamp(p: Vector2) -> Vector2:
 	var m := 130.0
 	var r := Arena.ROOM
 	return Vector2(clampf(p.x, r.position.x + m, r.end.x - m), clampf(p.y, r.position.y + m, r.end.y - m))
+
+
+# Nudge a landing spot off the seats and pillars.
+func _clear_of_cover(at: Vector2, half: float) -> Vector2:
+	for off: Vector2 in [Vector2.ZERO, Vector2(0, -150), Vector2(0, 150), Vector2(-170, 0), Vector2(170, 0)]:
+		var q := _clamp(at + off)
+		var rr := Rect2(q - Vector2(half, half), Vector2(half, half) * 2.0)
+		var hit := false
+		for ir: Rect2 in game.arena.inner:
+			if ir.intersects(rr):
+				hit = true
+				break
+		if not hit:
+			return q
+	return at
 
 
 func _land(w: W) -> void:
@@ -417,8 +432,9 @@ func _draw() -> void:
 			continue
 		var ks: float = s[1] / SHOCK_TIME
 		var rr: float = SHOCK_R * Pal.ease_out(ks)
-		draw_arc(s[0], rr - 9.0, 0.0, TAU, 96, Color(0, 0, 0, 0.35 * (1.0 - ks)), 14.0)
-		draw_arc(s[0], rr, 0.0, TAU, 96, Pal.red((1.0 - ks) * dim, 2.0), 3.0)
+		draw_arc(s[0], rr - 12.0, 0.0, TAU, 96, Color(0, 0, 0, 0.45 * (1.0 - ks)), 20.0)
+		draw_arc(s[0], rr, 0.0, TAU, 96, Pal.red((1.0 - ks) * dim, 2.2), 4.0)
+		draw_arc(s[0], rr - 26.0, 0.0, TAU, 96, Pal.red(0.3 * (1.0 - ks) * dim, 1.4), 1.5)
 	for w: W in ws:
 		if w.on:
 			_draw_shadow(w, dim * appear)
@@ -489,9 +505,17 @@ func _draw_weight(w: W, dim: float) -> void:
 	var r := Rect2(c - Vector2(h, h), Vector2(h, h) * 2.0)
 	var a := 1.0 - 0.62 * lift
 	# the cable, up to the top wall
-	var cy := minf(Arena.ROOM.position.y + 70.0, r.position.y)
-	draw_line(Vector2(c.x - 4.0, cy), Vector2(c.x - 4.0, r.position.y + 10.0), Pal.ink(0.3 * dim), 2.0)
-	draw_line(Vector2(c.x + 4.0, cy), Vector2(c.x + 4.0, r.position.y + 10.0), Pal.ink(0.3 * dim), 2.0)
+	# the cable: four strands up to a pulley block, swaying a little
+	var cy := minf(Arena.ROOM.position.y + 90.0, r.position.y)
+	var sway := sin(t * 1.3 + (1.0 if w.spare else 0.0)) * 6.0 * (0.3 + lift)
+	var py := Vector2(c.x + sway * 0.3, cy)
+	for st in 4:
+		var ox := (st - 1.5) * 4.0
+		draw_line(py + Vector2(ox, 0), Vector2(c.x + ox + sway, r.position.y + 6.0), Pal.ink((0.38 if st % 2 == 0 else 0.25) * dim), 1.5)
+	var pb := Rect2(py - Vector2(20, 14), Vector2(40, 22))
+	draw_rect(pb, Color(0.06, 0.06, 0.065))
+	draw_rect(pb, Pal.ink(0.5 * dim), false, 1.5)
+	draw_arc(py + Vector2(0, -3), 8.0, 0.0, TAU, 16, Pal.ink(0.5 * dim), 1.5)
 	var col := Pal.foe(a * dim, 1.0 + 0.8 * flash).lerp(Pal.red(dim, 2.4), red * 0.8)
 	draw_rect(r, Color(0.05, 0.05, 0.055, 0.6 + 0.4 * a))
 	# the plates: five bands across it, spreading apart once it has landed
@@ -503,16 +527,22 @@ func _draw_weight(w: W, dim: float) -> void:
 		draw_rect(pr, Color(0.06, 0.06, 0.065, a))
 		draw_rect(pr, col if j == 0 or j == bands - 1 else Pal.foe(0.55 * a * dim), false, 1.5)
 		# bolts at the ends of each plate
-		draw_circle(pr.position + Vector2(10, pr.size.y * 0.5), 2.5, Pal.foe(0.5 * a * dim))
-		draw_circle(Vector2(pr.end.x - 10.0, pr.position.y + pr.size.y * 0.5), 2.5, Pal.foe(0.5 * a * dim))
+		draw_circle(pr.position + Vector2(10, pr.size.y * 0.5), 3.0, Pal.foe(0.5 * a * dim))
+		draw_circle(Vector2(pr.end.x - 10.0, pr.position.y + pr.size.y * 0.5), 3.0, Pal.foe(0.5 * a * dim))
+		draw_circle(pr.position + Vector2(24, pr.size.y * 0.5), 2.0, Pal.foe(0.35 * a * dim))
+		draw_circle(Vector2(pr.end.x - 24.0, pr.position.y + pr.size.y * 0.5), 2.0, Pal.foe(0.35 * a * dim))
+		# the plate's number, painted at one end; streaks of wear
+		if j != 2 and j != bands - 1:
+			draw_string(Fonts.get_font("SemiBold"), Vector2(pr.end.x - 46.0, pr.position.y + pr.size.y * 0.5 + 5.0), "%02d" % (j + 1 + (5 if w.spare else 0)), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.35 * a * dim))
+		draw_line(pr.position + Vector2(36, 4), pr.position + Vector2(60 + (j * 13) % 30, 4), Pal.ink(0.12 * a * dim), 1.0)
 	draw_rect(r, col, false, 2.5)
 	# sprung: the core glowing in the gaps
 	if w.plates > 0.05 and w.mode != HANG:
 		var pulse := 0.5 + 0.5 * sin(t * 8.0)
 		for j in bands - 1:
 			var gy := r.position.y + (j + 1) * r.size.y / bands + (j - 1.5) * spread
-			draw_line(Vector2(r.position.x + 14.0, gy), Vector2(r.end.x - 14.0, gy), Pal.foe((0.5 + 0.5 * pulse) * w.plates * dim, 2.4), 2.0 + 2.0 * w.plates)
-		draw_rect(r.grow(6.0 + 4.0 * pulse), Pal.foe(0.35 * w.plates * dim, 1.8), false, 1.5)
+			draw_line(Vector2(r.position.x + 14.0, gy), Vector2(r.end.x - 14.0, gy), Pal.foe((0.45 + 0.4 * pulse) * w.plates * dim, 1.6), 1.5 + 1.5 * w.plates)
+		draw_rect(r.grow(6.0 + 4.0 * pulse), Pal.foe(0.18 * w.plates * dim, 1.4), false, 1.5)
 	# the cable clamp on top
 	var cl := Rect2(Vector2(c.x - 22.0, r.position.y - 6.0), Vector2(44, 16))
 	draw_rect(cl, Color(0.07, 0.07, 0.075, a))
@@ -520,7 +550,7 @@ func _draw_weight(w: W, dim: float) -> void:
 	# the stencil and the load it carries
 	var font := Fonts.get_font("SemiBold")
 	var lab := Txt.t("cw_spare" if w.spare else "cw_stencil")
-	var fs := 15 if not w.spare else 13
+	var fs := 18 if not w.spare else 15
 	var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var mid := Rect2(r.position.x + 8.0, r.position.y + 2.0 * r.size.y / bands + 2.0, r.size.x - 16.0, r.size.y / bands - 4.0)
 	draw_rect(Rect2(mid.get_center() - Vector2(lw * 0.5 + 6.0, fs * 0.5 + 3.0), Vector2(lw + 12.0, fs + 6.0)), Color(0.04, 0.04, 0.045, a))

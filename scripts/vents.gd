@@ -151,7 +151,10 @@ func _draught(dt: float, k: float) -> void:
 			continue
 		e.pos = game.arena.push_circle(e.pos + force_at(e.pos) * dt * 1.3, e.r)
 		if e.pos.distance_to(dp) < MOUTH + e.r:
-			game.fx.sparks(e.pos, -n, 8, Pal.foe(1.0, 1.8), 520.0, 0.3, 0.6)
+			# out through the door: a flash at the gap, its pieces flung into space
+			game.fx.sparks(e.pos, -n, 10, Pal.foe(1.0, 1.8), 620.0, 0.35, 0.5)
+			game.fx.ring(dp, 10.0, 70.0, 0.3, Pal.foe(0.8, 1.6), 2.0)
+			game.sfx.play("cross", 0.5, -6.0)
 			game.enemies.blast_hit(e, -n, 9999.0)
 	# rounds in the walls near it tear loose and fly to it
 	for b in game.bullets.list:
@@ -201,10 +204,15 @@ func _draw() -> void:
 		var fv := force_at(p)
 		if fv.length() < 1.0:
 			continue
+		var d := fv.normalized()
 		seg.append(p)
-		seg.append(p - fv.normalized() * minf(46.0, fv.length() * 0.25))
+		seg.append(p - d * minf(56.0, fv.length() * 0.3))
+		seg.append(p)
+		seg.append(p - d * 8.0 + d.orthogonal() * 5.0)
+		seg.append(p)
+		seg.append(p - d * 8.0 - d.orthogonal() * 5.0)
 	if seg.size() > 0:
-		draw_multiline(seg, Pal.ink(0.22 * dim), 1.5)
+		draw_multiline(seg, Pal.ink(0.38 * dim, 1.2), 1.5)
 
 
 func _draw_door(i: int, dim: float) -> void:
@@ -214,46 +222,57 @@ func _draw_door(i: int, dim: float) -> void:
 	var marked := door == i
 	var warn_k := clampf(door_t / WARN, 0.0, 1.0) if marked else 0.0
 	var ok := open_k() if marked else 0.0
-	# the frame set in the wall
-	var frame := Rect2(c - along * (HALF + 10.0) - n * 10.0, Vector2.ZERO)
-	frame = frame.expand(c + along * (HALF + 10.0) + n * 16.0)
-	draw_rect(frame, Color(0.05, 0.05, 0.055))
-	draw_rect(frame, Pal.ink(0.55 * dim), false, 2.0)
-	# open: the gap, and space beyond it with stars rushing past
+	var fl := 0.55 + 0.45 * sin(t * (12.0 + 16.0 * warn_k))
+	# the housing, standing out from the wall
+	var house := Rect2(c - along * (HALF + 18.0) - n * 6.0, Vector2.ZERO).expand(c + along * (HALF + 18.0) + n * 40.0)
+	draw_rect(house, Color(0.05, 0.05, 0.055))
+	draw_rect(house, Pal.ink(0.6 * dim), false, 2.0)
+	draw_rect(house.grow(-5.0), Pal.ink(0.2 * dim), false, 1.0)
+	# open: the gap, and the dark beyond it, the stars streaming past
 	var gap := HALF * ok
 	if ok > 0.0:
-		var hole := Rect2(c - along * gap - n * 9.0, Vector2.ZERO).expand(c + along * gap + n * 4.0)
+		var hole := Rect2(c - along * gap - n * 6.0, Vector2.ZERO).expand(c + along * gap + n * 30.0)
 		draw_rect(hole, Color(0.0, 0.0, 0.0, 1.0))
-		for s in 6:
-			var u := fmod(t * 3.0 + s * 0.37, 1.0)
-			var q := c + along * (sin(s * 2.3) * gap * 0.8) - n * (4.0 + 70.0 * u)
-			draw_line(q, q - n * 18.0, Pal.ink(0.5 * (1.0 - u) * dim), 1.5)
-	# the two panels, sliding apart
+		for s2 in 14:
+			var u := fmod(t * 2.4 + s2 * 0.29, 1.0)
+			var q := c + along * (sin(s2 * 2.3) * gap * 0.85) + n * (30.0 - 34.0 * u)
+			if absf((q - c).dot(along)) < gap - 2.0:
+				draw_line(q, q + n * (8.0 + 14.0 * u), Pal.ink((0.9 - 0.6 * u) * ok * dim, 1.8), 1.5)
+	# the two panels, sliding apart into the housing
 	for sd: float in [-1.0, 1.0]:
 		var inner := c + along * sd * gap
-		var outer := c + along * sd * (HALF + gap)
-		var pr := Rect2(inner - n * 6.0, Vector2.ZERO).expand(outer + n * 8.0)
-		draw_rect(pr, Color(0.08, 0.08, 0.085))
-		draw_rect(pr, Pal.ink(0.6 * dim), false, 1.5)
+		var outer := c + along * sd * (HALF + gap * 0.25)
+		if (outer - inner).dot(along * sd) < 6.0:
+			continue
+		var pr := Rect2(inner - n * 2.0, Vector2.ZERO).expand(outer + n * 30.0)
+		draw_rect(pr, Color(0.09, 0.09, 0.095))
+		draw_rect(pr, Pal.ink(0.65 * dim), false, 1.5)
 		var mid := (inner + outer) * 0.5
-		draw_line(mid - n * 3.0, mid + n * 5.0, Pal.ink(0.35 * dim), 3.0)
-	if marked and door_t < WARN + OPEN:
-		# hazard stripes on the floor before it, flashing; the reach of the draught
-		var fl := 0.55 + 0.45 * sin(t * (12.0 + 16.0 * warn_k))
-		var a := (0.35 + 0.5 * warn_k) * fl * dim if ok <= 0.0 else 0.6 * dim
-		var hatch := PackedVector2Array()
-		for j in 7:
-			var q0 := c + along * (-HALF + j * HALF * 2.0 / 6.0) + n * 24.0
-			hatch.append(q0)
-			hatch.append(q0 + n * 22.0 + along * 14.0)
-		draw_multiline(hatch, Pal.red(a, 1.5), 3.0)
-		draw_arc(c, R * (0.98 if ok > 0.0 else 0.4 + 0.58 * warn_k), (-n).angle() + PI * 0.5 + 0.05, (-n).angle() + PI * 1.5 - 0.05, 48, Pal.red(0.25 * fl * dim, 1.2), 1.5)
-		if ok <= 0.0:
-			var font := Fonts.get_font("SemiBold")
-			var lab := Txt.t("vent_warn")
-			var fs := 18
-			var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-			var at := c + n * 80.0 + Vector2(0 if n.x > 0.0 else -lw, 6.0)
-			draw_rect(Rect2(at + Vector2(-8, -fs - 2.0), Vector2(lw + 16, fs + 12)), Color(0.05, 0.0, 0.0, 0.85))
-			draw_rect(Rect2(at + Vector2(-8, -fs - 2.0), Vector2(lw + 16, fs + 12)), Pal.red(0.5 * dim, 1.3), false, 1.0)
-			draw_string(font, at, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.red((0.6 + 0.4 * fl) * dim, 1.6))
+		draw_line(mid + n * 6.0, mid + n * 24.0, Pal.ink(0.4 * dim), 3.0)
+	# the seam's warning lamps at both ends
+	for sd2: float in [-1.0, 1.0]:
+		var lp := c + along * sd2 * (HALF + 10.0) + n * 34.0
+		var lit := marked and door_t < WARN + OPEN
+		draw_circle(lp, 5.0, Color(0.06, 0.02, 0.02))
+		draw_circle(lp, 3.5, Pal.red((0.9 * fl if lit else 0.15) * dim, 2.0 if lit else 1.0))
+	if not marked or door_t >= WARN + OPEN:
+		return
+	# hazard stripes across the floor before it
+	var a := (0.35 + 0.5 * warn_k) * fl * dim if ok <= 0.0 else 0.7 * dim
+	var hatch := PackedVector2Array()
+	for j in 9:
+		var q0 := c + along * (-HALF - 10.0 + j * (HALF * 2.0 + 20.0) / 8.0) + n * 48.0
+		hatch.append(q0)
+		hatch.append(q0 + n * 34.0 + along * 18.0)
+	draw_multiline(hatch, Pal.red(a, 1.5), 4.0)
+	if ok <= 0.0:
+		# the reach of the draught, marked while it is still shut
+		draw_arc(c, R * (0.4 + 0.58 * warn_k), (-n).angle() + PI * 0.5 + 0.05, (-n).angle() + PI * 1.5 - 0.05, 48, Pal.red(0.22 * fl * dim, 1.2), 1.5)
+		var font := Fonts.get_font("SemiBold")
+		var lab := Txt.t("vent_warn")
+		var fs := 18
+		var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var at := c + n * 104.0 + Vector2(0 if n.x > 0.0 else -lw, 6.0)
+		draw_rect(Rect2(at + Vector2(-8, -fs - 2.0), Vector2(lw + 16, fs + 12)), Color(0.05, 0.0, 0.0, 0.85))
+		draw_rect(Rect2(at + Vector2(-8, -fs - 2.0), Vector2(lw + 16, fs + 12)), Pal.red(0.5 * dim, 1.3), false, 1.0)
+		draw_string(font, at, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.red((0.6 + 0.4 * fl) * dim, 1.6))

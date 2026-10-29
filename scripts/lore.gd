@@ -135,7 +135,7 @@ const WALL := {
 		["altitude", Vector2(80, 545), Vector2(1, 0), "screen", "当前高度 31,200 米 · 观景层到此为止", "ALTITUDE 31,200 M · THE VIEWING DECK ENDS HERE"],
 		["deck", Vector2(700, 1010), Vector2(0, -1), "floor", "观景层 · 第十三街居民止步于此", "VIEWING DECK · 13TH STREET RESIDENTS GO NO FURTHER"],
 		["rail", Vector2(1840, 545), Vector2(-1, 0), "notice", "舱门开启时请抓紧扶手。扶手按分钟计费。", "HOLD THE HANDRAIL WHEN THE DOORS OPEN. HANDRAILS ARE BILLED BY THE MINUTE."],
-		["scrawl", Vector2(1840, 900), Vector2(-1, 0), "scrawl", "我们把它修到了天上。他们不让我们上去。", "WE BUILT IT TO THE SKY. THEY WON'T LET US UP."],
+		["scrawl", Vector2(1840, 790), Vector2(-1, 0), "scrawl", "我们把它修到了天上。他们不让我们上去。", "WE BUILT IT TO THE SKY. THEY WON'T LET US UP."],
 	],
 }
 
