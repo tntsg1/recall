@@ -52,7 +52,7 @@ func _initialize() -> void:
 					empty += 1
 					continue
 				tries += int(lay.attempt) + 1
-				if not (lay.get("rails", lay.get("lanes", [])) as Array).is_empty():
+				if not (lay.get("rails", lay.get("lanes", lay.get("lanes3", []))) as Array).is_empty():
 					railed += 1
 				worst = maxi(worst, int(lay.attempt) + 1)
 				shapes[lay.shape] = shapes.get(lay.shape, 0) + 1

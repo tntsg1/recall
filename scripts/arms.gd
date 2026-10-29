@@ -21,6 +21,7 @@ const PERIOD := 9.0
 const CARRY := 0.65
 const CRATE := Rect2(220, 840, 190, 100)
 
+var crate_r := CRATE      # where this room's reserve crate stands
 var arms: Array = []      # {base, face, offset, mode, t, a, prev, ext}
 var carry: Array = []     # [bullet, from, to, t, feed]
 var crate: Array = []     # rounds sitting in the crate's wall
@@ -43,6 +44,7 @@ func setup(room: int) -> void:
 	belts.clear()
 	t = 0.0
 	feed_cd = 6.0
+	crate_r = CRATE
 	if room == 2:
 		for spec in [[Vector2(80, 540), Vector2.RIGHT, 0.0], [Vector2(1840, 380), Vector2.LEFT, 3.0], [Vector2(760, 1010), Vector2.UP, 6.0]]:
 			var face: Vector2 = spec[1]
@@ -50,6 +52,23 @@ func setup(room: int) -> void:
 		belts.append([Vector2(250, 290), Vector2(760, 290)])
 		belts.append([Vector2(1640, 290), Vector2(1160, 290)])
 		belts.append([Vector2(560, 965), Vector2(1270, 965)])
+	visible = not arms.is_empty()
+	queue_redraw()
+
+
+# A generated room's arms ([base, face, offset]), its crate and its belts.
+func set_layout(specs: Array, crate_at: Rect2, belt_list: Array) -> void:
+	arms.clear()
+	carry.clear()
+	crate.clear()
+	belts.clear()
+	t = 0.0
+	feed_cd = 6.0
+	crate_r = crate_at
+	for spec: Array in specs:
+		var face: Vector2 = spec[1]
+		arms.append({"base": spec[0], "face": face, "offset": spec[2], "mode": REST, "t": 0.0, "a": _rest(face), "prev": _rest(face), "ext": 0.45})
+	belts = belt_list.duplicate(true)
 	visible = not arms.is_empty()
 	queue_redraw()
 
@@ -163,9 +182,9 @@ func _carried(b) -> bool:
 # Take a round off the wall: its line now runs from where you fired it to
 # the crate, and it rides the claw's arc over to it.
 func _pluck(b, arm: Dictionary) -> void:
-	var to := Vector2(randf_range(CRATE.position.x + 14.0, CRATE.end.x - 14.0), CRATE.position.y - 1.0)
+	var to := Vector2(randf_range(crate_r.position.x + 14.0, crate_r.end.x - 14.0), crate_r.position.y - 1.0)
 	if randf() < 0.4:
-		to = Vector2(CRATE.end.x + 1.0, randf_range(CRATE.position.y + 12.0, CRATE.end.y - 12.0))
+		to = Vector2(crate_r.end.x + 1.0, randf_range(crate_r.position.y + 12.0, crate_r.end.y - 12.0))
 	carry.append([b, b.pos, to, 0.0, false])
 	game.fx.sparks(b.pos, -b.dir, 4, Pal.ink(0.9, 1.6), 260.0, 0.18, 0.9)
 	game.sfx.play("p_hit", randf_range(1.3, 1.5), -12.0)
@@ -237,7 +256,7 @@ func _feed() -> void:
 		n += 1
 	crate.clear()
 	game.sfx.play("focus", 0.5, -2.0)
-	game.fx.flash(CRATE.get_center(), 90.0, 0.2, Pal.foe(0.4, 1.6))
+	game.fx.flash(crate_r.get_center(), 90.0, 0.2, Pal.foe(0.4, 1.6))
 
 
 # ---------------------------------------------------------------- drawing

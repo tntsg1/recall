@@ -96,8 +96,14 @@ func build(i: int, entry: String, risky: bool) -> void:
 	# the range's laser fences: this room's, or the hand-made room's
 	if lay.is_empty():
 		game.lasers.setup(hand)
+		game.arms.setup(hand)
 	else:
 		game.lasers.set_fences(lay.get("fences", []))
+		var crate_at := Rect2()
+		for ci in (lay.cover as Array).size():
+			if lay.kinds[ci] == "reserve":
+				crate_at = lay.cover[ci]
+		game.arms.set_layout(lay.get("arms", []), crate_at, lay.get("belts", []))
 	game.lore.queue_redraw()
 	queue_redraw()
 
@@ -332,7 +338,7 @@ func _draw_door(d: Dictionary, k: float, dim: float, kind: String) -> void:
 	if ok > 0.01:
 		var g0 := p - tan * hw * ok
 		var g1 := p + tan * hw * ok
-		var lc := Pal.red(0.22 * ok * dim, 1.6) if red else Color(1, 1, 1, (0.24 if boss else 0.16) * ok * dim)
+		var lc := Pal.red(0.15 * ok * dim, 1.2) if red else Color(1, 1, 1, (0.24 if boss else 0.16) * ok * dim)
 		var spill := 150.0 * ok
 		draw_polygon(PackedVector2Array([g0, g1, g1 + n * spill + tan * 40.0, g0 + n * spill - tan * 40.0]), PackedColorArray([lc, lc, Color(lc, 0.0), Color(lc, 0.0)]))
 		draw_line(g0 - n * 4.0, g1 - n * 4.0, Pal.red(ok * dim, 2.6) if red else Pal.ink(ok * dim, 2.4), 4.0)

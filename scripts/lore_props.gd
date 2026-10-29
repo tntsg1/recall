@@ -278,15 +278,27 @@ func _draw() -> void:
 		if shows.get("w8_rules", 0.0) <= 0.01:
 			_draw_wall_notice(Vector2(1840, 476), dim)
 	elif story == 4:
-		_draw_stations(dim)
-		_draw_presses(dim)
-		_draw_reserve(dim)
-		_draw_terminal(Vector2(80, 260), dim, "w4_board")
-		if shows.get("w4_notice", 0.0) <= 0.01:
-			_draw_notice(Vector2(1500, 70), dim)
-		_draw_floor_wear(dim)
-		_draw_quota(dim)
-		_draw_scrawl(Vector2(1840, 820), dim)
+		var gen4: bool = game.arena.generated
+		if gen4:
+			_draw_union_paint(dim)
+			_draw_union_cover(dim)
+		else:
+			_draw_stations(dim)
+			_draw_presses(dim)
+		if game.arms.crate_r.size.x > 0.0:
+			_draw_reserve(dim)
+		var board_at = game.rooms.spot("board", Vector2(80, 260))
+		if board_at != null:
+			_draw_terminal(board_at, dim, "w4_board")
+		var notice_at4 = game.rooms.spot("notice", Vector2(1500, 70))
+		if notice_at4 != null and shows.get("w4_notice", 0.0) <= 0.01:
+			_draw_notice(notice_at4, dim)
+		if not gen4:
+			_draw_floor_wear(dim)
+			_draw_quota(dim)
+		var scrawl_at4 = game.rooms.spot("scrawl", Vector2(1840, 820))
+		if scrawl_at4 != null:
+			_draw_scrawl(scrawl_at4, dim)
 	var quiet := story == 8 and _archivist_up()
 	for w in _walls():
 		var id := "w%d_%s" % [story, w[0]]
@@ -533,6 +545,9 @@ func _draw_range_paint(dim: float) -> void:
 	var cut: Array = []
 	for r: Rect2 in game.arena.walls + game.arena.inner:
 		cut.append(r.grow(6.0))
+	for d: Dictionary in lay.get("gates", []) + lay.get("exits", []) + [lay.get("entry", {})]:
+		if not d.is_empty():
+			cut.append(Rect2(d.pos - Vector2(110, 110), Vector2(220, 220)))
 	var ln: Array = lay.get("lanes3", [])
 	if not ln.is_empty():
 		var side: String = ln[0]
@@ -599,6 +614,21 @@ func _draw_range_paint(dim: float) -> void:
 # blind, a weapons rack.
 func _draw_range_cover(dim: float) -> void:
 	var lay: Dictionary = game.rooms.lay
+	# a fence strung from a wall: its emitter is bolted to the wall, as big as a post
+	for f: Array in lay.get("fences", []):
+		var a: Vector2 = f[0]
+		var on_post := false
+		for ci in (lay.cover as Array).size():
+			if lay.kinds[ci] == "post" and (lay.cover[ci] as Rect2).has_point(a):
+				on_post = true
+		if on_post:
+			continue
+		var into := ((f[1] as Vector2) - a).normalized()
+		var base := Rect2(a + into * 12.0 - Vector2(18, 18), Vector2(36, 36))
+		draw_rect(base, Color(0.03, 0.03, 0.035, 1.0))
+		draw_rect(base, Pal.ink(0.5 * dim), false, 1.5)
+		draw_rect(Rect2(base.get_center() - Vector2(12, 3) if absf(into.y) > 0.5 else base.get_center() - Vector2(3, 12), Vector2(24, 6) if absf(into.y) > 0.5 else Vector2(6, 24)), Pal.red(0.45 * dim, 1.4))
+		draw_circle(base.get_center() + into * 6.0, 5.0, Pal.red(0.7 * dim, 1.8))
 	var kinds: Array = lay.get("kinds", [])
 	var cover: Array = lay.get("cover", [])
 	var sf := Fonts.get_font("SemiBold")
@@ -623,6 +653,13 @@ func _draw_range_cover(dim: float) -> void:
 					draw_line(Vector2(ins.position.x, ins.get_center().y), Vector2(ins.end.x, ins.get_center().y), Pal.ink(0.35 * dim), 1.5)
 				draw_string(sf, ins.position + Vector2(8, 20), "PG-IV", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
 				draw_circle(Vector2(ins.end.x - 9.0, ins.position.y + 9.0), 4.0, Pal.ink(0.4 * dim))
+				# the upper of a stacked pair: a lip, and the lower one's shadow under it
+				if i > 0 and (lay.piece[i] == lay.piece[i - 1]):
+					var top_r: Rect2 = cover[i - 1]
+					var seam_y := minf(top_r.end.y, r.end.y) if absf(top_r.end.y - r.position.y) < 2.0 or absf(r.end.y - top_r.position.y) < 2.0 else -1.0
+					if seam_y > 0.0:
+						draw_line(Vector2(r.position.x, seam_y), Vector2(r.end.x, seam_y), Pal.ink(0.8 * dim), 3.0)
+						draw_rect(Rect2(r.position.x, seam_y, r.size.x, 8.0), Color(0, 0, 0, 0.4 * dim))
 			"sandbag":
 				# a wall of sandbags: rounded bags in two courses
 				var span := r.size.x if long_x else r.size.y
@@ -656,15 +693,98 @@ func _draw_range_cover(dim: float) -> void:
 				draw_rect(slit, Color(0, 0, 0, 0.9))
 				draw_rect(slit, Pal.ink(0.5 * dim), false, 1.0)
 			"rack":
-				# a weapons rack: rifles stood in a row
+				# a weapons rack: rifles leant in a row, stock down, barrel up
 				var span2 := r.size.x if long_x else r.size.y
-				var ng := int(span2 / 22.0)
+				var ng := int(span2 / 26.0)
 				for k in ng:
 					var u := (k + 0.5) / ng
-					var a := Vector2(lerpf(ins.position.x, ins.end.x, u), ins.position.y + 4.0) if long_x else Vector2(ins.position.x + 4.0, lerpf(ins.position.y, ins.end.y, u))
-					var b := a + (Vector2(4.0, ins.size.y - 8.0) if long_x else Vector2(ins.size.x - 8.0, 4.0))
-					draw_line(a, b, Pal.ink(0.42 * dim), 2.0)
+					var a := Vector2(lerpf(ins.position.x, ins.end.x, u), ins.end.y - 4.0) if long_x else Vector2(ins.end.x - 4.0, lerpf(ins.position.y, ins.end.y, u))
+					var up := Vector2(10.0, -(ins.size.y - 10.0)) if long_x else Vector2(-(ins.size.x - 10.0), 10.0)
+					var b := a + up
+					draw_line(a, b, Pal.ink(0.5 * dim), 2.0)
+					# the stock, a wedge at the foot; the magazine, a tick part way up
+					var sd := up.orthogonal().normalized() * 6.0
+					# the stock: a solid butt at the foot
+					draw_colored_polygon(PackedVector2Array([a - sd * 0.4, a + sd, a + up * 0.3 + sd * 0.5, a + up * 0.3 - sd * 0.3]), Pal.ink(0.55 * dim))
+					# the magazine, a short block under the barrel part way up
+					draw_colored_polygon(PackedVector2Array([a + up * 0.45, a + up * 0.45 + sd * 1.4, a + up * 0.55 + sd * 1.4, a + up * 0.55]), Pal.ink(0.5 * dim))
 				draw_string(sf, ins.position + Vector2(4, 12), "PG-IV ×%d" % ng, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Pal.ink(0.45 * dim))
+
+
+# A generated union floor: oil worn in where the work goes on (the belts are
+# the arms' own to draw).
+func _draw_union_paint(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	for st: Array in lay.get("stains", []):
+		var p: Vector2 = st[0]
+		var rad: float = st[1]
+		var free := true
+		for r: Rect2 in game.arena.walls + game.arena.inner:
+			if r.grow(rad).has_point(p):
+				free = false
+		if free:
+			draw_set_transform(p, st[2], Vector2(1.0, 0.6))
+			draw_circle(Vector2.ZERO, rad, Color(0, 0, 0, 0.3))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+# A generated union floor's machines by kind: presses (as in the hand-made
+# floor, rams beating at full capacity), stacked rations, work stations, a
+# silo, a packing machine. The reserve crate is drawn on its own.
+func _draw_union_cover(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var kinds: Array = lay.get("kinds", [])
+	var cover: Array = lay.get("cover", [])
+	var sf := Fonts.get_font("SemiBold")
+	var n := 0
+	for i in cover.size():
+		var r: Rect2 = cover[i]
+		var kind: String = kinds[i] if i < kinds.size() else "press"
+		var long_x := r.size.x >= r.size.y
+		var ins := r.grow(-7.0)
+		match kind:
+			"press":
+				n += 1
+				var hz := PackedVector2Array()
+				var x := ins.position.x
+				while x < ins.end.x - 6.0:
+					hz.append(Vector2(x, ins.end.y))
+					hz.append(Vector2(x + 8.0, ins.end.y - 12.0))
+					x += 10.0
+				draw_multiline(hz, Pal.ink(0.3 * dim), 2.0)
+				draw_string(sf, ins.position + Vector2(4, 16), "PR-%02d" % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+				# the ram, beating on its own clock
+				var ph := fmod(t * (2.5 if _full() else 0.6) + i * 0.37, 1.0)
+				var ram := 1.0 - Pal.ease_out(ph) if ph < 0.5 else (ph - 0.5) * 2.0
+				var rr := ins.grow(-ins.size.x * 0.2 - 8.0 * (1.0 - ram))
+				draw_rect(rr, Color(0.07, 0.07, 0.08))
+				draw_rect(rr, Pal.ink((0.8 if ph < 0.1 else 0.3) * dim, 1.4 if ph < 0.1 else 1.0), false, 2.0)
+			"rations":
+				# a pallet of ration boxes: four to a layer, the stencil on top
+				for k in 4:
+					var q := Rect2(ins.position + ins.size * Vector2(0.5 * (k % 2), 0.5 * (k / 2)), ins.size * 0.5).grow(-2.0)
+					draw_rect(q, Pal.ink(0.22 * dim), false, 1.0)
+				draw_string(sf, ins.get_center() + Vector2(-14, 5), Txt.t("ration"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.5 * dim))
+			"station":
+				# a work station: its bench, the operator's mark, its lamp
+				draw_line(ins.position + Vector2(0, ins.size.y * 0.6), Vector2(ins.end.x, ins.position.y + ins.size.y * 0.6) if long_x else ins.position + Vector2(ins.size.x * 0.6, ins.size.y), Pal.ink(0.3 * dim), 1.0)
+				draw_circle(Vector2(ins.end.x - 6.0, ins.position.y + 6.0), 4.0, Pal.red(dim, 2.0) if _full() else Pal.ink(0.25 * dim))
+				draw_string(sf, ins.position + Vector2(4, 14), Txt.t("station") % (i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.45 * dim))
+			"silo":
+				# a flour silo seen from above: its rings, the hatch
+				var c := r.get_center()
+				for k in 3:
+					draw_arc(c, r.size.x * (0.42 - 0.12 * k), 0.0, TAU, 32, Pal.ink((0.35 - 0.08 * k) * dim), 1.5)
+				draw_rect(Rect2(c - Vector2(10, 10), Vector2(20, 20)), Pal.ink(0.5 * dim), false, 1.5)
+			"machine":
+				# a packing machine: its rollers and the bag it seals
+				var span := r.size.x if long_x else r.size.y
+				var nr := int(span / 30.0)
+				for k in nr:
+					var u := (k + 0.5) / nr
+					var cc := Vector2(lerpf(ins.position.x, ins.end.x, u), ins.get_center().y) if long_x else Vector2(ins.get_center().x, lerpf(ins.position.y, ins.end.y, u))
+					draw_arc(cc, 9.0, t * 4.0, t * 4.0 + PI * 1.5, 8, Pal.ink(0.45 * dim), 2.0)
+				draw_string(sf, ins.position + Vector2(4, 14), "PK-1", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
 
 
 # The parts of axis-aligned line a-b outside every rect, as [from, to].
@@ -1936,7 +2056,7 @@ func _draw_presses(dim: float) -> void:
 
 # The strategic reserve crate: banded, padlocked, sealed, its stencil big.
 func _draw_reserve(dim: float) -> void:
-	var r := Arms.CRATE
+	var r: Rect2 = game.arms.crate_r
 	var sf := Fonts.get_font("SemiBold")
 	var ins := r.grow(-8.0)
 	draw_rect(ins, Pal.ink(0.2 * dim), false, 1.0)

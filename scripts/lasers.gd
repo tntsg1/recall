@@ -166,7 +166,9 @@ func _draw() -> void:
 			# the beam: a hot core with a modest glow. Held on by the boss, the
 			# glow drops further so its own attacks read over the fences.
 			var soft := 0.55 if forced == 1 else 1.0
-			if forced == 1:
+			# held on by the boss, or strung across a generated room: a low line
+			# that flares only near you, so red keeps meaning "this is close"
+			if forced == 1 or (game and game.arena.generated):
 				# held on through a test: a low steady line, so the boss's own
 				# attacks read over it; it flares up only near you
 				draw_line(a, b, Pal.red(0.5, 1.5), 2.0)

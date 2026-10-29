@@ -259,6 +259,7 @@ const S := {
 	"face_tag": ["全国频道 · 董事长致辞 · 第 231 年", "NATIONAL CHANNEL · THE CHAIRMAN SPEAKS · YEAR 231"],
 	"door_on": ["常路", "THE WAY ON"],
 	"hall_desk": ["股东登记处", "SHAREHOLDER REGISTRY"],
+	"ration": ["口粮", "RATION"],
 	"door_risky": ["险路", "THE HARD WAY"],
 	"door_risky_sub": ["敌人更多 · 有精英\n每击掉 2 格 · 多一次强化", "MORE OF THEM · AN ELITE\nEACH HIT −2 · ONE MORE PICK"],
 	"risky_room": ["险路 · 每击掉 2 格", "THE HARD WAY · EACH HIT −2"],
