@@ -44,6 +44,14 @@ const SEIZE := {
 		Enemies.PRISM: [["我把站台的灯调亮，让等车的人看起来有希望。", "I TURN UP THE PLATFORM LIGHTS SO THE WAITING LOOK HOPEFUL."]],
 		Enemies.LEECH: [["货单上写着“民生物资”。终点写着“中央储备”。", "THE MANIFEST SAYS 'GOODS FOR THE PEOPLE'. THE DESTINATION SAYS 'CENTRAL RESERVE'."]],
 	},
+	6: {
+		Enemies.CHASER: [["抄表员 3301。第十三街的电表，指针从来不动。", "METER READER 3301. ON 13TH STREET THE NEEDLES NEVER MOVE."],
+			["他们说限电是暂时的。暂时了十一年。", "THEY SAID THE RATIONING WAS TEMPORARY. ELEVEN YEARS TEMPORARY."]],
+		Enemies.GUARD: [["配电柜要上锁。锁比电贵。", "THE CABINETS MUST BE LOCKED. THE LOCKS COST MORE THAN THE POWER."]],
+		Enemies.CHARGER: [["中央的灯整夜亮着。说是为了安全。", "THE CENTRE'S LIGHTS BURN ALL NIGHT. FOR SAFETY, THEY SAY."]],
+		Enemies.LEECH: [["我把多余的电收回来，再卖回给他们。", "I TAKE BACK THE SPARE POWER AND SELL IT TO THEM AGAIN."]],
+		Enemies.INSPECTOR: [["我关掉每一盏不该亮的灯。今天关了三千盏。", "I PUT OUT EVERY LIGHT THAT SHOULD NOT BE ON. THREE THOUSAND TODAY."]],
+	},
 }
 
 # remnants: [id, wall point, inward normal, kind of mark, zh, en]
@@ -78,6 +86,12 @@ const WALL := {
 		["manifest", Vector2(1525, 530), Vector2(0, -1), "crate", "货单：民生物资 1200 吨 · 收货方：中央储备", "MANIFEST: GOODS FOR THE PEOPLE, 1,200 T · CONSIGNEE: CENTRAL RESERVE"],
 		["scrawl", Vector2(300, 70), Vector2(0, 1), "scrawl_top", "它每天都经过。我们一次也没上去。", "IT PASSES EVERY DAY. WE HAVE NEVER BEEN ON IT."],
 	],
+	6: [
+		["ledger", Vector2(80, 700), Vector2(1, 0), "screen", "本月配额：中央区 98.6% · 第十三街 0.02%", "THIS MONTH: CENTRAL 98.6% · 13TH STREET 0.02%"],
+		["cabinet", Vector2(1840, 700), Vector2(-1, 0), "notice", "私接电线者，按窃取国家资产论处", "ANYONE WIRING THEIR OWN LINE WILL BE TREATED AS A THIEF OF STATE ASSETS"],
+		["notice", Vector2(1840, 230), Vector2(-1, 0), "notice", "节约用电是每位股东的美德。今晚 19 点至次日 7 点停电。", "SAVING POWER IS EVERY SHAREHOLDER'S VIRTUE. NO POWER 19:00 TO 07:00 TONIGHT."],
+		["scrawl", Vector2(1320, 70), Vector2(0, 1), "scrawl_top", "我们自己接的线，比他们的灯亮。", "THE LINE WE WIRED OURSELVES BURNS BRIGHTER THAN THEIR LIGHTS."],
+	],
 }
 
 const RADIO := {
@@ -105,6 +119,11 @@ const RADIO := {
 		"wave": [["超导运输网络今日准点率 100%。第十三街站暂停服务第 12 年。", "THE SUPERCONDUCTING LINE RAN 100% ON TIME TODAY. 13TH STREET STATION: CLOSED, YEAR 12."],
 			["专列运载的全部是民生物资，请市民放心。", "THE EXPRESS CARRIES ONLY GOODS FOR THE PEOPLE. CITIZENS NEED NOT WORRY."]],
 		"boss": [["中央专列因故临时停运。请市民不要靠近事故现场，也不要拍照。", "THE CENTRAL EXPRESS IS TEMPORARILY SUSPENDED. KEEP AWAY FROM THE SITE. NO PHOTOGRAPHS."]],
+	},
+	6: {
+		"wave": [["全国电网运行平稳。停电区域居民请早点休息。", "THE NATIONAL GRID IS STABLE. RESIDENTS OF BLACKOUT DISTRICTS, PLEASE SLEEP EARLY."],
+			["近期发现私接电线行为。私接者的积分已全部冻结。", "UNAUTHORISED WIRING HAS BEEN FOUND. THE OFFENDERS' CREDITS ARE FROZEN."]],
+		"boss": [["配电总闸进入检修。检修期间第十三街恢复供电——此为临时措施。", "THE GRID MASTER IS UNDER REPAIR. 13TH STREET HAS POWER MEANWHILE — A TEMPORARY MEASURE."]],
 	},
 }
 

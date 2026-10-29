@@ -16,6 +16,7 @@ var hold := {}               # remnant id -> seconds left at full
 var memory := ""             # a shell's memory, shown beside it
 var memory_t := -1.0
 var memory_at: Node2D = null
+var memory_fixed := Vector2.INF   # a memory pinned where it was found (a fallen inspector)
 var seize_n := 0
 var worker_t := -1.0         # the worker by the door, from the chapter's start
 var t := 0.0
@@ -27,6 +28,7 @@ var focus_last := 0.0
 var row_cache := {}
 var mirror_tick := 0.0
 var shutter_up := 0.0        # chapter 4: the quota window opens once the intake falls
+var inspector_told := false
 
 
 func _ready() -> void:
@@ -45,6 +47,8 @@ func start_chapter(ch: int) -> void:
 	shows.clear()
 	hold.clear()
 	shutter_up = 0.0
+	inspector_told = false
+	memory_fixed = Vector2.INF
 	if story == 5 and game.bosses_by.has("train"):
 		# the line runs here: its loop is laid from the start
 		var tr = game.bosses_by["train"]
@@ -88,6 +92,7 @@ func step(dt: float) -> void:
 		memory_t += dt
 		if memory_t > 3.4 or not is_instance_valid(memory_at):
 			memory_t = -1.0
+			memory_fixed = Vector2.INF
 		mem_layer.queue_redraw()
 	elif mem_shown:
 		mem_layer.queue_redraw()
@@ -116,6 +121,22 @@ func step(dt: float) -> void:
 
 
 # A shell was seized: its memory, once per seizing, cycling through its lines.
+# A fallen inspector's last log, once a chapter, where it fell.
+func on_inspector_down(at: Vector2) -> void:
+	if inspector_told:
+		return
+	inspector_told = true
+	var m := Lore.seize_line(story, Enemies.INSPECTOR, 0)
+	if m.is_empty():
+		return
+	memory = m.text
+	memory_t = 0.0
+	memory_at = game.possess
+	memory_fixed = at
+	if Lore.find(m.id):
+		game.hud.lore_found()
+
+
 func on_seize(shell) -> void:
 	var m := Lore.seize_line(story, shell.kind, seize_n)
 	seize_n += 1
@@ -124,6 +145,7 @@ func on_seize(shell) -> void:
 	memory = m.text
 	memory_t = 0.0
 	memory_at = game.possess
+	memory_fixed = Vector2.INF
 	if Lore.find(m.id):
 		game.hud.lore_found()
 
@@ -172,6 +194,15 @@ func _draw() -> void:
 		_draw_platform(dim)
 		_draw_containers(dim)
 		_draw_terminal(Vector2(80, 300), dim, "w5_timetable")
+	elif story == 6:
+		_draw_floor_cables(dim)
+		_draw_cabinets(dim)
+		_draw_terminal(Vector2(80, 700), dim, "w6_ledger")
+		if shows.get("w6_notice", 0.0) <= 0.01:
+			_draw_wall_notice(Vector2(1840, 230), dim)
+		if shows.get("w6_cabinet", 0.0) <= 0.01:
+			_draw_wall_notice(Vector2(1840, 700), dim)
+		_draw_wired_bulb(dim)
 	elif story == 4:
 		_draw_stations(dim)
 		_draw_presses(dim)
@@ -485,7 +516,7 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 			yy += step
 	elif id != "" or int(t * 2.0) % 3 != 0:
 		var dots := ".".repeat(int(t * 2.0) % 4)
-		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output", 5: "term_timetable"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
+		draw_string(font, scr.position + Vector2(8, 30), Txt.t({3: "term_log", 4: "term_output", 5: "term_timetable", 6: "term_power"}.get(story, "term_idle")) + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * dim))
 
 
 # The queue: posts with a rope slung between them, and the waiting line.
@@ -841,6 +872,73 @@ func _draw_floor_notice(c: Vector2, dim: float) -> void:
 		draw_line(r.position + Vector2(44, 16 + j * 11), r.position + Vector2(108 - (j % 2) * 20, 16 + j * 11), Pal.ink(0.25 * dim), 1.0)
 
 
+# ---------------------------------------------------------------- the energy bureau
+
+# The cables run under the floor plates from each cabinet to the middle: dark
+# until the transformer comes up (it draws its own live ones over them).
+func _draw_floor_cables(dim: float) -> void:
+	var grid_on: bool = game.boss is GridMaster and game.boss.alive()
+	if grid_on:
+		return
+	for k in 3:
+		var to: Vector2 = GridMaster.CABINETS[k]
+		var n := Vector2(1, 0) if to.x < 100.0 else (Vector2(-1, 0) if to.x > 1800.0 else Vector2(0, -1))
+		var b := to + n * 34.0
+		var a: Vector2 = GridMaster.HOME + (b - GridMaster.HOME).normalized() * 90.0
+		draw_line(a, b, Color(0.07, 0.07, 0.075), 9.0)
+		draw_line(a, b, Pal.ink(0.22 * dim), 1.0)
+	# the transformer's empty plinth in the middle
+	var pr := Rect2(GridMaster.HOME - Vector2(90, 90), Vector2(180, 180))
+	draw_rect(pr, Pal.ink(0.12 * dim), false, 2.0)
+	var hz := PackedVector2Array()
+	var x := pr.position.x + 8.0
+	while x < pr.end.x - 8.0:
+		hz.append(Vector2(x, pr.end.y - 6.0))
+		hz.append(Vector2(x + 10.0, pr.end.y - 16.0))
+		x += 16.0
+	draw_multiline(hz, Pal.ink(0.12 * dim), 2.0)
+
+
+# The cabinets on the walls: a locked box, a meter whose needle sits where
+# that district's share puts it, and the district's name and share.
+func _draw_cabinets(dim: float) -> void:
+	var sf := Fonts.get_font("SemiBold")
+	for k in 3:
+		var c: Vector2 = GridMaster.CABINETS[k]
+		var n := Vector2(1, 0) if c.x < 100.0 else (Vector2(-1, 0) if c.x > 1800.0 else Vector2(0, -1))
+		var side := n.orthogonal()
+		var box := PackedVector2Array([c - side * 46.0, c + side * 46.0, c + side * 46.0 + n * 34.0, c - side * 46.0 + n * 34.0])
+		draw_colored_polygon(box, Color(0.07, 0.07, 0.075))
+		box.append(box[0])
+		draw_polyline(box, Pal.ink(0.6 * dim), 1.5)
+		# the meter dial and its needle: the share it is given
+		var dc := c + n * 17.0 - side * 22.0
+		draw_arc(dc, 11.0, 0.0, TAU, 16, Pal.ink(0.5 * dim), 1.2)
+		var share: float = [1.0, 0.8, 0.005][k]
+		var na := PI + PI * share
+		draw_line(dc, dc + Vector2.from_angle(na) * 9.0, Pal.ink(0.85 * dim, 1.2), 1.5)
+		# the lock
+		var lk := c + n * 17.0 + side * 24.0
+		draw_rect(Rect2(lk - Vector2(6, 5), Vector2(12, 11)), Pal.ink(0.5 * dim), false, 1.5)
+		draw_arc(lk - Vector2(0, 5), 4.0, PI, TAU, 8, Pal.ink(0.5 * dim), 1.5)
+		# its label, out on the floor in front of it
+		var lab: String = Txt.t(GridMaster.CABLE_KEYS[k]) + " · " + GridMaster.CABLE_SHARE[k]
+		var lw := sf.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+		var lp := c + n * 30.0 + side * 92.0 if n.y == 0.0 else c + n * 40.0 + side * 120.0
+		var poor := k == 2
+		draw_string(sf, Vector2(lp.x - lw / 2.0, lp.y + 5.0), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink((0.95 if poor else 0.6) * dim, 1.3 if poor else 1.0))
+
+
+# Above the graffiti, a bulb on a wire someone ran themselves, lit.
+func _draw_wired_bulb(dim: float) -> void:
+	var a := Vector2(1290, 70)
+	var b := Vector2(1270, 150)
+	var wire := PackedVector2Array([a, Vector2(1280, 100), Vector2(1274, 128), b])
+	draw_polyline(wire, Pal.ink(0.45 * dim), 1.5)
+	draw_circle(b + Vector2(0, 8), 7.0, Pal.ink(0.8 * dim, 1.8))
+	draw_texture_rect(Fx.make_glow_texture(), Rect2(b + Vector2(-50, -42), Vector2(100, 100)), false, Color(1, 1, 1, 0.12 * dim))
+
+
 # ---------------------------------------------------------------- the superconducting line
 
 # 13th Street's platform, between the loop's bottom run and the wall: its
@@ -1158,18 +1256,23 @@ func _draw_worker(dim: float) -> void:
 
 
 func _draw_memory() -> void:
-	if memory_t < 0.0 or not game.possess.hosting() and memory_t > 0.6:
+	if memory_t < 0.0:
 		return
-	var sh = game.possess.shell
-	if sh == null:
-		return
+	var anchor := memory_fixed
+	if anchor == Vector2.INF:
+		if not game.possess.hosting() and memory_t > 0.6:
+			return
+		var sh = game.possess.shell
+		if sh == null:
+			return
+		anchor = sh.pos
 	var a := clampf(memory_t / 0.3, 0.0, 1.0) * (1.0 - clampf((memory_t - 2.8) / 0.6, 0.0, 1.0))
 	var size := 18
 	# typed out, a few characters at a time, like a log being read
 	var n := int(memory.length() * clampf(memory_t / 0.5, 0.0, 1.0))
 	var txt := memory.substr(0, n)
 	var tw := font.get_string_size(memory, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	var p: Vector2 = (sh.pos as Vector2) + Vector2(-tw / 2.0, 92.0)
+	var p: Vector2 = anchor + Vector2(-tw / 2.0, 92.0)
 	p.x = clampf(p.x, Arena.ROOM.position.x + 10.0, Arena.ROOM.end.x - tw - 10.0)
 	# keep the plate off cover and floor rails: step it away, one way only
 	var away := 40.0 if p.y < Arena.ROOM.get_center().y else -40.0

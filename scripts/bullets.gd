@@ -66,6 +66,7 @@ class B:
 	var first_bonus := false
 	var last_hit := Vector2.ZERO
 	var via_done := false       # bent once through a seized leech's well on the way home
+	var dark_by := 0            # the inspector who put it out (0: lit); it cannot be recalled
 
 	func total() -> float:
 		return cum[cum.size() - 1]
@@ -443,7 +444,7 @@ func light_up(from: Vector2) -> void:
 func recall(from: Vector2) -> int:
 	var c: Array[B] = []
 	for b in list:
-		if b.state == EMBED:
+		if b.state == EMBED and b.dark_by == 0:
 			c.append(b)
 	c.sort_custom(func(x: B, y: B) -> bool: return x.pos.distance_squared_to(from) < y.pos.distance_squared_to(from))
 	var n := c.size()

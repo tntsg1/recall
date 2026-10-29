@@ -153,6 +153,27 @@ func think(game) -> void:
 					move += v.normalized() * 2.2
 					if arm.mode == Arms.SWEEP and absf(wrapf(v.angle() - arm.a, -PI, PI)) < 0.35:
 						bot.dash = true
+	# the grid master: get out of a district being fed; arcs are to be stepped round
+	if bs is GridMaster and bs.state == GridMaster.RUN and bs.mode == GridMaster.WARN:
+		for z in bs.zones:
+			var zr: Rect2 = GridMaster.ZONES[z]
+			if zr.grow(30.0).has_point(p):
+				var out: Vector2 = p - zr.get_center()
+				move += out.normalized() * 2.5
+				if bs.mode_t > GridMaster.WARN_TIME - 0.15 and zr.has_point(p):
+					bot.dash = true
+	if bs is GridMaster and bs.state == GridMaster.RUN:
+		for rg in bs.rings:
+			var rr: float = GridMaster.RING_R * Pal.ease_out(rg[0] / GridMaster.RING_TIME)
+			var gap: float = p.distance_to(bs.pos) - rr
+			if gap > 0.0 and gap < 60.0:
+				bot.dash = true
+	if game.arcs.active():
+		for ac in game.arcs.arcs:
+			var q5 := Geometry2D.get_closest_point_to_segment(p, ac[0], ac[1])
+			var ad2: float = q5.distance_to(p)
+			if ad2 < 40.0:
+				move += (p - q5) / maxf(ad2, 1.0) * 1.5
 	# the express's pressure wave off the platform: dash through its edge
 	if bs is Boss and bs.state == Boss.RUN and bs.station_t < Boss.WAVE_TIME:
 		var wr: float = Boss.WAVE_R0 + (Boss.WAVE_R1 - Boss.WAVE_R0) * Pal.ease_out(bs.station_t / Boss.WAVE_TIME)
@@ -178,6 +199,14 @@ func think(game) -> void:
 	if bs is Lockdown and bs.state == Lockdown.RUN:
 		var lcp: Vector2 = bs.core_pos()
 		nearest = {"pos": lcp, "vel": Vector2.ZERO}
+	elif bs is GridMaster and bs.state == GridMaster.RUN:
+		var gt: Vector2 = bs.pos
+		for k in 3:
+			if bs.cable_hp[k] > 0.0:
+				gt = bs.cable_from(k).lerp(bs.cable_to(k), 0.5)
+				break
+		nearest = {"pos": gt, "vel": Vector2.ZERO}
+		nd = gt.distance_to(p)
 	elif (bs is Boss and (bs.state == Boss.RUN or bs.state == Boss.ENTER)) or (bs is Warden and bs.state == Warden.RUN) or (bs is Devourer and bs.state == Devourer.RUN) or (bs is Metronome and bs.state == Metronome.RUN) or (bs is Zero and bs.state == Zero.RUN) or (bs is Testbed and bs.state == Testbed.RUN):
 		if bs.core_open > 0.5 or not (bs is Boss or bs is Testbed):
 			var cp: Vector2 = bs.core_pos()
@@ -206,7 +235,7 @@ func think(game) -> void:
 	if focus_hold > 0.0:
 		focus_hold -= 1.0 / 60.0
 		bot.focus = focus_hold > 0.0
-	elif emb >= 8 and (game.ammo <= 3 or emb >= 18) and (es.size() > 0 or game.boss.core_open > 0.5 or (game.boss is Lockdown and game.boss.state == Lockdown.RUN)):
+	elif emb >= 8 and (game.ammo <= 3 or emb >= 18) and (es.size() > 0 or game.boss.core_open > 0.5 or (game.boss is Lockdown and game.boss.state == Lockdown.RUN) or (game.boss is GridMaster and game.boss.state == GridMaster.RUN)):
 		focus_hold = 0.25
 		bot.focus = true
 	else:

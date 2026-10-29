@@ -142,7 +142,7 @@ func _draw() -> void:
 	var f: float = game.focus if game else 0.0
 	var dim := 1.0 - 0.45 * f
 	# under the chapter's title card the rails stay dim
-	if game and game.hud.intro_t >= 0.0:
+	if game and game.hud and game.hud.intro_t >= 0.0:
 		dim *= clampf((game.hud.intro_t - 2.2) / 0.6, 0.25, 1.0)
 	var now: float = game.real_time if game else t
 	for r in rails:

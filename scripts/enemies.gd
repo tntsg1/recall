@@ -5,7 +5,7 @@ extends Node2D
 # its armour goes; it shatters into those edges when it dies.
 
 enum { WARN, SPAWN, ALIVE, DEAD, HOST }   # HOST: seized by you (Possess drives it)
-enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO }
+enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO, INSPECTOR }
 enum { APPROACH, WINDUP, DASH, STUN, RECOVER }
 
 const SPEC := {
@@ -16,6 +16,7 @@ const SPEC := {
 	LEECH: {"hp": 45.0, "r": 16.0, "sides": 5, "speed": 125.0},
 	PULSE: {"hp": 70.0, "r": 19.0, "sides": 6, "speed": 0.0},
 	ECHO: {"hp": 40.0, "r": 13.0, "sides": 8, "speed": 0.0},
+	INSPECTOR: {"hp": 55.0, "r": 17.0, "sides": 4, "speed": 110.0},
 }
 const WARN_TIME := 0.55
 const SPAWN_TIME := 0.6
@@ -332,6 +333,16 @@ func aftershock_hit(e: E, dir: Vector2) -> void:
 
 func _die(e: E, dir: Vector2) -> void:
 	e.state = DEAD
+	if e.kind == INSPECTOR:
+		var n := 0
+		for b in game.bullets.list:
+			if b.dark_by == e.id:
+				b.dark_by = 0
+				n += 1
+				game.fx.flash(b.pos, 26.0, 0.18, Pal.ink(0.7, 2.0))
+		if n > 0:
+			game.sfx.play("lit", 1.2, -6.0)
+		game.lore.on_inspector_down(e.pos)
 	if e.grip != null:
 		if game.bullets.held_by(e.grip).size() >= 4:
 			game.ach("leech4")
@@ -418,6 +429,8 @@ func step(dt: float) -> void:
 						e.rot += (0.5 if fmod(e.seed, 2.0) < 1.0 else -0.5) * dt
 					LEECH:
 						_leech(e, pl, dt)
+					INSPECTOR:
+						_inspector(e, pl, dt)
 					PULSE:
 						_pulse(e, pl, dt)
 					ECHO:
@@ -534,6 +547,43 @@ func _leech(e: E, pl: Vector2, dt: float) -> void:
 		var away := e.pos - pl
 		want = away.normalized() if away.length() < 420.0 else Vector2.from_angle(sin(e.t * 0.4 + e.seed) * 3.0)
 	e.vel = Pal.damp2(e.vel, _steer(e, want) * e.speed * (0.7 if held >= 4 else 1.0), 3.0, dt)
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-6.0 * dt))
+
+
+# The energy-saving inspector: walks to the nearest lit round of yours and
+# puts it out (up to six); a dark round cannot be recalled until it falls.
+const DIM_R := 95.0
+const DIM_MAX := 6
+
+
+func _inspector(e: E, pl: Vector2, dt: float) -> void:
+	var mine := 0
+	for b in game.bullets.list:
+		if b.dark_by == e.id:
+			mine += 1
+	var target = null
+	var td := 1400.0
+	if mine < DIM_MAX:
+		for b in game.bullets.list:
+			if b.state == Bullets.EMBED and b.dark_by == 0 and not b.foe:
+				var d: float = b.pos.distance_to(e.pos)
+				if d < td:
+					td = d
+					target = b
+	var want := Vector2.ZERO
+	if target != null:
+		want = (target.pos - e.pos).normalized()
+		if td < DIM_R:
+			target.dark_by = e.id
+			target.light = 0.0
+			game.fx.flash(target.pos, 22.0, 0.15, Pal.ink(0.3, 1.0))
+			game.fx.ring(target.pos, 14.0, 2.0, 0.25, Pal.foe(0.7, 1.4), 1.5)
+			game.sfx.play("tick", 0.6, -10.0)
+	else:
+		var away := e.pos - pl
+		want = away.normalized() if away.length() < 380.0 else Vector2.from_angle(sin(e.t * 0.4 + e.seed) * 3.0)
+	e.vel = Pal.damp2(e.vel, _steer(e, want) * e.speed, 3.0, dt)
 	if e.vel.length() > 5.0:
 		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-6.0 * dt))
 
@@ -727,6 +777,9 @@ func _poly(e: E) -> Array[Vector2]:
 		LEECH:
 			for k in 5:
 				pts.append(Vector2.from_angle(TAU * k / 5.0) * e.r * (1.0 + 0.08 * sin(e.t * 6.0 + k * 1.7)))
+		INSPECTOR:
+			# a clipboard-shaped body, longer than it is wide
+			pts = [Vector2(e.r * 1.1, -e.r * 0.75), Vector2(e.r * 1.1, e.r * 0.75), Vector2(-e.r * 1.1, e.r * 0.75), Vector2(-e.r * 1.1, -e.r * 0.75)]
 	pts.append(pts[0])
 	return pts
 
@@ -803,6 +856,13 @@ func _draw() -> void:
 			for k in 3:
 				var a3 := e.rot + TAU * k / 3.0 + PI / 3.0
 				draw_line(e.pos, e.pos + Vector2.from_angle(a3) * e.r * 0.8, Pal.foe((0.35 + 0.6 * e.shield_flash) * dim, 1.0 + e.shield_flash), 1.0)
+		if e.kind == INSPECTOR:
+			# its badge: a bulb crossed out, and the reach of its hand
+			var bp: Vector2 = e.pos
+			draw_circle(bp, 5.0, Color(0.03, 0.03, 0.035))
+			draw_arc(bp, 5.0, 0.0, TAU, 12, Pal.foe(0.8 * dim, 1.4), 1.5)
+			draw_line(bp + Vector2(-7, -7), bp + Vector2(7, 7), Pal.foe(0.9 * dim, 1.6), 1.5)
+			draw_arc(e.pos, DIM_R, 0.0, TAU, 32, Pal.foe(0.12 * dim), 1.0)
 		if e.kind == CHARGER and e.mode == STUN:
 			for k in 3:
 				var a3 := e.t * 5.0 + TAU * k / 3.0
