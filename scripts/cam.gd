@@ -49,7 +49,7 @@ func step(dt: float) -> void:
 	follow = Pal.damp2(follow, (pl - CENTER) * lerpf(0.05, 0.16, f), 5.0, dt)
 	var s := trauma * trauma * 16.0 * shake_scale
 	var shake := Vector2(noise.get_noise_2d(nt, 0.0), noise.get_noise_2d(0.0, nt)) * s
-	position = CENTER + follow
+	position = CENTER + follow + game.rooms.slide()
 	offset = shake + kick_p * shake_scale
 	rotation = noise.get_noise_2d(nt * 0.5, 77.0) * trauma * trauma * 0.012 * shake_scale
 	var z := 1.0 + 0.035 * Pal.ease_io(f) + zoom_k

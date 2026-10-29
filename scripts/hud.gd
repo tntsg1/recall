@@ -545,6 +545,9 @@ func _draw_title(vp: Vector2) -> void:
 	_text_stagger(font_xl, label, Vector2(cx, cy), size, Pal.ink(1.0, 1.1), t - 0.12, t - 1.5)
 	if title_note != "":
 		var na := clampf((t - 0.45) / 0.3, 0.0, 1.0) * a
+		# its own plate: the rooms put cover anywhere, even under it
+		var nw := font_s.get_string_size(Txt.t(title_note), HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+		view.draw_rect(Rect2(cx - nw / 2.0 - 12.0, bot + 10.0, nw + 24.0, 28.0), Color(0, 0, 0, 0.55 * na))
 		_text_c(font_s, Txt.t(title_note), Vector2(cx, bot + 30.0), 17, Pal.ink(0.7 * na))
 	var tick := Pal.ease_out(clampf((t - 0.2) / 0.5, 0.0, 1.0))
 	for sd in [-1.0, 1.0]:
@@ -614,6 +617,7 @@ func _draw_final(vp: Vector2) -> void:
 		view.draw_string(font_l, Vector2(cx - 10.0, by + 8.0), "%.1f s" % (total * Pal.ease_out(bt)), HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Pal.ink(bt))
 		view.draw_string(font_s, Vector2(cx + 120.0, by + 8.0), "%s  %d" % [Txt.t("hits"), game.hits_taken], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.55 * bt))
 		_run_stats(cx, by + 60.0, bt)
+		_text_c(font_s, Txt.t("room_seed") % game.run_seed, Vector2(cx, by + 122.0), 14, Pal.ink(0.32 * bt))
 		_text_c(font_s, Txt.t("done_next"), Vector2(cx, by + 150.0), 16, Pal.ink(0.45 * bt))
 		var pulse := 0.55 + 0.25 * sin(t * 3.0)
 		_text_c(font_b, Txt.t("restart"), Vector2(cx, by + 190.0), 20, Pal.ink(pulse * bt))
@@ -1355,6 +1359,12 @@ func _draw_cracks(vp: Vector2) -> void:
 	if mine <= 0.01:
 		return
 	var base := Vector2(vp.x / 2.0 - 230.0, vp.y - 54.0 + 8.0 * (1.0 - mine))
+	# the harder way's room: the price stands over your cracks while you are in it
+	if game.rooms.active and game.rooms.risky_now and game.wave_ctl.index < Waves.BOSS:
+		var rt := Txt.t("risky_room")
+		var pulse := 0.75 + 0.25 * sin(game.real_time * 4.0)
+		view.draw_rect(Rect2(base + Vector2(-16.0, -50.0), Vector2(font_s.get_string_size(rt, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 12.0, 26.0)), Color(0, 0, 0, 0.55 * mine))
+		view.draw_string(font_s, base + Vector2(-10.0, -31.0), rt, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.red(pulse * mine, 1.6))
 	for i in game.max_cracks:
 		var c := base + Vector2(i * 24.0, 0)
 		var whole: bool = i < game.cracks

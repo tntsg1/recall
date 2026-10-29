@@ -60,115 +60,134 @@ func start_chapter(ch: int) -> void:
 # Random waves, with the two teaching waves keeping their new enemy.
 func _build_plan() -> void:
 	plan.clear()
-	var scale := (1.0 + 0.3 * chapter) * Loadout.budget()
 	for i in BOSS:
-		var budget: int = int(BUDGET[i] * scale)
-		var kinds: Array = []
-		var left := budget
-		match i:
-			0:
-				pass
-			1 when pool == 0 or pool == 5 or pool == 4:
-				pass
-			1 when pool == 1:
-				kinds.append(P)
-				kinds.append(P)
-				left -= COST[P] * 2
-			1 when pool == 2:
-				kinds.append(L)
-				kinds.append(L)
-				kinds.append(L)
-				left -= COST[L] * 3
-			1 when pool == 3:
-				for k in 3:
-					kinds.append(U)
-				left -= COST[U] * 3
-			1 when pool == 6:
-				for k in 3:
-					kinds.append(E)
-				left -= COST[E] * 3
-			1 when pool == 7:
-				for k in 3:
-					kinds.append(I)
-				left -= COST[I] * 3
-			1 when pool == 8:
-				for k in 3:
-					kinds.append(W)
-				left -= COST[W] * 3
-			1 when pool == 10:
-				# escorts round a guard, so there is something to guard
-				kinds.append(G)
-				for k in 4:
-					kinds.append(X)
-				left -= COST[G] + COST[X] * 4
-			1 when pool == 11:
-				for k in 3:
-					kinds.append(F)
-				left -= COST[F] * 3
-			1:
-				pass
-			2 when pool == 0:
-				kinds.append(G)
-				left -= COST[G]
-			3 when pool == 0:
-				kinds.append(H)
-				kinds.append(H)
-				left -= COST[H] * 2
-			_:
-				var specials := randi_range(2, 4) + chapter
-				var mix: Array = [G, H]
-				if pool == 1:
-					mix = [G, H, P, P]
-				elif pool == 2:
-					mix = [G, H, P, L, L]
-				elif pool == 5:
-					mix = [G, H, H, P, L]
-				elif pool == 3:
-					mix = [G, H, L, U, U]
-				elif pool == 6:
-					mix = [G, H, H, P, E]
-				elif pool == 7:
-					mix = [G, H, P, L, I, I]
-				elif pool == 8:
-					mix = [G, H, P, L, E, W, W]
-				elif pool == 9:
-					mix = [G, H, H, P, L, U, E, I, W]
-				elif pool == 10:
-					mix = [G, G, H, P, L, U, E, X, X, X]
-				elif pool == 11:
-					mix = [G, H, P, L, U, E, I, W, X, F, F, F]
-				elif pool == 4:
-					# the last chapter: everything you have met
-					mix = [G, H, P, L, U, E, I, W, X, F]
-				for k in specials:
-					var kind: int = mix[randi() % mix.size()]
-					if left - COST[kind] >= 8:
-						kinds.append(kind)
-						left -= COST[kind]
-		var groups: Array = []
-		var delay := 0.0
-		var side_i := randi() % 4
-		for kind in kinds:
-			groups.append([delay, kind, 1, SIDES[side_i]])
-			side_i = (side_i + 1 + randi() % 3) % 4
-			delay += randf_range(0.6, 1.4)
-		# the rest are chasers, in packs of 4-8
-		var chase := left
-		delay = 0.0 if kinds.is_empty() else 1.0
-		while chase > 0:
-			var n := mini(chase, randi_range(4, 8))
-			if chase - n < 3:
-				n = chase
-			groups.append([delay, C, n, SIDES[side_i]])
-			side_i = (side_i + 1 + randi() % 3) % 4
-			chase -= n
-			delay += randf_range(2.0, 3.4)
-		var last := 0.0
-		for g in groups:
-			last = maxf(last, g[0])
-		var s := roundf(3.0 + 0.26 * budget + 0.45 * last)
-		plan.append({"groups": groups, "par": [s, roundf(s * 1.5)]})
+		plan.append(_wave_plan(i, 1.0, false))
 	plan.append({"groups": [], "par": Chapters.at(chapter).par})
+
+
+# Wave i drawn from its budget (times `more`). The harder way on brings an
+# elite besides: one special, stronger, marked.
+func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
+	var scale := (1.0 + 0.3 * chapter) * Loadout.budget() * more
+	var budget: int = int(BUDGET[i] * scale)
+	var kinds: Array = []
+	var left := budget
+	match i:
+		0:
+			pass
+		1 when pool == 0 or pool == 5 or pool == 4:
+			pass
+		1 when pool == 1:
+			kinds.append(P)
+			kinds.append(P)
+			left -= COST[P] * 2
+		1 when pool == 2:
+			kinds.append(L)
+			kinds.append(L)
+			kinds.append(L)
+			left -= COST[L] * 3
+		1 when pool == 3:
+			for k in 3:
+				kinds.append(U)
+			left -= COST[U] * 3
+		1 when pool == 6:
+			for k in 3:
+				kinds.append(E)
+			left -= COST[E] * 3
+		1 when pool == 7:
+			for k in 3:
+				kinds.append(I)
+			left -= COST[I] * 3
+		1 when pool == 8:
+			for k in 3:
+				kinds.append(W)
+			left -= COST[W] * 3
+		1 when pool == 10:
+			# escorts round a guard, so there is something to guard
+			kinds.append(G)
+			for k in 4:
+				kinds.append(X)
+			left -= COST[G] + COST[X] * 4
+		1 when pool == 11:
+			for k in 3:
+				kinds.append(F)
+			left -= COST[F] * 3
+		1:
+			pass
+		2 when pool == 0:
+			kinds.append(G)
+			left -= COST[G]
+		3 when pool == 0:
+			kinds.append(H)
+			kinds.append(H)
+			left -= COST[H] * 2
+		_:
+			var specials := randi_range(2, 4) + chapter
+			var mix: Array = [G, H]
+			if pool == 1:
+				mix = [G, H, P, P]
+			elif pool == 2:
+				mix = [G, H, P, L, L]
+			elif pool == 5:
+				mix = [G, H, H, P, L]
+			elif pool == 3:
+				mix = [G, H, L, U, U]
+			elif pool == 6:
+				mix = [G, H, H, P, E]
+			elif pool == 7:
+				mix = [G, H, P, L, I, I]
+			elif pool == 8:
+				mix = [G, H, P, L, E, W, W]
+			elif pool == 9:
+				mix = [G, H, H, P, L, U, E, I, W]
+			elif pool == 10:
+				mix = [G, G, H, P, L, U, E, X, X, X]
+			elif pool == 11:
+				mix = [G, H, P, L, U, E, I, W, X, F, F, F]
+			elif pool == 4:
+				# the last chapter: everything you have met
+				mix = [G, H, P, L, U, E, I, W, X, F]
+			for k in specials:
+				var kind: int = mix[randi() % mix.size()]
+				if left - COST[kind] >= 8:
+					kinds.append(kind)
+					left -= COST[kind]
+	var groups: Array = []
+	var delay := 0.0
+	var side_i := randi() % 4
+	for kind in kinds:
+		groups.append([delay, kind, 1, SIDES[side_i]])
+		side_i = (side_i + 1 + randi() % 3) % 4
+		delay += randf_range(0.6, 1.4)
+	# the rest are chasers, in packs of 4-8
+	var chase := left
+	delay = 0.0 if kinds.is_empty() else 1.0
+	while chase > 0:
+		var n := mini(chase, randi_range(4, 8))
+		if chase - n < 3:
+			n = chase
+		groups.append([delay, C, n, SIDES[side_i]])
+		side_i = (side_i + 1 + randi() % 3) % 4
+		chase -= n
+		delay += randf_range(2.0, 3.4)
+	var last := 0.0
+	for g in groups:
+		last = maxf(last, g[0])
+	var s := roundf(3.0 + 0.26 * budget + 0.45 * last)
+	if elite:
+		var ek: int = G
+		for g in groups:
+			if g[1] != C:
+				ek = g[1]
+				break
+		groups.append([1.2, ek, 1, SIDES[randi() % 4], true])
+	return {"groups": groups, "par": [s, roundf(s * 1.5)]}
+
+
+# The harder way was taken into wave i's room: more of everything, and an elite.
+func harder(i: int) -> void:
+	if i < BOSS:
+		plan[i] = _wave_plan(i, 1.3, true)
 
 
 func time_now() -> float:
@@ -215,7 +234,7 @@ func step(dt: float) -> void:
 			while k < queue.size():
 				var q: Array = queue[k]
 				if t >= q[0]:
-					_spawn_group(q[1], q[2], q[3])
+					_spawn_group(q[1], q[2], q[3], q.size() > 4 and q[4])
 					queue.remove_at(k)
 				else:
 					k += 1
@@ -257,11 +276,19 @@ func step(dt: float) -> void:
 					game.on_run_done(chapter_log)
 				elif index + 1 >= COUNT:
 					game.next_chapter()
+				elif game.rooms.active and game.rooms.room_index == index and not game.rooms.lay.is_empty():
+					# the ways on open; the next wave's title follows you through
+					game.rooms.open_doors()
 				else:
 					_next()
 
 
 func pick_done() -> void:
+	if game.rooms.bonus > 0:
+		# the harder way's reward: another pick straight after
+		game.rooms.bonus -= 1
+		pick_state = 0
+		return
 	pick_state = 2
 	pick_done_t = t
 
@@ -277,11 +304,12 @@ func _next() -> void:
 		game.boss.begin_track()
 
 
-func _spawn_group(kind: int, count: int, side: String) -> void:
+func _spawn_group(kind: int, count: int, side: String, elite := false) -> void:
 	var room := Arena.ROOM.grow(-70)
 	var pl: Vector2 = game.player.pos
 	var center := Vector2.ZERO
-	for tries in 40:
+	var gate: Vector2 = game.rooms.gate_for(side, pl)
+	for tries in (0 if gate.x >= 0.0 else 40):
 		match side:
 			"T":
 				center = Vector2(randf_range(room.position.x + 200, room.end.x - 200), room.position.y + 40)
@@ -293,6 +321,8 @@ func _spawn_group(kind: int, count: int, side: String) -> void:
 				center = Vector2(room.end.x - 40, randf_range(room.position.y + 150, room.end.y - 150))
 		if center.distance_to(pl) > 420.0:
 			break
+	if gate.x >= 0.0:
+		center = gate
 	var spec: Dictionary = Enemies.SPEC[kind]
 	var placed: Array[Vector2] = []
 	for i in count:
@@ -307,4 +337,6 @@ func _spawn_group(kind: int, count: int, side: String) -> void:
 			if ok:
 				break
 		placed.append(p)
-		game.enemies.spawn(kind, p, i * 0.07)
+		var e = game.enemies.spawn(kind, p, i * 0.07)
+		if elite:
+			game.enemies.make_elite(e)

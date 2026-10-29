@@ -65,7 +65,7 @@ func step(dt: float) -> void:
 		if worker_t > 6.0:
 			worker_t = -1.0
 	# remnants wake while a round coming home passes them
-	for w in Lore.walls(story):
+	for w in _walls():
 		var id := "w%d_%s" % [story, w[0]]
 		var at: Vector2 = (w[1] as Vector2) + (w[2] as Vector2) * 40.0
 		var near := false
@@ -161,32 +161,60 @@ func _draw() -> void:
 	var f: float = game.focus
 	var dim := 1.0 - 0.45 * f
 	if story == 1:
-		_draw_floor(dim)
-		_draw_crates(dim)
-		# the door stands in the left wall, read as if the wall were its floor
-		draw_set_transform(Vector2(80, 790), PI / 2.0, Vector2.ONE)
-		_draw_door(Vector2.ZERO, dim)
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		_draw_screen(Vector2(80, 300), dim)
-		_draw_scrawl(Vector2(1840, 780), dim)
-		if shows.get("w1_notice", 0.0) <= 0.01:
-			_draw_notice(Vector2(1500, 70), dim)
-		if worker_t >= 0.0 and game.wave_ctl.index <= 0:
-			_draw_worker(dim)
+		if game.arena.generated:
+			# a generated room: its own paint, and its freight drawn by kind
+			_draw_yard_paint(dim)
+			_draw_yard_cover(dim)
+		else:
+			_draw_floor(dim)
+			_draw_crates(dim)
+		# each where this room holds it (the hand-made room: all, in their places)
+		var door_at = game.rooms.spot("door", Vector2(80, 790))
+		if door_at != null:
+			# the door stands in the left wall, read as if the wall were its floor
+			draw_set_transform(door_at, PI / 2.0, Vector2.ONE)
+			_draw_door(Vector2.ZERO, dim, door_at)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		var screen_at = game.rooms.spot("screen", Vector2(80, 300))
+		if screen_at != null:
+			_draw_screen(screen_at, dim)
+		var scrawl_at = game.rooms.spot("graffiti", Vector2(1840, 780))
+		if scrawl_at != null:
+			_draw_scrawl(scrawl_at, dim)
+		var notice_at = game.rooms.spot("notice", Vector2(1500, 70))
+		if notice_at != null and shows.get("w1_notice", 0.0) <= 0.01:
+			_draw_notice(notice_at, dim)
+		if worker_t >= 0.0 and game.wave_ctl.index <= 0 and door_at != null:
+			_draw_worker(dim, door_at - Vector2(80, 790))
 	elif story == 2:
-		_draw_seal(Vector2(330, 880), dim)
-		_draw_pillars(dim)
+		var gen: bool = game.arena.generated
+		if gen:
+			_draw_hall_paint(dim)
+			_draw_hall_cover(dim)
+		else:
+			_draw_seal(Vector2(330, 880), dim)
+			_draw_pillars(dim)
 		_draw_reflections(dim)
-		_draw_queue(dim)
+		var queue_at = game.rooms.spot("queue", Vector2(1240, 1010))
+		if queue_at != null:
+			draw_set_transform(queue_at - Vector2(1240, 1010), 0.0, Vector2.ONE)
+			_draw_queue(dim)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		# the gates, half again as large, a little clear of the wall
-		draw_set_transform(Vector2(1500, 96), 0.0, Vector2(1.5, 1.5))
-		_draw_gates(Vector2.ZERO, dim)
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		_draw_scan(Vector2(1500 - 114, 96 + 72), dim)
-		_draw_terminal(Vector2(80, 300), dim, "w2_terminal")
-		_draw_terminal(Vector2(80, 760), dim, "")
-		if shows.get("w2_retire", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 760), dim)
+		var gate_at = game.rooms.spot("gate", Vector2(1500, 70))
+		if gate_at != null:
+			draw_set_transform(gate_at + Vector2(0, 26), 0.0, Vector2(1.5, 1.5))
+			_draw_gates(Vector2.ZERO, dim)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			_draw_scan(gate_at + Vector2(-114, 98), dim)
+		var term_at = game.rooms.spot("terminal", Vector2(80, 300))
+		if term_at != null:
+			_draw_terminal(term_at, dim, "w2_terminal")
+		if not gen:
+			_draw_terminal(Vector2(80, 760), dim, "")
+		var retire_at = game.rooms.spot("retire", Vector2(1840, 760))
+		if retire_at != null and shows.get("w2_retire", 0.0) <= 0.01:
+			_draw_wall_notice(retire_at, dim)
 	elif story == 3:
 		_draw_lanes(dim)
 		_draw_weapon_crates(dim)
@@ -249,7 +277,7 @@ func _draw() -> void:
 		_draw_quota(dim)
 		_draw_scrawl(Vector2(1840, 820), dim)
 	var quiet := story == 8 and _archivist_up()
-	for w in Lore.walls(story):
+	for w in _walls():
 		var id := "w%d_%s" % [story, w[0]]
 		var k: float = shows.get(id, 0.0)
 		if k <= 0.01:
@@ -258,6 +286,26 @@ func _draw() -> void:
 			# the floor along the bottom wall is the archivist's to strike
 			continue
 		_draw_remnant(w, Pal.ease_out(k), dim)
+
+
+# The chapter's remnants as this room holds them: in a generated room only
+# those it was given, each where it was put (Rooms); in the hand-made room all.
+func _walls() -> Array:
+	var all: Array = Lore.walls(story)
+	if not game.rooms.active:
+		return all
+	var out: Array = []
+	for w in all:
+		var p = game.rooms.spot(w[0], w[1])
+		if p == null:
+			continue
+		if p == w[1]:
+			out.append(w)
+		else:
+			var c: Array = w.duplicate()
+			c[1] = p
+			out.append(c)
+	return out
 
 
 # Paint on the yard's floor, worn almost away: the street's number and a lane,
@@ -271,6 +319,353 @@ func _draw_floor(dim: float) -> void:
 		draw_line(Vector2(x, 900.0), Vector2(x + 40.0, 900.0), c, 6.0)
 		x += 80.0
 	draw_string(sf, Vector2(1230.0, 888.0), "B3 →", HORIZONTAL_ALIGNMENT_LEFT, -1, 28, c)
+
+
+# A generated room's floor paint (RoomGen._paint): rails across it with
+# their sleepers, a row of parking bays, stains, the bay's number. None of
+# it is drawn where cover or a wall block stands.
+func _draw_yard_paint(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var solid: Array = game.arena.walls + game.arena.inner
+	var cut: Array = []
+	for r: Rect2 in solid:
+		cut.append(r.grow(10.0))
+	for d: Dictionary in lay.get("gates", []) + lay.get("exits", []) + [lay.get("entry", {})]:
+		if not d.is_empty():
+			cut.append(Rect2(d.pos - Vector2(110, 110), Vector2(220, 220)))
+	cut.append_array(lay.get("quiet", []))
+	var rail := Color(1, 1, 1, 0.05 * dim)
+	var sleeper := Color(1, 1, 1, 0.022 * dim)
+	var room := Arena.ROOM
+	for rl: Array in lay.get("rails", []):
+		var horiz: bool = rl[0]
+		var c: float = rl[1]
+		var a := Vector2(room.position.x, c) if horiz else Vector2(c, room.position.y)
+		var b := Vector2(room.end.x, c) if horiz else Vector2(c, room.end.y)
+		var o := Vector2(0, 18) if horiz else Vector2(18, 0)
+		for sgn: float in [-1.0, 1.0]:
+			for sp: Array in _open_spans(a + o * sgn, b + o * sgn, cut):
+				draw_line(sp[0], sp[1], rail, 2.0)
+		var along := (b - a).normalized()
+		var d := 14.0
+		while d < a.distance_to(b):
+			var m := a + along * d
+			var free := true
+			for r: Rect2 in cut:
+				if r.grow(6.0).has_point(m):
+					free = false
+					break
+			if free:
+				draw_line(m - o * 1.6, m + o * 1.6, sleeper, 7.0)
+			d += 30.0
+	var bay := Color(1, 1, 1, 0.06 * dim)
+	var sf := Fonts.get_font("SemiBold")
+	var k := 0
+	for r: Rect2 in lay.get("bays", []):
+		k += 1
+		draw_rect(r.grow(-6.0), bay, false, 3.0)
+		draw_string(sf, r.get_center() + Vector2(-14, 8), "%d" % k, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 1, 1, 0.07 * dim))
+	for st: Array in lay.get("stains", []):
+		var p: Vector2 = st[0]
+		var rad: float = st[1]
+		var free := true
+		for r: Rect2 in solid:
+			if r.grow(rad).has_point(p):
+				free = false
+		if free:
+			draw_set_transform(p, st[2], Vector2(1.0, 0.55))
+			draw_circle(Vector2.ZERO, rad, Color(0, 0, 0, 0.35))
+			draw_circle(Vector2(rad * 0.3, 0), rad * 0.45, Color(0, 0, 0, 0.25))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var sten: Array = lay.get("stencil", [])
+	if not sten.is_empty():
+		var c := Color(1, 1, 1, 0.022 * dim)
+		draw_string(sf, sten[0], sten[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 150, c)
+		draw_string(sf, (sten[0] as Vector2) + Vector2(4, 30), "B3 →", HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(1, 1, 1, 0.05 * dim))
+
+
+# A generated hall's floor (RoomGen._paint_hall): tile seams, queue lanes
+# with their posts, the Union's seal and the hall's number. Not drawn where
+# cover or a wall block stands, nor where words are shown.
+func _draw_hall_paint(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var room := Arena.ROOM
+	var cut: Array = []
+	for r: Rect2 in game.arena.walls + game.arena.inner + game.arena.mirrors:
+		cut.append(r.grow(6.0))
+	var seam := Color(1, 1, 1, 0.018 * dim)
+	var tile: float = lay.get("tile", 130.0)
+	var x := room.position.x + tile
+	while x < room.end.x:
+		for sp: Array in _open_spans(Vector2(x, room.position.y), Vector2(x, room.end.y), cut):
+			draw_line(sp[0], sp[1], seam, 1.0)
+		x += tile
+	var y := room.position.y + tile
+	while y < room.end.y:
+		for sp: Array in _open_spans(Vector2(room.position.x, y), Vector2(room.end.x, y), cut):
+			draw_line(sp[0], sp[1], seam, 1.0)
+		y += tile
+	# queue lanes: two lines a lane apart, posts along them, stopped where words are
+	var lane_cut: Array = cut + lay.get("quiet", [])
+	for d: Dictionary in lay.get("gates", []) + lay.get("exits", []) + [lay.get("entry", {})]:
+		if not d.is_empty():
+			lane_cut.append(Rect2(d.pos - Vector2(110, 110), Vector2(220, 220)))
+	var lc := Color(1, 1, 1, 0.06 * dim)
+	for ln: Array in lay.get("lanes", []):
+		var horiz: bool = ln[0]
+		var c: float = ln[1]
+		var a := Vector2(room.position.x, c) if horiz else Vector2(c, room.position.y)
+		var b := Vector2(room.end.x, c) if horiz else Vector2(c, room.end.y)
+		var o := Vector2(0, 34) if horiz else Vector2(34, 0)
+		for sgn: float in [-1.0, 1.0]:
+			for sp: Array in _open_spans(a + o * sgn, b + o * sgn, lane_cut):
+				var p0: Vector2 = sp[0]
+				var p1: Vector2 = sp[1]
+				var along := (p1 - p0).normalized()
+				var d := 0.0
+				while d < p0.distance_to(p1) - 12.0:
+					draw_line(p0 + along * d, p0 + along * minf(d + 22.0, p0.distance_to(p1)), lc, 3.0)
+					d += 34.0
+	var sten: Array = lay.get("stencil", [])
+	if not sten.is_empty():
+		_draw_seal(sten[0], dim)
+		var sf := Fonts.get_font("SemiBold")
+		draw_string(sf, (sten[0] as Vector2) + Vector2(-46, 196), sten[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(1, 1, 1, 0.05 * dim))
+
+
+# A generated hall's furniture by kind: registration pillars (a number, a
+# scan strip), benches, kiosks, the registry desk, turnstiles. The mirrors
+# are the arena's own.
+func _draw_hall_cover(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var kinds: Array = lay.get("kinds", [])
+	var sf := Fonts.get_font("SemiBold")
+	var cover: Array = lay.get("cover", [])
+	var n := 0
+	for i in cover.size():
+		var r: Rect2 = cover[i]
+		var kind: String = kinds[i] if i < kinds.size() else "pillar"
+		var long_x := r.size.x >= r.size.y
+		var ins := r.grow(-8.0)
+		match kind:
+			"pillar":
+				n += 1
+				var pi := r.grow(-10.0)
+				draw_string(sf, pi.position + Vector2(4, 16), "REG-%d" % n, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.5 * dim))
+				var sy := pi.position.y + 22.0 + fmod(t * 30.0 + n * 17.0, pi.size.y - 26.0)
+				draw_line(Vector2(pi.position.x + 4.0, sy), Vector2(pi.end.x - 4.0, sy), Pal.ink(0.45 * dim, 1.4), 1.5)
+				draw_rect(Rect2(pi.position + Vector2(4, 22), Vector2(pi.size.x - 8.0, pi.size.y - 26.0)), Pal.ink(0.18 * dim), false, 1.0)
+			"bench":
+				# the seat's slats along it, the armrests at its ends
+				for k in 3:
+					var v := (k + 0.5) / 3.0
+					if long_x:
+						var yy := lerpf(ins.position.y, ins.end.y, v)
+						draw_line(Vector2(ins.position.x + 10.0, yy), Vector2(ins.end.x - 10.0, yy), Pal.ink(0.3 * dim), 3.0)
+					else:
+						var xx := lerpf(ins.position.x, ins.end.x, v)
+						draw_line(Vector2(xx, ins.position.y + 10.0), Vector2(xx, ins.end.y - 10.0), Pal.ink(0.3 * dim), 3.0)
+				for e2 in 2:
+					var arm := Rect2(Vector2(ins.position.x if e2 == 0 else ins.end.x - 6.0, ins.position.y), Vector2(6, ins.size.y)) if long_x else Rect2(Vector2(ins.position.x, ins.position.y if e2 == 0 else ins.end.y - 6.0), Vector2(ins.size.x, 6))
+					draw_rect(arm, Pal.ink(0.5 * dim))
+			"kiosk":
+				# a self-service kiosk: its screen asking for your card
+				var scr := Rect2(ins.position + ins.size * Vector2(0.15, 0.15), ins.size * Vector2(0.7, 0.45))
+				draw_rect(scr, Pal.ink(0.12 * dim))
+				draw_rect(scr, Pal.ink(0.45 * dim), false, 1.0)
+				var blink := 0.5 + 0.5 * sin(t * 3.0 + i)
+				draw_rect(Rect2(scr.position + Vector2(4, 4), Vector2(scr.size.x * 0.5, 3)), Pal.ink(0.5 * blink * dim, 1.4))
+				draw_rect(Rect2(Vector2(ins.get_center().x - 10.0, ins.end.y - 12.0), Vector2(20, 4)), Pal.red(0.6 * dim, 1.4))
+			"desk":
+				# the registry desk: a counter, two screens, the stamp
+				draw_line(ins.position + Vector2(0, ins.size.y * 0.35), Vector2(ins.end.x, ins.position.y + ins.size.y * 0.35), Pal.ink(0.3 * dim), 1.0)
+				for k in 2:
+					var sc := Rect2(ins.position + Vector2(ins.size.x * (0.2 + 0.45 * k), 4.0), Vector2(46, 14))
+					draw_rect(sc, Pal.ink(0.4 * dim), false, 1.5)
+				draw_circle(ins.position + ins.size * Vector2(0.5, 0.7), 7.0, Pal.red(0.5 * dim, 1.4))
+				draw_string(sf, ins.position + Vector2(6, ins.size.y - 6.0), Txt.t("hall_desk"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.45 * dim))
+			"turnstile":
+				# a gate post, its arm across the lane
+				var c := ins.get_center()
+				draw_circle(c, 9.0, Pal.ink(0.45 * dim))
+				var arm_d := Vector2(ins.size.x * 0.45, 0) if long_x else Vector2(0, ins.size.y * 0.45)
+				draw_line(c, c + arm_d, Pal.ink(0.55 * dim), 3.0)
+				var on := int(t * 1.5 + i * 0.7) % 4 == 0
+				draw_circle(c, 3.0, Pal.red(0.9 * dim, 2.0) if on else Pal.ink(0.3 * dim))
+
+
+# The parts of axis-aligned line a-b outside every rect, as [from, to].
+func _open_spans(a: Vector2, b: Vector2, rects: Array) -> Array:
+	var horiz := absf(b.y - a.y) < 0.5
+	var lo := a.x if horiz else a.y
+	var hi := b.x if horiz else b.y
+	var cuts: Array = []
+	for r: Rect2 in rects:
+		var g := r.grow(4.0)
+		if horiz and (a.y < g.position.y or a.y > g.end.y):
+			continue
+		if not horiz and (a.x < g.position.x or a.x > g.end.x):
+			continue
+		cuts.append([g.position.x if horiz else g.position.y, g.end.x if horiz else g.end.y])
+	cuts.sort_custom(func(p, q): return p[0] < q[0])
+	var out: Array = []
+	var u := lo
+	for ct: Array in cuts:
+		if ct[0] > u:
+			out.append([u, minf(ct[0], hi)])
+		u = maxf(u, ct[1])
+	if u < hi:
+		out.append([u, hi])
+	var segs: Array = []
+	for sp: Array in out:
+		if sp[1] - sp[0] > 2.0:
+			segs.append([Vector2(sp[0], a.y), Vector2(sp[1], a.y)] if horiz else [Vector2(a.x, sp[0]), Vector2(a.x, sp[1])])
+	return segs
+
+
+# A generated room's freight by kind: crates as in the hand-made yard,
+# pallets slatted, a container ribbed with its doors at one end, a gantry's
+# two steel legs with the beam between them overhead, a buffer stop.
+func _draw_yard_cover(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var kinds: Array = lay.get("kinds", [])
+	var sf := Fonts.get_font("SemiBold")
+	var inner: Array = lay.get("cover", [])
+	var gantry: Array = []
+	for i in inner.size():
+		var r: Rect2 = inner[i]
+		var kind: String = kinds[i] if i < kinds.size() else "crate"
+		var long_x := r.size.x >= r.size.y
+		var ins := r.grow(-8.0)
+		var c := Pal.ink(0.2 * dim)
+		if kind == "crate_pallet":
+			kind = "pallet" if minf(r.size.x, r.size.y) <= 50.0 else "crate"
+		match kind:
+			"pallet":
+				# deck boards along it with gaps between, the three blocks they sit on
+				for k in 3:
+					var u := (k + 0.5) / 3.0
+					var blk := Rect2((Vector2(lerpf(ins.position.x, ins.end.x, u), ins.get_center().y) if long_x else Vector2(ins.get_center().x, lerpf(ins.position.y, ins.end.y, u))) - Vector2(9, 9), Vector2(18, 18))
+					draw_rect(blk, Pal.ink(0.12 * dim))
+				for k in 3:
+					var v := (k + 0.5) / 3.0
+					if long_x:
+						var y := lerpf(ins.position.y, ins.end.y, v)
+						draw_line(Vector2(ins.position.x, y), Vector2(ins.end.x, y), Pal.ink(0.34 * dim), 6.0)
+					else:
+						var x := lerpf(ins.position.x, ins.end.x, v)
+						draw_line(Vector2(x, ins.position.y), Vector2(x, ins.end.y), Pal.ink(0.34 * dim), 6.0)
+			"drums":
+				# four drums, banded, strapped together
+				var q := r.size / 4.0
+				for k in 4:
+					var dc := r.position + q * Vector2(1 + (k % 2) * 2, 1 + (k / 2) * 2)
+					draw_circle(dc, q.x * 0.92, Color(0.05, 0.05, 0.055, 1.0))
+					draw_arc(dc, q.x * 0.92, 0.0, TAU, 20, Pal.ink(0.55 * dim), 1.5)
+					draw_arc(dc, q.x * 0.55, 0.0, TAU, 16, Pal.ink(0.22 * dim), 1.0)
+					draw_circle(dc + Vector2(q.x * 0.35, -q.x * 0.3), 2.5, Pal.ink(0.5 * dim))
+				draw_line(Vector2(r.position.x, r.get_center().y), Vector2(r.end.x, r.get_center().y), Pal.ink(0.3 * dim), 2.0)
+			"tarp":
+				# a load under a tarp: the folds run from the ropes, the ropes cross it
+				# wavy folds across the long way, the cloth sagging between the load's corners
+				var span := ins.size.x if long_x else ins.size.y
+				var across := ins.size.y if long_x else ins.size.x
+				for k in 4:
+					var v := (k + 0.5) / 4.0
+					var pts := PackedVector2Array()
+					for j in 13:
+						var u := j / 12.0
+						var off := sin(u * TAU * 2.0 + k * 1.3) * 5.0
+						var q := Vector2(u * span, v * across + off)
+						pts.append(ins.position + (q if long_x else Vector2(q.y, q.x)))
+					draw_polyline(pts, Pal.ink(0.24 * dim), 1.5)
+				# one rope over it, tied off at the edges
+				var r0 := ins.position + (Vector2(span * 0.5, 0) if long_x else Vector2(0, span * 0.5))
+				var r1 := r0 + (Vector2(0, across) if long_x else Vector2(across, 0))
+				draw_line(r0, r1, Pal.ink(0.6 * dim), 2.5)
+				draw_circle(r0, 3.0, Pal.ink(0.7 * dim))
+				draw_circle(r1, 3.0, Pal.ink(0.7 * dim))
+			"container":
+				# ribbed sides, doors and their locking bars at one end
+				var span := r.size.x if long_x else r.size.y
+				var d := 14.0
+				while d < span - 34.0:
+					var a := Vector2(r.position.x + d, ins.position.y) if long_x else Vector2(ins.position.x, r.position.y + d)
+					var b := Vector2(a.x, ins.end.y) if long_x else Vector2(ins.end.x, a.y)
+					draw_line(a, b, Pal.ink(0.16 * dim), 1.0)
+					d += 12.0
+				var door := Rect2(r.end.x - 30.0, ins.position.y, 22.0, ins.size.y) if long_x else Rect2(ins.position.x, r.end.y - 30.0, ins.size.x, 22.0)
+				draw_rect(door, Pal.ink(0.45 * dim), false, 1.5)
+				for k in 2:
+					if long_x:
+						var x := door.position.x + 6.0 + k * 10.0
+						draw_line(Vector2(x, door.position.y + 4.0), Vector2(x, door.end.y - 4.0), Pal.ink(0.55 * dim), 1.5)
+					else:
+						var y := door.position.y + 6.0 + k * 10.0
+						draw_line(Vector2(door.position.x + 4.0, y), Vector2(door.end.x - 4.0, y), Pal.ink(0.55 * dim), 1.5)
+				if long_x:
+					draw_string(sf, ins.position + Vector2(6, 16), "FCU · 13-%02d" % (i * 11 % 97), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.5 * dim))
+				else:
+					# stood on end: its number runs down its side
+					draw_set_transform(ins.position + Vector2(14, 6), PI / 2.0, Vector2.ONE)
+					draw_string(sf, Vector2.ZERO, "FCU · 13-%02d" % (i * 11 % 97), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.5 * dim))
+					draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			"gantry":
+				# a steel leg in section, an I-beam: two flanges and the web, bolted
+				var fl := 7.0
+				draw_rect(Rect2(ins.position, Vector2(ins.size.x, fl)), Pal.ink(0.42 * dim))
+				draw_rect(Rect2(Vector2(ins.position.x, ins.end.y - fl), Vector2(ins.size.x, fl)), Pal.ink(0.42 * dim))
+				draw_rect(Rect2(Vector2(ins.get_center().x - 3.0, ins.position.y), Vector2(6.0, ins.size.y)), Pal.ink(0.32 * dim))
+				for q: Vector2 in [r.position + Vector2(4, 4), Vector2(r.end.x - 4, r.position.y + 4), r.end - Vector2(4, 4), Vector2(r.position.x + 4, r.end.y - 4)]:
+					draw_circle(q, 2.5, Pal.ink(0.6 * dim))
+				gantry.append(r.get_center())
+			"buffer":
+				# a buffer stop: hazard stripes and two buffers on its face
+				for k in 4:
+					var u := (k + 0.5) / 4.0
+					var a := ins.position.lerp(Vector2(ins.end.x, ins.position.y), u) if long_x else ins.position.lerp(Vector2(ins.position.x, ins.end.y), u)
+					draw_line(a, a + (Vector2(-8, ins.size.y) if long_x else Vector2(ins.size.x, -8)), Pal.ink((0.5 if k % 2 == 0 else 0.22) * dim), 5.0)
+				for sgn: float in [-1.0, 1.0]:
+					var bp := r.get_center() + (Vector2(r.size.x * 0.28 * sgn, -r.size.y / 2.0 - 3.0) if long_x else Vector2(-r.size.x / 2.0 - 3.0, r.size.y * 0.28 * sgn))
+					draw_circle(bp, 6.0, Pal.ink(0.6 * dim))
+			"open" when (game.rooms.lay.get("piece", []) as Array).size() > i and _first_of_piece(i):
+				# forced open: the lid knocked askew, straw spilling, nothing inside now
+				draw_rect(Rect2(ins.position + Vector2(6, -4), ins.size * Vector2(0.9, 0.5)).abs(), Pal.ink(0.32 * dim), false, 1.5)
+				for k in 6:
+					var sp := ins.get_center() + Vector2(cos(k * 1.7), sin(k * 2.3)) * ins.size.x * 0.3
+					draw_line(sp, sp + Vector2(8, 3).rotated(k * 0.9), Pal.ink(0.3 * dim), 1.0)
+				draw_string(sf, ins.position + Vector2(4, ins.size.y - 4), "已开封", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.45 * dim))
+			_:
+				# a crate (as in the hand-made yard)
+				draw_line(ins.position, ins.end, c, 1.0)
+				draw_line(Vector2(ins.end.x, ins.position.y), Vector2(ins.position.x, ins.end.y), c, 1.0)
+				draw_string(sf, ins.position + Vector2(4, 14), "FCU-%02d" % ((i + 1) * 7 % 97), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+				var o := ins.end
+				for j in 3:
+					var dd := 8.0 + j * 9.0
+					draw_line(o - Vector2(dd, 0), o - Vector2(0, dd), Pal.ink((0.55 if j % 2 == 0 else 0.25) * dim), 4.0)
+	# the gantry's beam runs overhead from leg to leg: a truss, and its hook
+	if gantry.size() == 2:
+		var a: Vector2 = gantry[0]
+		var b: Vector2 = gantry[1]
+		var side := (b - a).orthogonal().normalized() * 10.0
+		var col := Pal.ink(0.42 * dim)
+		draw_line(a + side, b + side, col, 2.0)
+		draw_line(a - side, b - side, col, 2.0)
+		var n := int(a.distance_to(b) / 24.0)
+		for k in n:
+			var p0 := a.lerp(b, float(k) / n)
+			var p1 := a.lerp(b, float(k + 1) / n)
+			draw_line(p0 + side * (1.0 if k % 2 == 0 else -1.0), p1 + side * (-1.0 if k % 2 == 0 else 1.0), Pal.ink(0.25 * dim), 1.0)
+		var hook := a.lerp(b, 0.5 + 0.12 * sin(t * 0.4))
+		draw_rect(Rect2(hook - Vector2(10, 7), Vector2(20, 14)), Color(0.05, 0.05, 0.055, 1.0))
+		draw_rect(Rect2(hook - Vector2(10, 7), Vector2(20, 14)), Pal.ink(0.6 * dim), false, 1.5)
+
+
+# Is cover rect i the first of its piece? (the "open" pair: the first is forced open)
+func _first_of_piece(i: int) -> bool:
+	var piece: Array = game.rooms.lay.get("piece", [])
+	return i == 0 or piece[i - 1] != piece[i]
 
 
 # The yard's cover is freight left where it stood: braced crates, each with
@@ -606,7 +1001,8 @@ func _draw_wall_notice(c: Vector2, dim: float) -> void:
 
 # The old-era door R-0 came out of: two heavy panels, one slid half open,
 # hazard hatching, the stencilled 00, and a little light still inside.
-func _draw_door(c: Vector2, dim: float) -> void:
+# `at`: where on the left wall the door stands (it is drawn turned onto it)
+func _draw_door(c: Vector2, dim: float, at := Vector2(80, 790)) -> void:
 	var w := 260.0
 	var h := 46.0
 	var top := c.y - h
@@ -619,10 +1015,10 @@ func _draw_door(c: Vector2, dim: float) -> void:
 	draw_rect(gap, Color(1, 1, 1, glow * dim))
 	# and that light spills out across the floor in front of the door
 	# the door is drawn turned onto the left wall: put the pool where that lands
-	var pool_c := Vector2(80, 790) + Vector2(-(top - 40.0), gap.get_center().x)
+	var pool_c := at + Vector2(-(top - 40.0), gap.get_center().x)
 	draw_set_transform(pool_c, 0.0, Vector2(0.9, 1.5))
 	draw_texture_rect(Fx.make_glow_texture(), Rect2(-Vector2(60, 60), Vector2(120, 120)), false, Color(1, 1, 1, glow * 0.9 * dim))
-	draw_set_transform(Vector2(80, 790), PI / 2.0, Vector2.ONE)
+	draw_set_transform(at, PI / 2.0, Vector2.ONE)
 	for j in 4:
 		draw_line(Vector2(gap.position.x + 8.0 + j * 16.0, gap.position.y + 4.0), Vector2(gap.position.x + 8.0 + j * 16.0, gap.end.y - 4.0), Color(1, 1, 1, 0.05 * dim), 1.0)
 	var left := Rect2(c.x - w / 2.0, top, w / 2.0 - 10.0, h)
@@ -1387,7 +1783,7 @@ func _draw_reserve(dim: float) -> void:
 
 
 # The maintenance worker: by the door as the chapter opens, then back inside.
-func _draw_worker(dim: float) -> void:
+func _draw_worker(dim: float, shift := Vector2.ZERO) -> void:
 	var k := worker_t
 	var a := clampf(k / 0.6, 0.0, 1.0) * (1.0 - clampf((k - 4.6) / 0.6, 0.0, 1.0))
 	if a <= 0.01:
@@ -1395,7 +1791,7 @@ func _draw_worker(dim: float) -> void:
 	var y := 700.0
 	if k > 3.2:
 		y = lerpf(700.0, 790.0, Pal.ease_io(clampf((k - 3.2) / 1.4, 0.0, 1.0)))
-	var foot := Vector2(150.0 - 40.0 * clampf((k - 3.2) / 1.4, 0.0, 1.0), y)
+	var foot := Vector2(150.0 - 40.0 * clampf((k - 3.2) / 1.4, 0.0, 1.0), y) + shift
 	var c := Pal.ink(0.7 * a * dim)
 	draw_set_transform(foot, 0.0, Vector2(1.7, 1.7))
 	foot = Vector2.ZERO
@@ -1410,14 +1806,16 @@ func _draw_worker(dim: float) -> void:
 	var lamp := foot + Vector2(12, -20)
 	draw_circle(lamp, 2.5, Pal.ink(a * dim, 2.2))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	var lamp_w := Vector2(150.0, y) + Vector2(12, -20) * 1.7
+	var lamp_w := Vector2(150.0, y) + shift + Vector2(12, -20) * 1.7
 	var aim_w: Vector2 = (game.player.pos - lamp_w).normalized()
 	draw_polygon(PackedVector2Array([lamp_w, lamp_w + aim_w.rotated(0.2) * 140.0, lamp_w + aim_w.rotated(-0.2) * 140.0]), PackedColorArray([Color(1, 1, 1, 0.14 * a * dim), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
 	# what he says, once, as you wake
 	var say := Txt.t("worker_line")
 	var sa := a * clampf((k - 0.8) / 0.3, 0.0, 1.0) * (1.0 - clampf((k - 3.0) / 0.4, 0.0, 1.0))
 	if sa > 0.01:
-		draw_string(font, Vector2(150.0 + 30.0, y - 92.0), say, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.95 * sa * dim, 1.2))
+		var sw := font.get_string_size(say, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
+		draw_rect(Rect2(Vector2(150.0 + 22.0, y - 114.0) + shift, Vector2(sw + 16.0, 30.0)), Color(0, 0, 0, 0.6 * sa))
+		draw_string(font, Vector2(150.0 + 30.0, y - 92.0) + shift, say, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.95 * sa * dim, 1.2))
 
 
 func _draw_memory() -> void:

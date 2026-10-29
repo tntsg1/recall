@@ -150,6 +150,15 @@ func wave_push(center: Vector2, radius: float, strength: float) -> void:
 			m[1] += d / l * strength * (1.0 - l / radius)
 
 
+# Into a new room: what flew and burned in the last one stays behind.
+func clear_room() -> void:
+	sp_list.clear()
+	rings.clear()
+	shards.clear()
+	numbers.clear()
+	flashes.clear()
+
+
 func step(dt: float, real_dt: float) -> void:
 	_age(sp_list, 2, 3, dt)
 	for s in sp_list:

@@ -29,6 +29,24 @@ func think(game) -> void:
 			bot["pick"] = randi() % game.offers.size() if game.offers.size() > 0 else -1
 			bot.erase("pick_wait")
 	var p: Vector2 = game.player.pos
+	# a cleared room: walk out through one of its doors (round its walls)
+	if game.rooms.active and game.rooms.open and not game.picking:
+		var exits: Array = game.rooms.lay.get("exits", [])
+		if not exits.is_empty():
+			if int(bot.get("door_room", -1)) != game.rooms.room_index:
+				bot["door_room"] = game.rooms.room_index
+				bot["door"] = randi() % exits.size()
+				if bot.get("plain", false):
+					for k in exits.size():
+						if not exits[k].risky:
+							bot["door"] = k
+			var d: Dictionary = exits[mini(int(bot.door), exits.size() - 1)]
+			var at: Vector2 = (d.pos as Vector2) + (d.n as Vector2) * 40.0
+			bot.fire = false
+			bot.dash = false
+			bot.focus = false
+			bot.move = game.arena.nav_dir(p, at) if p.distance_to(at) > 30.0 else -(d.n as Vector2)
+			return
 	var es: Array = []
 	for e in game.enemies.list:
 		if e.state == Enemies.ALIVE:

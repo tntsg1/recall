@@ -12,6 +12,7 @@ static var dev_auth := false     # the passcode was entered this session (DevPro
 static var resume = null         # a run snapshot the next game should continue from
 static var training_requested := 0 # 1: before new run; 2: replay from title
 static var training_active := false
+static var next_seed := 0         # a run seed typed in the dev panel: the next run's rooms
 static var possess_trial := false  # the title's "seize trial": an endless practice room
 
 

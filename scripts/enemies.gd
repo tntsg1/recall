@@ -64,6 +64,7 @@ class E:
 	var orbit_a := 0.0
 	var bounce := 0.0           # knocked hard by a seized shell: a wall throws it back
 	var pinned := 0.0           # rammed into a wall by a seized guard: recalls cut it twice as hard
+	var elite := false          # the harder way's: more of it, ringed red
 
 var list: Array[E] = []
 var game
@@ -118,6 +119,13 @@ func spawn(kind: int, pos: Vector2, delay: float = 0.0) -> E:
 		e.offs.append([Vector2.from_angle(randf() * TAU) * randf_range(50, 90), randf_range(-2.5, 2.5)])
 	list.append(e)
 	return e
+
+
+func make_elite(e: E) -> void:
+	e.elite = true
+	e.hp *= 2.2
+	e.maxhp *= 2.2
+	e.r *= 1.12
 
 
 # ---------------------------------------------------------------- bullets
@@ -851,6 +859,9 @@ func _route(e: E, target: Vector2) -> Vector2:
 	var h: Dictionary = game.arena.raycast(e.pos, target)
 	if h.is_empty() or int(h.get("rect", -1)) < 0:
 		return direct
+	if game.arena.generated:
+		# a generated room: the way round is found over the grid
+		return game.arena.nav_dir(e.pos, target)
 	var r: Rect2 = game.arena.rects[h.rect]
 	if not Arena.ROOM.grow(-10.0).encloses(r):
 		return direct
@@ -873,6 +884,14 @@ func _route(e: E, target: Vector2) -> Vector2:
 	if best == Vector2.INF:
 		return direct
 	return (best - e.pos).normalized()
+
+
+# In a generated room a wall can stand between it and you: one that circles
+# at a distance would circle there for ever, so it goes round to find you.
+func _seek(e: E, pl: Vector2, want: Vector2) -> Vector2:
+	if not game.arena.generated or game.arena.raycast(e.pos, pl).is_empty():
+		return want
+	return _route(e, pl)
 
 
 func _steer(e: E, want: Vector2) -> Vector2:
@@ -929,7 +948,7 @@ func _charger(e: E, pl: Vector2, dt: float) -> void:
 			# hold a middle distance and circle, then wind up when the lane is clear
 			var radial := to / maxf(d, 1.0) * clampf((d - 360.0) / 120.0, -1.0, 1.0)
 			var orbit := to.orthogonal().normalized() * (0.6 if fmod(e.seed, 2.0) < 1.0 else -0.6)
-			e.vel = Pal.damp2(e.vel, _steer(e, (radial + orbit).normalized()) * e.speed, 2.5, dt)
+			e.vel = Pal.damp2(e.vel, _steer(e, _seek(e, pl, (radial + orbit).normalized())) * e.speed, 2.5, dt)
 			e.face = e.face.slerp(to.normalized(), 1.0 - exp(-6.0 * dt))
 			e.rot = e.face.angle()
 			e.cool -= dt
@@ -1115,6 +1134,15 @@ func _draw() -> void:
 			if e.kind == GUARD:
 				_draw_shield(e, dim, Pal.ease_out(clampf((e.t - 0.3) / 0.3, 0.0, 1.0)))
 			continue
+		if e.elite:
+			# the harder way's elite: a slow red ring of eight dashes round it
+			var er := e.r + 12.0
+			for k in 8:
+				var a0 := e.t * 0.8 + TAU * k / 8.0
+				draw_arc(e.pos, er, a0, a0 + TAU / 16.0, 5, Pal.red(0.9 * dim, 2.2), 2.0)
+			# and a red chevron over it, so it reads across the room
+			var top := e.pos + Vector2(0, -er - 14.0)
+			draw_colored_polygon(PackedVector2Array([top + Vector2(-8, -7), top + Vector2(8, -7), top + Vector2(0, 4)]), Pal.red(0.95 * dim, 2.2))
 		var whole := _edges_left(e)
 		# a phaser: filled while solid, only a dashed outline while faint
 		var faint_now: bool = e.kind == PHASE and e.state == ALIVE and phased(e)

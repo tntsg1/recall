@@ -15,8 +15,17 @@ var mirror_from := 9999        # index in rects where mirrors begin
 var movers: Array[Rect2] = []  # the archive's shelves: solid, moved by Shelves (drawn there)
 var mover_from := 9999         # index in rects where movers begin
 var soft: Array[Rect2] = []    # solid to bodies only (the archivist's cabinet and bars)
+var walls: Array[Rect2] = []   # a generated room's wall blocks (drawn as the room's own wall)
+var generated := false         # a room from RoomGen: found its way round over the grid
 var shine := 0.0
 var game
+# the way round walls: steps to a target over a 40 px grid (rooms with wall blocks)
+const NAV := 40.0
+var nav_nx := 0
+var nav_ny := 0
+var nav_block := PackedByteArray()
+var nav_cache := {}            # target cell -> distance field
+var nav_order: Array = []
 
 
 func _init() -> void:
@@ -25,17 +34,33 @@ func _init() -> void:
 	setup(0)
 
 
-func setup(ch: int) -> void:
+# `lay` (RoomGen) replaces the chapter's hand-made room with a generated one.
+func setup(ch: int, lay := {}) -> void:
 	rects.clear()
 	inner.clear()
 	mirrors.clear()
 	soft.clear()
+	walls.clear()
 	var r := ROOM
 	rects.append(Rect2(r.position.x - OUTER, r.position.y - OUTER, r.size.x + OUTER * 2.0, OUTER))
 	rects.append(Rect2(r.position.x - OUTER, r.end.y, r.size.x + OUTER * 2.0, OUTER))
 	rects.append(Rect2(r.position.x - OUTER, r.position.y, OUTER, r.size.y))
 	rects.append(Rect2(r.end.x, r.position.y, OUTER, r.size.y))
+	generated = not lay.is_empty()
+	if generated:
+		walls.assign(lay.walls)
+		# the chapter's own pieces sort out by kind: mirror panels turn rounds away
+		var kinds: Array = lay.get("kinds", [])
+		for i in (lay.cover as Array).size():
+			if i < kinds.size() and kinds[i] == "mirror":
+				mirrors.append(lay.cover[i])
+			else:
+				inner.append(lay.cover[i])
+		rects.append_array(walls)
+		ch = -1
 	match ch:
+		-1:
+			pass
 		0:
 			for c in [Vector2(600, 330), Vector2(1320, 330), Vector2(600, 750), Vector2(1320, 750)]:
 				inner.append(Rect2(c - Vector2(44, 44), Vector2(88, 88)))
@@ -109,7 +134,96 @@ func setup(ch: int) -> void:
 	rects.append_array(movers)
 	mirror_from = rects.size()
 	rects.append_array(mirrors)
+	_build_nav()
 	queue_redraw()
+
+
+func _build_nav() -> void:
+	nav_cache.clear()
+	nav_order.clear()
+	nav_nx = int(ROOM.size.x / NAV)
+	nav_ny = int(ROOM.size.y / NAV)
+	nav_block = PackedByteArray()
+	nav_block.resize(nav_nx * nav_ny)
+	if not generated:
+		return
+	for j in nav_ny:
+		for i in nav_nx:
+			var c := ROOM.position + Vector2(i + 0.5, j + 0.5) * NAV
+			for r: Rect2 in walls + inner:
+				if r.grow(18.0).has_point(c):
+					nav_block[j * nav_nx + i] = 1
+					break
+
+
+# Which way to head for `to` from `from`, round the walls: toward the
+# neighbouring cell nearest the target, or straight on where there is no grid.
+func nav_dir(from: Vector2, to: Vector2) -> Vector2:
+	var direct := (to - from).normalized()
+	if not generated:
+		return direct
+	var tc := _nav_cell(to)
+	var fc := _nav_cell(from)
+	if tc < 0 or fc < 0:
+		return direct
+	var field: PackedInt32Array = nav_cache.get(tc, PackedInt32Array())
+	if field.is_empty():
+		field = _nav_field(tc)
+		nav_cache[tc] = field
+		nav_order.append(tc)
+		if nav_order.size() > 6:
+			nav_cache.erase(nav_order.pop_front())
+	var fi := fc % nav_nx
+	var fj := fc / nav_nx
+	var best := field[fc]
+	var to_c := Vector2(-1, -1)
+	for o: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+		var a := fi + o.x
+		var b := fj + o.y
+		if a < 0 or b < 0 or a >= nav_nx or b >= nav_ny:
+			continue
+		# no cutting a blocked corner
+		if o.x != 0 and o.y != 0 and (nav_block[fj * nav_nx + a] == 1 or nav_block[b * nav_nx + fi] == 1):
+			continue
+		var d := field[b * nav_nx + a]
+		if d >= 0 and (best < 0 or d < best):
+			best = d
+			to_c = ROOM.position + Vector2(a + 0.5, b + 0.5) * NAV
+	if to_c.x < 0.0:
+		return direct
+	return (to_c - from).normalized()
+
+
+func _nav_cell(p: Vector2) -> int:
+	var i := int((p.x - ROOM.position.x) / NAV)
+	var j := int((p.y - ROOM.position.y) / NAV)
+	if i < 0 or j < 0 or i >= nav_nx or j >= nav_ny:
+		return -1
+	return j * nav_nx + i
+
+
+func _nav_field(tc: int) -> PackedInt32Array:
+	var f := PackedInt32Array()
+	f.resize(nav_nx * nav_ny)
+	f.fill(-1)
+	f[tc] = 0
+	var q := PackedInt32Array([tc])
+	var head := 0
+	while head < q.size():
+		var k := q[head]
+		head += 1
+		var i := k % nav_nx
+		var j := k / nav_nx
+		for o: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var a := i + o.x
+			var b := j + o.y
+			if a < 0 or b < 0 or a >= nav_nx or b >= nav_ny:
+				continue
+			var kk := b * nav_nx + a
+			if f[kk] < 0 and nav_block[kk] == 0:
+				f[kk] = f[k] + 1
+				q.append(kk)
+	return f
 
 
 # Nearest hit of segment a->b. Returns {} or {point, normal, t}.
@@ -188,7 +302,7 @@ func push_circle(p: Vector2, rad: float) -> Vector2:
 func is_free(p: Vector2, rad: float) -> bool:
 	if not ROOM.grow(-rad).has_point(p):
 		return false
-	for r: Rect2 in inner + movers + soft:
+	for r: Rect2 in inner + movers + soft + walls:
 		if r.grow(rad).has_point(p):
 			return false
 	return true
@@ -207,6 +321,21 @@ func _draw() -> void:
 	draw_rect(ROOM, edge, false, 2.0)
 	draw_rect(ROOM.grow(10), faint, false, 1.0)
 	_corner_marks(ROOM.grow(22), Pal.ink(0.35 - 0.2 * f))
+	# a generated room's wall blocks: the same dark mass, edged where they face the floor
+	# (solid all through: hatched like a wall cut in a plan, where crates are crossed)
+	for w in walls:
+		draw_rect(w.grow(2.0), Pal.WALL)
+		var hatch := Pal.ink(0.07 - 0.03 * f)
+		var d := -w.size.y
+		while d < w.size.x:
+			var a := Vector2(w.position.x + maxf(d, 0.0), w.position.y + maxf(-d, 0.0))
+			var b := Vector2(w.position.x + minf(d + w.size.y, w.size.x), w.position.y + minf(w.size.x - d, w.size.y))
+			draw_line(a, b, hatch, 1.0)
+			d += 16.0
+	for w in walls:
+		for s: Array in _faces(w):
+			draw_line(s[0], s[1], edge, 2.0)
+			draw_line(s[0] - s[2] * 10.0, s[1] - s[2] * 10.0, faint, 1.0)
 	# cover sits a step below you and the enemies in brightness: the room's
 	# edge, then its blocks, then whatever moves
 	var block := Pal.ink(0.62 - 0.25 * f)
@@ -243,6 +372,53 @@ func _draw() -> void:
 		var a0 := m.position + (Vector2(0, m.size.y / 2.0) if long_x else Vector2(m.size.x / 2.0, 0))
 		var a1 := a0 + (Vector2(m.size.x, 0) if long_x else Vector2(0, m.size.y))
 		draw_line(a0, a1, Pal.ink(0.5, 1.6), 1.0)
+
+
+# The faces of wall block `w` that look onto the floor, as [a, b, normal]:
+# not those against the room's edge or inside another block.
+func _faces(w: Rect2) -> Array:
+	var out: Array = []
+	var sides := [
+		[w.position, Vector2(w.end.x, w.position.y), Vector2(0, -1)],
+		[Vector2(w.position.x, w.end.y), w.end, Vector2(0, 1)],
+		[w.position, Vector2(w.position.x, w.end.y), Vector2(-1, 0)],
+		[Vector2(w.end.x, w.position.y), w.end, Vector2(1, 0)],
+	]
+	for s: Array in sides:
+		var a: Vector2 = s[0]
+		var b: Vector2 = s[1]
+		var n: Vector2 = s[2]
+		# lying on the room's edge
+		if (n.y != 0.0 and (absf(a.y - ROOM.position.y) < 1.0 or absf(a.y - ROOM.end.y) < 1.0)) or (n.x != 0.0 and (absf(a.x - ROOM.position.x) < 1.0 or absf(a.x - ROOM.end.x) < 1.0)):
+			continue
+		# cut where another block covers it, a step out from the face
+		var spans: Array = [[0.0, 1.0]]
+		for o in walls:
+			if o == w:
+				continue
+			var g := o.grow(1.0)
+			var lo := 2.0
+			var hi := -1.0
+			for k in 21:
+				var u := k / 20.0
+				if g.has_point(a.lerp(b, u) + n * 1.5):
+					lo = minf(lo, u)
+					hi = maxf(hi, u)
+			if hi < lo:
+				continue
+			var next: Array = []
+			for sp: Array in spans:
+				if sp[1] <= lo or sp[0] >= hi:
+					next.append(sp)
+					continue
+				if sp[0] < lo:
+					next.append([sp[0], lo])
+				if sp[1] > hi:
+					next.append([hi, sp[1]])
+			spans = next
+		for sp: Array in spans:
+			out.append([a.lerp(b, sp[0]), a.lerp(b, sp[1]), n])
+	return out
 
 
 func game_t() -> float:

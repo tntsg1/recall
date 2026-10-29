@@ -6,9 +6,10 @@ extends CanvasLayer
 # Runs on unscaled time so it moves while the run is frozen behind it.
 
 signal unlocked
+signal seeded(n: int)        # seed mode: the run seed typed in
 
 const CODE := "111"
-const MAX := 8
+const MAX := 9
 const SIZE := Vector2(440, 560)
 const PAD_KEYS := ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "OK"]
 
@@ -17,6 +18,7 @@ var font_l: Font
 var font_s: Font
 var font_b: Font
 var typed := ""
+var seed_mode := false       # the dev panel's seed box: digits shown, any number taken
 var open_s := Motion.Spring.new(0.0, 320.0, 0.72)
 var shake := Motion.Spring.new(0.0, 900.0, 0.18)
 var dots: Array = []          # per typed digit: Spring (0 -> 1 pop)
@@ -66,7 +68,10 @@ func _process(delta: float) -> void:
 	if ok_t >= 0.0:
 		ok_t += dt
 		if ok_t > 0.45 and not closing:
-			unlocked.emit()
+			if seed_mode:
+				seeded.emit(int(typed))
+			else:
+				unlocked.emit()
 			_close()
 	if closing and open_s.x < 0.02:
 		queue_free()
@@ -126,7 +131,10 @@ func _pad(label: String) -> void:
 
 
 func _submit() -> void:
-	if typed == CODE:
+	if seed_mode and typed.length() > 0 and int(typed) > 0:
+		ok_t = 0.0
+		return
+	if typed == CODE and not seed_mode:
 		ok_t = 0.0
 		return
 	wrong = 1.0
@@ -158,7 +166,7 @@ func _draw_view() -> void:
 		var sy := 1.0 if p.y < 0.0 else -1.0
 		view.draw_line(p, p + Vector2(tick * sx, 0), Pal.red(a, 2.0), 2.0)
 		view.draw_line(p, p + Vector2(0, tick * sy), Pal.red(a, 2.0), 2.0)
-	_text_c(font_b, Txt.t("devp_title"), Vector2(0, r.position.y + 48.0), 15, Pal.red(a, 1.6))
+	_text_c(font_b, Txt.t("devp_seed" if seed_mode else "devp_title"), Vector2(0, r.position.y + 48.0), 15, Pal.red(a, 1.6))
 	_text_c(font_s, Txt.t("devp_hint"), Vector2(0, r.end.y - 22.0), 13, Pal.ink(0.4 * a))
 	# the pad: twelve keys that light under the pointer and dip when pressed
 	keys.clear()
@@ -195,7 +203,10 @@ func _draw_view() -> void:
 			var col := Pal.ink(a, 1.2)
 			if ok_t >= 0.0:
 				col = Pal.red(a, 2.4)
-			view.draw_circle(p, 6.0 * clampf(s, 0.0, 1.4), col)
+			if seed_mode:
+				_text_c(font_l, typed[i], p + Vector2(0, 10), int(28 * clampf(s, 0.2, 1.2)), col)
+			else:
+				view.draw_circle(p, 6.0 * clampf(s, 0.0, 1.4), col)
 	if wrong > 0.0:
 		_text_c(font_s, Txt.t("devp_wrong"), Vector2(0, -88.0), 14, Pal.red(wrong * a, 1.6))
 	if ok_t >= 0.0:

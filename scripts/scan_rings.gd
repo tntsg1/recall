@@ -21,6 +21,8 @@ var game
 func _init() -> void:
 	z_index = 2
 	z_as_relative = false
+	# off until a chapter turns it on (the first chapter never calls setup)
+	visible = false
 
 
 func setup(story: int) -> void:

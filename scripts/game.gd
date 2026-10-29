@@ -30,6 +30,8 @@ var plates: Plates          # the shipyard's hull plates adrift (chapter 10)
 var stasis: Stasis          # the institute's stasis fields (chapter 11)
 var nodes: ControlNodes     # the board's control nodes (chapter 12)
 var ending: Ending          # the true ending, after the last boss
+var rooms: Rooms            # room to room, in the chapters laid out fresh each run
+var run_seed := 0           # the run's rooms come from this (shown on the results)
 var radio_n := 0
 var wave_ctl: Waves
 var fx: Fx
@@ -154,6 +156,8 @@ func _ready() -> void:
 	Settings.load_all()
 	if bot == null:
 		randomize()
+	run_seed = Meta.next_seed if Meta.next_seed > 0 else randi() % 1000000000
+	Meta.next_seed = 0
 	_setup_input()
 	var env := WorldEnvironment.new()
 	env.environment = make_environment()
@@ -215,6 +219,9 @@ func _ready() -> void:
 	ending = Ending.new()
 	ending.game = self
 	add_child(ending)
+	rooms = Rooms.new()
+	rooms.game = self
+	add_child(rooms)
 	player = Player.new()
 	player.game = self
 	add_child(player)
@@ -254,6 +261,9 @@ func _ready() -> void:
 	if bot == null:
 		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 	hud.chapter_intro()
+	rooms.setup(0)
+	if rooms.active:
+		player.pos = rooms.start_pos()
 	sfx.game = self
 	_apply_loadout()
 	if tutorial != null:
@@ -391,6 +401,14 @@ func dev_action(id: String, arg) -> void:
 					_gain_relic(pick)
 					hud.relic_pop[pick] = 1.0
 					hud.flash_text(Cards.relic_name(pick))
+			"seed":
+				_ask_seed()
+				return
+			"reroom":
+				if rooms.active and not rooms.lay.is_empty():
+					run_seed = randi() % 1000000000
+					rooms.setup(chapter)
+					dev_jump(maxi(wave_ctl.index, 0))
 			"spawn":
 				# from the panel the pointer is on the panel: drop it near the player instead
 				var at := aim_world()
@@ -433,6 +451,8 @@ func _dev_rows() -> Array:
 		{"kind": "head", "text": Txt.t("devx_h_jump")},
 		{"kind": "btns", "items": [{"label": Txt.t("devx_prev"), "id": "prev"}, {"label": Txt.t("devx_next"), "id": "next"}]},
 		{"kind": "btns", "items": [{"label": Txt.t("dev_boss"), "id": "boss"}, {"label": Txt.t("dev_next_ch"), "id": "nextch"}]},
+		{"kind": "stat", "get": func(): return Txt.t("room_seed") % run_seed + ("  ·  %s" % rooms.lay.get("shape", "") if rooms.active else "")},
+		{"kind": "btns", "items": [{"label": Txt.t("devx_seed"), "id": "seed"}, {"label": Txt.t("devx_reroom"), "id": "reroom"}]},
 		{"kind": "head", "text": Txt.t("devx_h_toggle")},
 		{"kind": "toggle", "label": Txt.t("dev_god"), "id": "god", "get": func(): return dev_god},
 		{"kind": "toggle", "label": Txt.t("dev_ammo"), "id": "ammo", "get": func(): return dev_ammo},
@@ -464,6 +484,10 @@ func dev_jump(i: int) -> void:
 	while w.results.size() < i:
 		w.results.append([0.0, "-"])
 	w.queue.clear()
+	if rooms.active and not rooms.sliding():
+		rooms.build(i, ["T", "B", "L", "R"][randi() % 4], false)
+		player.pos = rooms.start_pos()
+		bullets.clear_for_chapter()
 	w.index = i - 1
 	w._next()
 
@@ -826,6 +850,23 @@ func _in_dash() -> bool:
 
 
 # ~ asks for the code first (111); the run stands still while the box is open.
+# Dev: type a run seed; the run starts over in that seed's rooms.
+func _ask_seed() -> void:
+	if has_node("DevPrompt"):
+		return
+	var keep := Engine.time_scale
+	Engine.time_scale = 0.0001
+	var dp := DevPrompt.new()
+	dp.name = "DevPrompt"
+	dp.seed_mode = true
+	dp.seeded.connect(func(n: int):
+		Meta.next_seed = n
+		get_tree().call_deferred("reload_current_scene"))
+	dp.tree_exited.connect(func(): Engine.time_scale = keep)
+	add_child(dp)
+	sfx.play("tick", 1.1, -6.0)
+
+
 func _ask_dev_code() -> void:
 	if has_node("DevPrompt"):
 		return
@@ -978,6 +1019,13 @@ func _run_frame(dt: float) -> void:
 		post.step(dt)
 		return
 	real_time += dt
+	if rooms.sliding():
+		rooms.step(dt)
+		cam.step(dt)
+		post.step(dt)
+		hud.step(dt)
+		sfx.step(dt, focus)
+		return
 	if picking and bot != null and bot.get("pick", -1) >= 0:
 		choose(bot.pick)
 		bot.pick = -1
@@ -1031,6 +1079,7 @@ func _run_frame(dt: float) -> void:
 	plates.step(sdt)
 	stasis.step(sdt)
 	nodes.step(sdt)
+	rooms.step(dt)
 	ending.step(dt)
 	hud.visible = not ending.running()
 	if prof_on:
@@ -1391,9 +1440,11 @@ func on_player_hit(dir: Vector2, _e) -> bool:
 		sfx.play("shield", 1.2, -2.0)
 		return false
 	hits_taken += 1
-	var damage := 1
+	# the harder way's room: every hit there takes two cracks
+	var hurt := 2 if rooms.active and rooms.risky_now and wave_ctl.index < Waves.BOSS else 1
+	var damage := hurt
 	if Settings.assist:
-		assist_damage += 1.0 - Settings.damage_reduction / 100.0
+		assist_damage += hurt * (1.0 - Settings.damage_reduction / 100.0)
 		damage = int(floor(assist_damage + 0.00001))
 		assist_damage = maxf(0.0, assist_damage - damage)
 	cracks -= damage
@@ -1728,12 +1779,14 @@ func run_snapshot() -> Dictionary:
 		"hits_taken": hits_taken, "chapter_hits": chapter_hits, "max_combo": max_combo, "crosses": crosses,
 		"crit_recalls": crit_recalls, "steals": steals, "run_ach": run_ach.duplicate(),
 		"results": wave_ctl.results.duplicate(true), "chapter_log": wave_ctl.chapter_log.duplicate(true),
+		"seed": run_seed, "room": rooms.snapshot(),
 	}
 
 
 func _resume(snap: Dictionary) -> void:
 	# runs saved before the story-order table counted the old five chapters
 	var ch := Chapters.from_save(snap)
+	run_seed = int(snap.get("seed", run_seed))
 	for i in ch:
 		next_chapter()
 	assist_retries_used = int(snap.get("assist_retries_used", 0))
@@ -1770,6 +1823,16 @@ func _resume(snap: Dictionary) -> void:
 	wave_ctl.results = snap.get("results", []).duplicate(true)
 	wave_ctl.chapter_log = snap.get("chapter_log", []).duplicate(true)
 	var w := int(snap.get("wave", 0))
+	# the rooms come from the saved run's seed
+	rooms.setup(chapter)
+	if rooms.active:
+		player.pos = rooms.start_pos()
+	if rooms.active and w > 0:
+		# the room this wave was fought in, as it was
+		var rs: Dictionary = snap.get("room", {})
+		rooms.build(w, str(rs.get("entry", "L")), bool(rs.get("risky", false)))
+		rooms.bonus = int(rs.get("bonus", 0))
+		player.pos = rooms.start_pos()
 	if w > 0:
 		# pick up as if the cards before this wave had just been chosen
 		wave_ctl.index = w - 1
@@ -1801,12 +1864,13 @@ func next_chapter() -> void:
 	plates.setup(Chapters.story(chapter))
 	stasis.setup(Chapters.story(chapter))
 	nodes.setup(Chapters.story(chapter))
+	rooms.setup(chapter)
 	lore.start_chapter(chapter)
 	sfx.start_chapter(Chapters.music(chapter))
 	sfx.play("chapter", 1.0, -2.0)
 	hud.chapter_intro()
 	wave_ctl.start_chapter(chapter)
-	player.pos = Vector2(960, 860)
+	player.pos = rooms.start_pos() if rooms.active else Vector2(960, 860)
 	player.vel = Vector2.ZERO
 
 
@@ -1849,6 +1913,8 @@ func on_wave_title(index: int, note: String) -> void:
 
 func on_wave_clear(index: int, time: float, grade: String) -> void:
 	waves_cleared += 1
+	if rooms.active and rooms.risky_now and index < Waves.BOSS:
+		rooms.bonus += 1
 	if has("second_wind") and waves_cleared % 3 == 0 and cracks < max_cracks:
 		cracks += 1
 		hud.crack_mend(cracks)
