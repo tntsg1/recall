@@ -479,7 +479,8 @@ func step(dt: float) -> void:
 							e.vel = (want - e.pos) * 6.0
 						else:
 							var ang := sin(e.t * 0.31 + e.seed) * 2.2 + cos(e.t * 0.19 + e.seed * 1.3) * 1.5
-							e.vel = Pal.damp2(e.vel, _steer(e, Vector2.from_angle(ang)) * e.speed, 1.5, dt)
+							# (in a generated room, out of sight it drifts round to where you are)
+							e.vel = Pal.damp2(e.vel, _steer(e, _seek(e, game.player.pos, Vector2.from_angle(ang))) * e.speed, 1.5, dt)
 						e.rot += (0.5 if fmod(e.seed, 2.0) < 1.0 else -0.5) * dt
 					LEECH:
 						_leech(e, pl, dt)

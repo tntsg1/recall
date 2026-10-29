@@ -216,13 +216,24 @@ func _draw() -> void:
 		if retire_at != null and shows.get("w2_retire", 0.0) <= 0.01:
 			_draw_wall_notice(retire_at, dim)
 	elif story == 3:
-		_draw_lanes(dim)
-		_draw_weapon_crates(dim)
-		_draw_terminal(Vector2(80, 600), dim, "w3_log")
-		_draw_target(Vector2(1840, 600), Vector2(-1, 0), dim, 0)
-		_draw_target(Vector2(600, 70), Vector2(0, 1), dim, 1)
-		if shows.get("w3_safety", 0.0) <= 0.01:
-			_draw_floor_notice(Vector2(1490, 1010), dim)
+		var gen3: bool = game.arena.generated
+		if gen3:
+			_draw_range_paint(dim)
+			_draw_range_cover(dim)
+		else:
+			_draw_lanes(dim)
+			_draw_weapon_crates(dim)
+		var log_at = game.rooms.spot("log", Vector2(80, 600))
+		if log_at != null:
+			_draw_terminal(log_at, dim, "w3_log")
+		var tgt_at = game.rooms.spot("target", Vector2(1840, 600))
+		if tgt_at != null:
+			_draw_target(tgt_at, Vector2(-1, 0), dim, 0)
+		if not gen3:
+			_draw_target(Vector2(600, 70), Vector2(0, 1), dim, 1)
+		var safe_at = game.rooms.spot("safety", Vector2(1490, 1010))
+		if safe_at != null and shows.get("w3_safety", 0.0) <= 0.01:
+			_draw_floor_notice(safe_at, dim)
 	elif story == 5:
 		_draw_platform(dim)
 		_draw_containers(dim)
@@ -414,13 +425,15 @@ func _draw_hall_paint(dim: float) -> void:
 	for ln: Array in lay.get("lanes", []):
 		var horiz: bool = ln[0]
 		var c: float = ln[1]
-		var a := Vector2(room.position.x, c) if horiz else Vector2(c, room.position.y)
-		var b := Vector2(room.end.x, c) if horiz else Vector2(c, room.end.y)
+		var a := Vector2(room.position.x + 40.0, c) if horiz else Vector2(c, room.position.y + 40.0)
+		var b := Vector2(room.end.x - 40.0, c) if horiz else Vector2(c, room.end.y - 40.0)
 		var o := Vector2(0, 34) if horiz else Vector2(34, 0)
 		for sgn: float in [-1.0, 1.0]:
 			for sp: Array in _open_spans(a + o * sgn, b + o * sgn, lane_cut):
 				var p0: Vector2 = sp[0]
 				var p1: Vector2 = sp[1]
+				if p0.distance_to(p1) < 220.0:
+					continue      # a stub between two cuts reads as litter, not a lane
 				var along := (p1 - p0).normalized()
 				var d := 0.0
 				while d < p0.distance_to(p1) - 12.0:
@@ -456,42 +469,202 @@ func _draw_hall_cover(dim: float) -> void:
 				draw_line(Vector2(pi.position.x + 4.0, sy), Vector2(pi.end.x - 4.0, sy), Pal.ink(0.45 * dim, 1.4), 1.5)
 				draw_rect(Rect2(pi.position + Vector2(4, 22), Vector2(pi.size.x - 8.0, pi.size.y - 26.0)), Pal.ink(0.18 * dim), false, 1.0)
 			"bench":
-				# the seat's slats along it, the armrests at its ends
-				for k in 3:
-					var v := (k + 0.5) / 3.0
+				# a waiting bench: the backrest a bright bar along one side, the
+				# seat behind it, armrests dividing it into places
+				var back := Rect2(ins.position, Vector2(ins.size.x, 7)) if long_x else Rect2(ins.position, Vector2(7, ins.size.y))
+				draw_rect(back, Pal.ink(0.55 * dim))
+				var places := 4 if (r.size.x if long_x else r.size.y) > 150.0 else 2
+				for k in range(1, places):
+					var u := float(k) / places
 					if long_x:
-						var yy := lerpf(ins.position.y, ins.end.y, v)
-						draw_line(Vector2(ins.position.x + 10.0, yy), Vector2(ins.end.x - 10.0, yy), Pal.ink(0.3 * dim), 3.0)
+						var xx := lerpf(ins.position.x, ins.end.x, u)
+						draw_line(Vector2(xx, ins.position.y + 7.0), Vector2(xx, ins.end.y), Pal.ink(0.38 * dim), 3.0)
 					else:
-						var xx := lerpf(ins.position.x, ins.end.x, v)
-						draw_line(Vector2(xx, ins.position.y + 10.0), Vector2(xx, ins.end.y - 10.0), Pal.ink(0.3 * dim), 3.0)
-				for e2 in 2:
-					var arm := Rect2(Vector2(ins.position.x if e2 == 0 else ins.end.x - 6.0, ins.position.y), Vector2(6, ins.size.y)) if long_x else Rect2(Vector2(ins.position.x, ins.position.y if e2 == 0 else ins.end.y - 6.0), Vector2(ins.size.x, 6))
-					draw_rect(arm, Pal.ink(0.5 * dim))
+						var yy := lerpf(ins.position.y, ins.end.y, u)
+						draw_line(Vector2(ins.position.x + 7.0, yy), Vector2(ins.end.x, yy), Pal.ink(0.38 * dim), 3.0)
 			"kiosk":
-				# a self-service kiosk: its screen asking for your card
-				var scr := Rect2(ins.position + ins.size * Vector2(0.15, 0.15), ins.size * Vector2(0.7, 0.45))
+				# a self-service kiosk: a canopy over it, its lit screen asking for your card
+				draw_rect(Rect2(r.position - Vector2(6, 6), Vector2(r.size.x + 12.0, 8)), Pal.ink(0.6 * dim))
+				var scr := Rect2(ins.position + ins.size * Vector2(0.15, 0.2), ins.size * Vector2(0.7, 0.45))
 				draw_rect(scr, Pal.ink(0.12 * dim))
-				draw_rect(scr, Pal.ink(0.45 * dim), false, 1.0)
+				draw_rect(scr.grow(2.0), Pal.ink(0.7 * dim, 1.4), false, 1.5)
 				var blink := 0.5 + 0.5 * sin(t * 3.0 + i)
 				draw_rect(Rect2(scr.position + Vector2(4, 4), Vector2(scr.size.x * 0.5, 3)), Pal.ink(0.5 * blink * dim, 1.4))
 				draw_rect(Rect2(Vector2(ins.get_center().x - 10.0, ins.end.y - 12.0), Vector2(20, 4)), Pal.red(0.6 * dim, 1.4))
 			"desk":
-				# the registry desk: a counter, two screens, the stamp
-				draw_line(ins.position + Vector2(0, ins.size.y * 0.35), Vector2(ins.end.x, ins.position.y + ins.size.y * 0.35), Pal.ink(0.3 * dim), 1.0)
+				# the registry desk, drawn the way it stands: a counter, two screens, the stamp
+				var cen := r.get_center()
+				var rot := 0.0 if long_x else PI / 2.0
+				var lw := maxf(r.size.x, r.size.y) - 16.0
+				var lh := minf(r.size.x, r.size.y) - 16.0
+				draw_set_transform(cen, rot, Vector2.ONE)
+				var o := Vector2(-lw / 2.0, -lh / 2.0)
+				draw_line(o + Vector2(0, lh * 0.35), o + Vector2(lw, lh * 0.35), Pal.ink(0.3 * dim), 1.0)
 				for k in 2:
-					var sc := Rect2(ins.position + Vector2(ins.size.x * (0.2 + 0.45 * k), 4.0), Vector2(46, 14))
-					draw_rect(sc, Pal.ink(0.4 * dim), false, 1.5)
-				draw_circle(ins.position + ins.size * Vector2(0.5, 0.7), 7.0, Pal.red(0.5 * dim, 1.4))
-				draw_string(sf, ins.position + Vector2(6, ins.size.y - 6.0), Txt.t("hall_desk"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.45 * dim))
+					draw_rect(Rect2(o + Vector2(lw * (0.2 + 0.45 * k), 4.0), Vector2(46, 12)), Pal.ink(0.4 * dim), false, 1.5)
+				draw_circle(o + Vector2(lw * 0.85, lh * 0.7), 6.0, Pal.red(0.5 * dim, 1.4))
+				var dt2 := Txt.t("hall_desk")
+				var tw := sf.get_string_size(dt2, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+				# its name along the middle of the counter, on its own dark strip
+				var tx := -tw / 2.0
+				draw_rect(Rect2(Vector2(tx - 5.0, 2.0), Vector2(tw + 10.0, 20)), Color(0, 0, 0, 0.65))
+				draw_string(sf, Vector2(tx, 17.0), dt2, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.8 * dim))
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 			"turnstile":
-				# a gate post, its arm across the lane
+				# one lane of the gate: a cabinet each side, the barrier arm across,
+				# the lamp over it red (refused) or white (pass)
 				var c := ins.get_center()
-				draw_circle(c, 9.0, Pal.ink(0.45 * dim))
-				var arm_d := Vector2(ins.size.x * 0.45, 0) if long_x else Vector2(0, ins.size.y * 0.45)
-				draw_line(c, c + arm_d, Pal.ink(0.55 * dim), 3.0)
-				var on := int(t * 1.5 + i * 0.7) % 4 == 0
-				draw_circle(c, 3.0, Pal.red(0.9 * dim, 2.0) if on else Pal.ink(0.3 * dim))
+				var side := Vector2(0, ins.size.y / 2.0 - 3.0) if long_x else Vector2(ins.size.x / 2.0 - 3.0, 0)
+				var along := Vector2(ins.size.x / 2.0, 0) if long_x else Vector2(0, ins.size.y / 2.0)
+				draw_line(c - side - along * 0.9, c - side + along * 0.9, Pal.ink(0.6 * dim), 5.0)
+				draw_line(c + side - along * 0.9, c + side + along * 0.9, Pal.ink(0.6 * dim), 5.0)
+				var refused := int(t * 1.5 + i * 0.7) % 4 == 0
+				var arm_a := 0.0 if refused else 0.9
+				var arm := (side * 1.6).rotated(arm_a)
+				draw_line(c - side * 0.8, c - side * 0.8 + arm, Pal.ink(0.5 * dim), 2.0)
+				draw_circle(c, 3.5, Pal.red(0.9 * dim, 2.0) if refused else Pal.ink(0.7 * dim, 1.4))
+
+
+# A generated range's floor (RoomGen._paint_range): numbered firing lanes
+# out from a wall with their distance marks, scorch, bullet holes.
+func _draw_range_paint(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var sf := Fonts.get_font("SemiBold")
+	var cut: Array = []
+	for r: Rect2 in game.arena.walls + game.arena.inner:
+		cut.append(r.grow(6.0))
+	var ln: Array = lay.get("lanes3", [])
+	if not ln.is_empty():
+		var side: String = ln[0]
+		var all: Rect2 = ln[1]
+		var n: int = ln[2]
+		var horiz := side == "T"
+		var c := Color(1, 1, 1, 0.045 * dim)
+		for k in n + 1:
+			var u := float(k) / n
+			var a := Vector2(lerpf(all.position.x, all.end.x, u), all.position.y) if horiz else Vector2(all.position.x, lerpf(all.position.y, all.end.y, u))
+			var b := a + (Vector2(0, all.size.y) if horiz else Vector2(all.size.x, 0))
+			for sp: Array in _open_spans(a, b, cut):
+				var p0: Vector2 = sp[0]
+				var along := ((sp[1] as Vector2) - p0).normalized()
+				var d := 0.0
+				while d < p0.distance_to(sp[1]):
+					draw_line(p0 + along * d, p0 + along * minf(d + 22.0, p0.distance_to(sp[1])), c, 3.0)
+					d += 40.0
+		for k in n:
+			var u := (k + 0.5) / n
+			var at := Vector2(lerpf(all.position.x, all.end.x, u) - 20.0, all.position.y + 52.0) if horiz else Vector2((all.position.x + 24.0) if side == "L" else (all.end.x - 70.0), lerpf(all.position.y, all.end.y, u) + 14.0)
+			var free := true
+			for r: Rect2 in cut:
+				if r.grow(20.0).has_point(at):
+					free = false
+			if free:
+				draw_string(sf, at, "%02d" % (k + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 40, Color(1, 1, 1, 0.05 * dim))
+		# distance marks down the lanes
+		var far := Vector2(0, all.size.y) if horiz else Vector2(all.size.x * (1.0 if side == "L" else -1.0), 0)
+		var root := Vector2(all.end.x + 12.0, all.position.y) if horiz else Vector2(all.position.x if side == "L" else all.end.x, all.end.y + 26.0)
+		for m in [[0.5, "25 m"], [1.0, "50 m"]]:
+			var mp: Vector2 = root + far * float(m[0])
+			draw_string(sf, mp, m[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 1, 0.08 * dim))
+	for sc: Array in lay.get("scorch", []):
+		var sp2: Vector2 = sc[0]
+		var sr: float = sc[1]
+		var free2 := true
+		for r: Rect2 in cut:
+			if r.grow(sr).has_point(sp2):
+				free2 = false
+		if free2:
+			for j in 4:
+				draw_circle(sp2 + Vector2.from_angle(j * 1.9) * sr * 0.4, sr * (0.75 - j * 0.1), Color(0, 0, 0, 0.22 * dim))
+	var holes := PackedVector2Array()
+	var hn := 0
+	for spot: Array in lay.get("holes", []):
+		for j in int(spot[2]):
+			hn += 1
+			var hp: Vector2 = (spot[0] as Vector2) + Vector2.from_angle(hn * 2.39) * float(spot[1]) * sqrt(fmod(hn * 0.618, 1.0))
+			var inside := false
+			for r: Rect2 in game.arena.walls + game.arena.inner:
+				if r.has_point(hp):
+					inside = true
+			if inside:
+				continue
+			holes.append(hp - Vector2(2, 2))
+			holes.append(hp + Vector2(2, 2))
+	if holes.size() > 0:
+		draw_multiline(holes, Color(0, 0, 0, 0.55 * dim), 2.0)
+
+
+# A generated range's things by kind: beam posts, arms crates (as in the
+# hand-made range), sandbag walls, target stands, a firing bench, a concrete
+# blind, a weapons rack.
+func _draw_range_cover(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var kinds: Array = lay.get("kinds", [])
+	var cover: Array = lay.get("cover", [])
+	var sf := Fonts.get_font("SemiBold")
+	for i in cover.size():
+		var r: Rect2 = cover[i]
+		var kind: String = kinds[i] if i < kinds.size() else "arms"
+		var long_x := r.size.x >= r.size.y
+		var ins := r.grow(-6.0)
+		match kind:
+			"post":
+				# an emitter post: dark, its red band, the lens toward its beam
+				draw_rect(ins, Color(0.03, 0.03, 0.035, 1.0))
+				draw_rect(ins, Pal.ink(0.35 * dim), false, 1.0)
+				draw_rect(Rect2(r.position.x + 6.0, r.get_center().y - 3.0, r.size.x - 12.0, 6.0), Pal.red(0.45 * dim, 1.4))
+				draw_circle(r.get_center(), 5.0, Pal.red(0.7 * dim, 1.8))
+			"arms":
+				draw_colored_polygon(PackedVector2Array([Vector2(r.end.x, r.position.y + 8.0), Vector2(r.end.x + 12.0, r.position.y + 20.0), Vector2(r.end.x + 12.0, r.end.y + 12.0),
+					Vector2(r.position.x + 12.0, r.end.y + 12.0), Vector2(r.position.x + 8.0, r.end.y), Vector2(r.end.x, r.end.y)]), Color(0, 0, 0, 0.45 * dim))
+				if long_x:
+					draw_line(Vector2(ins.get_center().x, ins.position.y), Vector2(ins.get_center().x, ins.end.y), Pal.ink(0.35 * dim), 1.5)
+				else:
+					draw_line(Vector2(ins.position.x, ins.get_center().y), Vector2(ins.end.x, ins.get_center().y), Pal.ink(0.35 * dim), 1.5)
+				draw_string(sf, ins.position + Vector2(8, 20), "PG-IV", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+				draw_circle(Vector2(ins.end.x - 9.0, ins.position.y + 9.0), 4.0, Pal.ink(0.4 * dim))
+			"sandbag":
+				# a wall of sandbags: rounded bags in two courses
+				var span := r.size.x if long_x else r.size.y
+				var nb := int(span / 34.0)
+				for row in 2:
+					for k in nb:
+						var u := (k + 0.5 + 0.5 * row) / (nb + 0.5)
+						var bc := Vector2(lerpf(ins.position.x, ins.end.x, u), lerpf(ins.position.y, ins.end.y, 0.3 + 0.4 * row)) if long_x else Vector2(lerpf(ins.position.x, ins.end.x, 0.3 + 0.4 * row), lerpf(ins.position.y, ins.end.y, u))
+						draw_set_transform(bc, 0.0 if long_x else PI / 2.0, Vector2(1.0, 0.55))
+						draw_arc(Vector2.ZERO, 16.0, 0.0, TAU, 14, Pal.ink(0.38 * dim), 1.5)
+						draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			"stand":
+				# a target stand: its frame and the paper figure on it, holed
+				draw_line(ins.position + Vector2(4, ins.size.y * 0.5), Vector2(ins.end.x - 4.0, ins.position.y + ins.size.y * 0.5), Pal.ink(0.5 * dim), 3.0)
+				var hc := ins.get_center()
+				draw_circle(hc, 8.0, Pal.ink(0.2 * dim))
+				draw_arc(hc, 8.0, 0.0, TAU, 12, Pal.red(0.6 * dim, 1.4), 1.5)
+			"firing":
+				# a firing bench: the table, its rests, the spent casings by it
+				draw_line(ins.position + Vector2(0, ins.size.y * 0.5), Vector2(ins.end.x, ins.position.y + ins.size.y * 0.5) if long_x else ins.position + Vector2(ins.size.x * 0.5, ins.size.y), Pal.ink(0.3 * dim), 1.0)
+				for k in 3:
+					var u := (k + 0.5) / 3.0
+					var rp := Vector2(lerpf(ins.position.x, ins.end.x, u), ins.position.y + 10.0) if long_x else Vector2(ins.position.x + 10.0, lerpf(ins.position.y, ins.end.y, u))
+					draw_rect(Rect2(rp - Vector2(8, 4), Vector2(16, 8)), Pal.ink(0.45 * dim))
+				for k in 5:
+					draw_circle(r.end + Vector2(8.0 + k * 5.0, -6.0 - (k % 2) * 6.0), 1.5, Pal.ink(0.5 * dim))
+			"bunker":
+				# a concrete blind: thick, a firing slit along its face
+				draw_rect(ins.grow(-6.0), Pal.ink(0.12 * dim), false, 3.0)
+				var slit := Rect2(ins.position + Vector2(ins.size.x * 0.2, 10.0), Vector2(ins.size.x * 0.6, 6)) if long_x else Rect2(ins.position + Vector2(10.0, ins.size.y * 0.2), Vector2(6, ins.size.y * 0.6))
+				draw_rect(slit, Color(0, 0, 0, 0.9))
+				draw_rect(slit, Pal.ink(0.5 * dim), false, 1.0)
+			"rack":
+				# a weapons rack: rifles stood in a row
+				var span2 := r.size.x if long_x else r.size.y
+				var ng := int(span2 / 22.0)
+				for k in ng:
+					var u := (k + 0.5) / ng
+					var a := Vector2(lerpf(ins.position.x, ins.end.x, u), ins.position.y + 4.0) if long_x else Vector2(ins.position.x + 4.0, lerpf(ins.position.y, ins.end.y, u))
+					var b := a + (Vector2(4.0, ins.size.y - 8.0) if long_x else Vector2(ins.size.x - 8.0, 4.0))
+					draw_line(a, b, Pal.ink(0.42 * dim), 2.0)
+				draw_string(sf, ins.position + Vector2(4, 12), "PG-IV ×%d" % ng, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Pal.ink(0.45 * dim))
 
 
 # The parts of axis-aligned line a-b outside every rect, as [from, to].

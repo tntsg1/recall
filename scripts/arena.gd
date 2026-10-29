@@ -150,7 +150,7 @@ func _build_nav() -> void:
 	for j in nav_ny:
 		for i in nav_nx:
 			var c := ROOM.position + Vector2(i + 0.5, j + 0.5) * NAV
-			for r: Rect2 in walls + inner:
+			for r: Rect2 in walls + inner + mirrors:
 				if r.grow(18.0).has_point(c):
 					nav_block[j * nav_nx + i] = 1
 					break
@@ -339,11 +339,22 @@ func _draw() -> void:
 	# cover sits a step below you and the enemies in brightness: the room's
 	# edge, then its blocks, then whatever moves
 	var block := Pal.ink(0.62 - 0.25 * f)
+	# a generated hall of mirrors: the glass is what the room is about, the rest steps back
+	var glass_room := generated and not mirrors.is_empty()
+	if glass_room:
+		block = Pal.ink(0.5 - 0.2 * f)
 	for r in inner:
 		draw_rect(r, Pal.WALL)
 		draw_rect(r, block, false, 2.0)
 		draw_rect(r.grow(-7), faint, false, 1.0)
-	# mirrors: bright glass with a sheen that slides along when struck
+	# mirrors: bright glass with a sheen that slides along when struck; in a
+	# generated hall the two nearest you shine brightest, the rest a step down
+	var near_m: Array = []
+	if glass_room and game:
+		var by: Array = mirrors.duplicate()
+		var pp: Vector2 = game.player.pos
+		by.sort_custom(func(p, q): return p.get_center().distance_squared_to(pp) < q.get_center().distance_squared_to(pp))
+		near_m = by.slice(0, 2)
 	for m in mirrors:
 		var long_x := m.size.x > m.size.y
 		# glass: a pale gradient across it and one bright edge, so it reads as a mirror
@@ -368,7 +379,15 @@ func _draw() -> void:
 		var sq := m.position + (Vector2(slide, 0) if long_x else Vector2(0, slide))
 		var sd := Vector2(-10, m.size.y) if long_x else Vector2(m.size.x, -10)
 		draw_line(sq, sq + sd, Pal.ink(0.7, 1.8), 4.0)
-		draw_rect(m, Pal.ink(0.95 - 0.3 * f, 1.4), false, 1.5)
+		var lead: bool = near_m.has(m)
+		if glass_room:
+			# a faint halo round the glass; the lit band wider on the near ones
+			# the more glass in the room, the quieter each halo
+			var hk := 2.0 / maxf(2.0, mirrors.size())
+			draw_rect(m.grow(5.0), Pal.ink((0.07 if lead else 0.04) * hk, 1.0), false, 3.0)
+			if lead:
+				draw_line(sq, sq + sd, Pal.ink(0.75, 1.6), 5.0)
+		draw_rect(m, Pal.ink(0.95 - 0.3 * f, 1.5 if lead else 1.3), false, 2.0 if glass_room else 1.5)
 		var a0 := m.position + (Vector2(0, m.size.y / 2.0) if long_x else Vector2(m.size.x / 2.0, 0))
 		var a1 := a0 + (Vector2(m.size.x, 0) if long_x else Vector2(0, m.size.y))
 		draw_line(a0, a1, Pal.ink(0.5, 1.6), 1.0)

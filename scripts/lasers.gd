@@ -43,6 +43,17 @@ func setup(room: int) -> void:
 	queue_redraw()
 
 
+# A generated room's fences ([a, b, group]); the two groups take turns as ever.
+func set_fences(f: Array) -> void:
+	fences = f.duplicate(true)
+	t = 0.0
+	forced = -1
+	live = [false, false]
+	warn = [0.0, 0.0]
+	visible = not fences.is_empty()
+	queue_redraw()
+
+
 func active() -> bool:
 	return not fences.is_empty()
 

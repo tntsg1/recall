@@ -141,12 +141,37 @@ func _run() -> void:
 	r.dev_jump(Waves.BOSS)
 	_ok(r.rooms.lay.is_empty() and not r.arena.generated, "the boss keeps the hand-made room")
 	r.queue_free()
+	# every remnant of each chapter turns up in one of its rooms
+	for sd in 6:
+		var q = _game(3000 + sd)
+		await frames(3)
+		for story in RoomGen.ON:
+			while Chapters.story(q.chapter) < story:
+				q.next_chapter()
+			var placed := {}
+			var entry: String = "L"
+			q.rooms.setup(q.chapter)
+			for i in Waves.BOSS:
+				if i > 0:
+					q.rooms.build(i, entry, false)
+				for id in q.rooms.lay.get("spots", {}):
+					placed[id] = true
+				var ex: Array = q.rooms.lay.get("exits", [])
+				if not ex.is_empty():
+					entry = RoomGen.OPPOSITE[ex[0].side]
+			var all_here := true
+			for w in Lore.walls(story):
+				if not placed.has(w[0]):
+					all_here = false
+			_ok(all_here, "story %d seed %d: every remnant in a room (%s)" % [story, sd, str(placed.keys())])
+		q.queue_free()
 	# chapters not yet laid out fresh keep their room
 	var h = _game(9)
 	await frames(3)
-	h.next_chapter()
+	while RoomGen.on(Chapters.story(h.chapter)) and h.chapter + 1 < Chapters.count():
+		h.next_chapter()
 	await frames(3)
-	_ok(not h.rooms.active and not h.arena.generated, "chapter 2 keeps its hand-made room")
+	_ok(not h.rooms.active and not h.arena.generated, "a chapter not laid out fresh keeps its hand-made room (story %d)" % Chapters.story(h.chapter))
 	h.queue_free()
 	print("ROOMS CHECK ", "PASS" if fails == 0 else "FAIL %d" % fails)
 	quit(1 if fails > 0 else 0)

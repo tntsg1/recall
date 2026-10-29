@@ -37,13 +37,22 @@ func _initialize() -> void:
 					exits = [{"boss": true}]
 				elif (k + idx) % 3 == 0:
 					exits = [{}, {"risky": true}]
-				var rem: Array = ["door"] if idx == 0 else ([["screen"], ["graffiti"], ["notice"], [], []][(k + idx) % 5])
+				# the chapter's remnants, one to a room in turn (the first room its own where it has them)
+				var ids: Array = []
+				for w in Lore.walls(story):
+					ids.append(w[0])
+				var first: Array = RoomGen.STYLE[story].get("first_room", [])
+				var rem: Array = first.duplicate() if idx == 0 and not first.is_empty() else ([ids[(k + idx) % ids.size()]] if not ids.is_empty() and (k + idx) % 3 != 0 else [])
+				# as Rooms does: one that reads off the wall you come in by waits for a later room
+				for w in Lore.walls(story):
+					if rem.has(w[0]) and not first.has(w[0]) and RoomGen.NORMAL[entry] == w[2] and idx < 5:
+						rem.erase(w[0])
 				var lay := RoomGen.make(story, idx, 1000 + k, entry, exits, rem)
 				if lay.is_empty():
 					empty += 1
 					continue
 				tries += int(lay.attempt) + 1
-				if not (lay.rails as Array).is_empty():
+				if not (lay.get("rails", lay.get("lanes", [])) as Array).is_empty():
 					railed += 1
 				worst = maxi(worst, int(lay.attempt) + 1)
 				shapes[lay.shape] = shapes.get(lay.shape, 0) + 1
@@ -54,7 +63,7 @@ func _initialize() -> void:
 		var gen_ms := Time.get_ticks_msec() - t0
 		_ok(empty == 0, "story %d: every one of %d rooms came out (%d none)" % [story, n * 6, empty])
 		print("     tries per room %.2f (worst %d), %.2f ms a room, shapes %s" % [float(tries) / (n * 6 - empty), worst, float(gen_ms) / (n * 6), shapes])
-		_ok(railed >= (n * 6 - empty) * 0.65, "story %d: a yard's tracks in %.0f%% of rooms (at least 65%%)" % [story, 100.0 * railed / (n * 6 - empty)])
+		_ok(railed >= (n * 6 - empty) * 0.65, "story %d: floor lines (tracks, lanes) in %.0f%% of rooms (at least 65%%)" % [story, 100.0 * railed / (n * 6 - empty)])
 		for set_name in ["rooms · cover", "rooms · cover and walls", "first rooms · cover"]:
 			var lays: Array = sparse if set_name.begins_with("first") else rooms
 			var with_walls: bool = set_name.ends_with("walls")

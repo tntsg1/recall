@@ -87,18 +87,31 @@ func build(i: int, entry: String, risky: bool) -> void:
 		if lay.is_empty():
 			lay = _make(i, entry)
 	ahead.clear()
+	# a remnant this room found no wall for goes on to the next room
+	if not lay.is_empty():
+		for id in homes:
+			if homes[id] == i and not (lay.spots as Dictionary).has(id) and i + 1 < Waves.BOSS:
+				homes[id] = i + 1
 	game.arena.setup(hand, lay)
+	# the range's laser fences: this room's, or the hand-made room's
+	if lay.is_empty():
+		game.lasers.setup(hand)
+	else:
+		game.lasers.set_fences(lay.get("fences", []))
 	game.lore.queue_redraw()
 	queue_redraw()
 
 
 func _make(i: int, entry: String) -> Dictionary:
 	var exits: Array = [{"boss": true}] if i == Waves.BOSS - 1 else ([{}, {"risky": true}] if forks.has(i) else [{}])
+	var story := Chapters.story(game.chapter)
 	var rem: Array = []
-	for id in homes:
-		if homes[id] == i:
-			rem.append(id)
-	return RoomGen.make(Chapters.story(game.chapter), i, cseed, entry, exits, rem)
+	for w in Lore.walls(story):
+		# one that reads off the wall you come in by waits for a later room
+		# (the way in crowds that wall); the first room's own stays
+		if homes.get(w[0], -1) == i and (RoomGen.NORMAL[entry] != w[2] or RoomGen.STYLE[story].get("first_room", []).has(w[0]) or i + 1 >= Waves.BOSS):
+			rem.append(w[0])
+	return RoomGen.make(story, i, cseed, entry, exits, rem)
 
 
 # Where you stand as the room begins.
@@ -289,8 +302,19 @@ func _draw_gate(g: Dictionary, hot: float, dim: float) -> void:
 	var m := p + n * 22.0
 	draw_polyline(PackedVector2Array([m - tan * 10.0, m + n * 8.0, m + tan * 10.0]), Pal.red(0.3 * dim, 1.2), 2.0)
 	if hot > 0.0:
-		draw_line(a, b, Pal.red(hot * dim, 2.4), 3.0)
-		draw_colored_polygon(PackedVector2Array([a, b, b + n * 70.0 * hot, a + n * 70.0 * hot]), Pal.red(0.12 * hot * dim, 1.4))
+		# lit for a spawn: a dashed dark-red frame pushing out into the room
+		var depth := 44.0 * hot
+		var q0 := a + n * depth
+		var q1 := b + n * depth
+		for seg: Array in [[a, q0], [q0, q1], [q1, b]]:
+			var s0: Vector2 = seg[0]
+			var s1: Vector2 = seg[1]
+			var ln := s0.distance_to(s1)
+			var d := 0.0
+			while d < ln:
+				draw_line(s0.lerp(s1, d / ln), s0.lerp(s1, minf(1.0, (d + 9.0) / ln)), Pal.red(0.65 * hot * dim, 1.2), 2.0)
+				d += 15.0
+		draw_colored_polygon(PackedVector2Array([a, b, q1, q0]), Pal.red(0.06 * hot * dim, 1.0))
 
 
 func _draw_door(d: Dictionary, k: float, dim: float, kind: String) -> void:
@@ -370,4 +394,6 @@ func _draw_door(d: Dictionary, k: float, dim: float, kind: String) -> void:
 	var hint := Txt.t("door_hint")
 	var hw2 := font_s.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
 	var pulse := 0.4 + 0.25 * sin(t * 4.0)
-	draw_string(font_s, Vector2(at.x - hw2 / 2.0, plate.end.y + 20.0), hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(pulse * ta))
+	# on the plate's far side from the door (a door in the bottom wall: above it, clear of the chevrons)
+	var hy := plate.position.y - 8.0 if n.y < -0.5 else plate.end.y + 20.0
+	draw_string(font_s, Vector2(at.x - hw2 / 2.0, hy), hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink((pulse + 0.3) * ta))

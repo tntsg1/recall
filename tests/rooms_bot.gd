@@ -16,6 +16,7 @@ var all: Array = []
 var hits: Array = []
 var last_hits := 0
 var stall := 0
+var story := 1
 
 
 func _initialize() -> void:
@@ -23,6 +24,9 @@ func _initialize() -> void:
 	if args.size() > 0:
 		runs = int(args[0])
 	RoomGen.force_off = "hand" in args
+	for a in args:
+		if a.begins_with("story="):
+			story = int(a.substr(6))
 	_start()
 
 
@@ -35,6 +39,8 @@ func _start() -> void:
 	game.bot = bot
 	root.add_child(game)
 	brain = preload("res://tests/brain.gd").new(bot)
+	while Chapters.story(game.chapter) < story:
+		game.next_chapter()
 	frame = 0
 	hits = []
 	last_hits = 0

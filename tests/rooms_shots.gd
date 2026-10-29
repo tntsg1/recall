@@ -3,17 +3,23 @@ extends SceneTree
 # sealed lab, enemies through the spawn gates, a cleared room with two ways
 # on, the slide between rooms, the next room, a spread of generated rooms of
 # every shape, the elite of the harder way, and the walk into the boss's room.
-# -> proofs/rooms/*.png
-# Usage: tools/run_test.sh tests/rooms_shots.gd --fixed-fps 60
+# -> proofs/rooms/*.png (chapter 1) or proofs/rooms/chN_*.png
+# Usage: tools/run_test.sh tests/rooms_shots.gd --fixed-fps 60 -- [story=N]
 
 const Cap = preload("res://tests/cap.gd")
 var game
 var bot := {"move": Vector2.ZERO, "aim": Vector2(960, 300), "fire": false, "focus": false, "dash": false, "possess": false}
+var story := 1
+var prefix := ""
 
 
 func _initialize() -> void:
 	Meta.test_mode = true
 	Meta.next_seed = 424242
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("story="):
+			story = int(a.substr(6))
+	prefix = "" if story == 1 else "ch%d_" % story
 	seed(5)
 	root.add_child(preload("res://tests/test_window.gd").new())
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://proofs/rooms"))
@@ -33,7 +39,7 @@ func frames(n: int) -> void:
 func shot(name: String) -> void:
 	await process_frame
 	await RenderingServer.frame_post_draw
-	Cap.save(root, "res://proofs/rooms/%s.png" % name)
+	Cap.save(root, "res://proofs/rooms/%s%s.png" % [prefix, name])
 	print(name, " saved  (room %d, %s)" % [game.rooms.room_index, game.rooms.lay.get("shape", "hand")])
 
 
@@ -55,6 +61,9 @@ func walk_out(k: int) -> void:
 
 
 func _run() -> void:
+	await frames(2)
+	while Chapters.story(game.chapter) < story:
+		game.next_chapter()
 	await frames(2)
 	print("seed ", game.run_seed, " forks ", game.rooms.forks)
 	game.dev_god = true
@@ -125,7 +134,7 @@ func _run() -> void:
 		game.rooms.cseed = 20000 + k2
 		game.rooms.build(2, "L", false)
 		var ks: Array = game.rooms.lay.get("kinds", [])
-		if ks.has("open") and ks.has("tarp"):
+		if story != 1 or (ks.has("open") and ks.has("tarp")):
 			game.player.pos = game.rooms.start_pos()
 			await frames(40)
 			await shot("08_freight")

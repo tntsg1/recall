@@ -25,7 +25,8 @@ const EXIT_APART := 480.0                     # two ways on: this far apart, the
 const FROM_ENTRY := 700.0                     # a way on this far from the way in: the room is crossed
 
 # The chapters that walk room to room; the rest keep their one hand-made room.
-const ON := [1]
+const ON := [1, 2]
+const POST := 48.0
 
 # Per chapter: room shapes (weights), its pieces of cover (weight, rects,
 # kind), the landmarks one of which every room is built round, the hand-made
@@ -33,7 +34,7 @@ const ON := [1]
 # each remnant's prop needs along its wall and in front of it.
 const STYLE := {
 	1: {
-		"shapes": {"hall": 3, "corner": 3, "twin": 2, "neck": 2, "bays": 3},
+		"shapes": {"hall": 3, "corner": 3, "twin": 2, "neck": 1, "bays": 3},
 		"pieces": [
 			[3, [Rect2(0, 0, 88, 88)], "crate"],
 			[2, [Rect2(0, 0, 88, 88), Rect2(0, 88, 88, 88)], "crate"],          # two, stacked
@@ -66,7 +67,7 @@ const STYLE := {
 		# the Hall of Mirrors: a shareholders' registry. Registration pillars,
 		# benches for the queue, kiosks; the chapter's mirror panels laid with
 		# them, more of them room by room.
-		"shapes": {"hall": 3, "corner": 2, "twin": 3, "neck": 2},
+		"shapes": {"hall": 3, "corner": 2, "twin": 2, "neck": 1, "columns": 3},
 		"pieces": [
 			[3, [Rect2(0, 0, 80, 80)], "pillar"],
 			[3, [Rect2(0, 0, 200, 44)], "bench"],
@@ -85,9 +86,34 @@ const STYLE := {
 		"themes": [["bench"], ["kiosk"], ["pillar"], ["bench", "kiosk"]],
 		"props": {"terminal": [200.0, 170.0], "gate": [420.0, 160.0], "queue": [600.0, 140.0], "retire": [160.0, 150.0]},
 	},
+	3: {
+		# the weapons range: arms crates, sandbag walls, target stands; the
+		# chapter's own is its laser fences, strung between posts across open
+		# floor, one fence in the first room, three by the last
+		"shapes": {"hall": 3, "bays": 3, "twin": 2, "corner": 2, "neck": 1},
+		"pieces": [
+			[3, [Rect2(0, 0, 110, 64)], "arms"],
+			[2, [Rect2(0, 0, 110, 64), Rect2(0, 64, 110, 64)], "arms"],          # two, stacked
+			[3, [Rect2(0, 0, 170, 36)], "sandbag"],
+			[2, [Rect2(0, 0, 64, 30)], "stand"],                                # a target stand
+		],
+		"landmarks": [
+			[3, [Rect2(0, 0, 260, 50)], "firing"],                               # a firing bench
+			[2, [Rect2(0, 0, 180, 90)], "bunker"],                               # a concrete blind
+			[2, [Rect2(0, 0, 220, 56)], "rack"],                                 # a weapons rack
+		],
+		"fences": [1, 1, 2, 2, 3, 3],
+		# the hand-made range: four posts, four crate stacks
+		"count": 8, "area": 37400.0,
+		"themes": [["arms"], ["sandbag"], ["stand", "arms"]],
+		"props": {"log": [220.0, 180.0], "target": [200.0, 130.0], "crate": [0.0, 0.0], "safety": [170.0, 130.0]},
+		# a remnant read off a piece of cover, not a wall: the crate's stencil
+		"on_cover": {"crate": "arms"},
+	},
 }
 
 
+static var last_why := ""        # tests: where the last try gave up
 static var force_off := false     # tests: the hand-made rooms, to compare against
 
 
@@ -103,7 +129,7 @@ static func make(story: int, index: int, cseed: int, entry: String, exits: Array
 	var rng := RandomNumberGenerator.new()
 	for attempt in 150:
 		rng.seed = hash([cseed, story, index, entry, exits.size(), attempt])
-		var lay := _try(st, story, index, cseed, entry, exits, remnants, rng)
+		var lay := _try(st, story, index, cseed, entry, exits, remnants, rng, attempt >= 100)
 		if lay.is_empty():
 			continue
 		lay["attempt"] = attempt
@@ -112,7 +138,9 @@ static func make(story: int, index: int, cseed: int, entry: String, exits: Array
 	return {}
 
 
-static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: String, exits: Array, remnants: Array, rng: RandomNumberGenerator) -> Dictionary:
+# `spare`: late tries may leave out a remnant there is no wall for (Rooms
+# carries it on to the next room)
+static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: String, exits: Array, remnants: Array, rng: RandomNumberGenerator, spare := false) -> Dictionary:
 	var sparse := index == 0 and story == 1
 	var shape := "hall" if sparse else _weighted(st.shapes, rng)
 	var walls := _shape(shape, rng)
@@ -122,6 +150,7 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 	# the way in
 	var e := _door_on(entry, walls, [], rng, DOOR_W)
 	if e.is_empty():
+		last_why = "t1"
 		return {}
 	if index == 0 and st.has("entry_prop"):
 		e["w"] = float(st.props[st.entry_prop][0])
@@ -146,6 +175,9 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 					break
 				c["label"] = label_rect(c)
 				var ok := (c.pos as Vector2).distance_to(e.pos) >= FROM_ENTRY
+				for wr: Rect2 in walls:
+					if wr.grow(12.0).intersects(c.label):
+						ok = false
 				for o: Dictionary in lay.exits:
 					if (o.pos as Vector2).distance_to(c.pos) < EXIT_APART or (o.label as Rect2).grow(30.0).intersects(c.label):
 						ok = false
@@ -153,6 +185,7 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 					d = c
 					break
 		if d.is_empty():
+			last_why = "t2"
 			return {}
 		d["risky"] = spec.get("risky", false)
 		d["boss"] = spec.get("boss", false)
@@ -166,6 +199,7 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 				lay.gates.append(g)
 				taken.append(g)
 	if lay.gates.size() < 3:
+		last_why = "t3"
 		return {}
 	lay["start"] = (e.pos as Vector2) + (e.n as Vector2) * 110.0
 	# cover, piece by piece
@@ -178,8 +212,37 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 	var pid := 0
 	# the room is built round one landmark (the first room keeps to small things)
 	var mark: Array = _weighted_piece(st.landmarks, rng)
+	if st.has("fences"):
+		# the landmark first, then the fences round it
+		var rs0 := _turn(mark[1], rng)
+		var bb0 := _bounds(rs0)
+		var placed0 := false
+		for k in 80:
+			var at0 := Vector2(rng.randf_range(ROOM.position.x + GAP, ROOM.end.x - GAP - bb0.size.x), rng.randf_range(ROOM.position.y + GAP, ROOM.end.y - GAP - bb0.size.y))
+			var pl0: Array[Rect2] = []
+			for r: Rect2 in rs0:
+				pl0.append(Rect2(r.position + at0 - bb0.position, r.size))
+			if _fits(pl0, lay, taken):
+				for r in pl0:
+					lay.cover.append(r)
+					lay.piece.append(pid)
+					lay.kinds.append(mark[2])
+					area += r.get_area()
+				pid += 1
+				placed0 = true
+				break
+		if not placed0:
+			last_why = "landmark"
+			return {}
 	while sparse and (mark[1] as Array).size() != 1:
 		mark = _weighted_piece(st.landmarks, rng)   # the first room: the container, to leave it room for more pieces
+	lay["fences"] = []
+	if st.has("fences"):
+		var want_f: int = (st.fences as Array)[mini(index, (st.fences as Array).size() - 1)]
+		if not _fence_up(lay, taken, rng, want_f, pid):
+			last_why = "fences"
+			return {}
+		pid += want_f
 	var mech: Dictionary = st.get("mech", {})
 	var mech_left: int = (mech.count as Array)[mini(index, (mech.count as Array).size() - 1)] if not mech.is_empty() else 0
 	for tries in 500:
@@ -189,8 +252,10 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		var is_mech := pid > 0 and mech_left > 0
 		var piece: Array = mark if pid == 0 else (_weighted_piece(mech.pieces, rng) if is_mech else _weighted_piece(st.pieces, rng, lay.theme))
 		if tries > 120 and pid == 0:
+			last_why = "t4"
 			return {}
 		if tries > 300 and mech_left > 0:
+			last_why = "t5"
 			return {}
 		if lay.cover.size() + (piece[1] as Array).size() > hi_n:
 			continue
@@ -223,26 +288,80 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 			continue
 		var need: Array = st.props.get(id, [220.0, 140.0])
 		var spot: Array = []
-		if id == st.get("entry_prop", "") and index == 0:
+		var on_kind: String = st.get("on_cover", {}).get(id, "")
+		if on_kind != "":
+			# on the lid of a piece of that kind, read from above
+			for ci in (lay.cover as Array).size():
+				if lay.kinds[ci] == on_kind:
+					var cr: Rect2 = lay.cover[ci]
+					spot = [Vector2(cr.get_center().x, cr.position.y), Vector2(0, -1)]
+					break
+		elif id == st.get("entry_prop", "") and index == 0:
 			if NORMAL[entry] == w[2]:
 				spot = [e.pos, e.n]
 		else:
 			spot = _spot_for(w[2], need, lay, taken, rng)
+		if spot.is_empty() and spare:
+			continue
 		if spot.is_empty():
+			last_why = "t6"
 			return {}
 		lay.spots[id] = spot
 		taken.append({"pos": spot[0], "n": spot[1], "w": need[0]})
-	if sparse:
-		var halves := [0.0, 0.0]
-		for r: Rect2 in lay.cover:
-			halves[0 if r.get_center().x < 960.0 else 1] += r.get_area()
-		if halves[0] < 6000.0 or halves[1] < 6000.0:
-			return {}
+	# both halves of the room have something in them (the first room: a fair piece each)
+	var halves := [0.0, 0.0]
+	for r: Rect2 in lay.cover:
+		halves[0 if r.get_center().x < 960.0 else 1] += r.get_area()
+	var least: float = 6000.0 if sparse else 0.18 * (halves[0] + halves[1])
+	if halves[0] < least or halves[1] < least:
+		last_why = "t7"
+		return {}
 	if story == 2:
 		_paint_hall(lay, taken, rng)
+	elif story == 3:
+		_paint_range(lay, taken, rng)
 	else:
 		_paint(lay, taken, rng)
 	return lay
+
+
+# The range's floor: numbered firing lanes out from one wall, distance marks
+# down them, scorch where things burned, holes round what was shot at.
+static func _paint_range(lay: Dictionary, taken: Array, rng: RandomNumberGenerator) -> void:
+	lay["quiet"] = _quiet(lay)
+	var solid: Array = lay.walls + lay.cover
+	lay["lanes3"] = []
+	for tries in 16:
+		var side: String = ["T", "L", "R"][rng.randi() % 3]
+		if side == lay.entry.side:
+			continue
+		var horiz := side == "T"
+		var n := rng.randi_range(3, 5)
+		var lw := rng.randf_range(150.0, 200.0)
+		var deep := rng.randf_range(260.0, 360.0)
+		var u0 := rng.randf_range((ROOM.position.x if horiz else ROOM.position.y) + 120.0, (ROOM.end.x if horiz else ROOM.end.y) - 120.0 - lw * n)
+		var base: float = {"T": ROOM.position.y, "L": ROOM.position.x, "R": ROOM.end.x - deep}[side]
+		var all := Rect2(u0, base, lw * n, deep) if horiz else Rect2(base, u0, deep, lw * n)
+		var ok := not all.intersects(HUD_STRIP) and not all.intersects(BANNER)
+		for d: Dictionary in taken:
+			if all.grow(40.0).has_point(d.pos):
+				ok = false
+		for r: Rect2 in lay.walls:
+			if r.intersects(all):
+				ok = false
+		if ok:
+			lay.lanes3 = [side, all, n]
+			break
+	var scorch: Array = []
+	for k in rng.randi_range(3, 5):
+		scorch.append([Vector2(rng.randf_range(ROOM.position.x + 100.0, ROOM.end.x - 100.0), rng.randf_range(ROOM.position.y + 100.0, ROOM.end.y - 100.0)), rng.randf_range(20.0, 36.0)])
+	lay["scorch"] = scorch
+	# holes cluster round what stood to be shot at
+	var holes: Array = []
+	for ci in (lay.cover as Array).size():
+		if rng.randf() < 0.5:
+			holes.append([(lay.cover[ci] as Rect2).get_center(), 50.0 + (lay.cover[ci] as Rect2).size.length() * 0.3, rng.randi_range(5, 10)])
+	lay["holes"] = holes
 
 
 # The registry hall's floor: tile seams, queue lanes (pairs of lines with
@@ -257,12 +376,19 @@ static func _paint_hall(lay: Dictionary, taken: Array, rng: RandomNumberGenerato
 		lanes.append([horiz, c])
 	lay["lanes"] = lanes
 	var solid: Array = lay.walls + lay.cover
+	# the seal keeps off the lanes and the waiting area's rope: one thing to a patch of floor
+	var keep_off: Array = []
+	for ln: Array in lanes:
+		keep_off.append(Rect2(ROOM.position.x, ln[1] - 100.0, ROOM.size.x, 200.0) if ln[0] else Rect2(ln[1] - 100.0, ROOM.position.y, 200.0, ROOM.size.y))
+	if lay.spots.has("queue"):
+		var q: Vector2 = lay.spots.queue[0]
+		keep_off.append(Rect2(q - Vector2(320, 180), Vector2(640, 200)))
 	lay["stencil"] = []
-	for tries in 30:
-		var at := Vector2(rng.randf_range(ROOM.position.x + 200.0, ROOM.end.x - 200.0), rng.randf_range(ROOM.position.y + 200.0, ROOM.end.y - 200.0))
-		var box := Rect2(at - Vector2(160, 160), Vector2(320, 320))
+	for tries in 40:
+		var at := Vector2(rng.randf_range(ROOM.position.x + 200.0, ROOM.end.x - 200.0), rng.randf_range(ROOM.position.y + 200.0, ROOM.end.y - 280.0))
+		var box := Rect2(at - Vector2(160, 160), Vector2(320, 380))
 		var ok := ROOM.encloses(box) and not box.intersects(BANNER)
-		for r: Rect2 in solid + lay.quiet:
+		for r: Rect2 in solid + lay.quiet + keep_off:
 			if r.intersects(box):
 				ok = false
 		for d: Dictionary in taken:
@@ -447,6 +573,17 @@ static func _shape(shape: String, rng: RandomNumberGenerator) -> Array[Rect2]:
 					var at := rng.randf_range(lr.position.x + 260.0, lr.end.x - 260.0 - g2)
 					out[li] = Rect2(lr.position.x, lr.position.y, at - lr.position.x, lr.size.y)
 					out.append(Rect2(at + g2, lr.position.y, lr.end.x - at - g2, lr.size.y))
+		"columns":
+			# a row of great columns down the hall, standing free
+			var n := rng.randi_range(2, 4)
+			var size := rng.randf_range(100.0, 150.0)
+			var horiz := rng.randf() < 0.65
+			var c := rng.randf_range(380.0, 700.0) if horiz else rng.randf_range(500.0, 1420.0)
+			var span := (x1 - x0 - 500.0) / maxf(1.0, n - 1) if horiz else (y1 - y0 - 340.0) / maxf(1.0, n - 1)
+			for k in n:
+				var u := (x0 + 250.0 + span * k) if horiz else (y0 + 170.0 + span * k)
+				u += rng.randf_range(-40.0, 40.0)
+				out.append(Rect2(u - size / 2.0, c - size / 2.0, size, size) if horiz else Rect2(c - size / 2.0, u - size / 2.0, size, size))
 		"bays":
 			# loading bays: short walls out from one long wall
 			var top := rng.randf() < 0.5
@@ -490,10 +627,11 @@ static func _door_on(side: String, walls: Array, taken: Array, rng: RandomNumber
 					ok = false
 		for d: Dictionary in taken:
 			var dn: Vector2 = d.n
-			var keep := w / 2.0 + float(d.get("w", DOOR_W)) / 2.0 + 120.0
+			var mixed: bool = (w < DOOR_W) != (float(d.get("w", DOOR_W)) < DOOR_W)
+			var keep := w / 2.0 + float(d.get("w", DOOR_W)) / 2.0 + (300.0 if mixed else 120.0)
 			if dn == n and (d.pos as Vector2).distance_to(p) < keep:
 				ok = false
-			elif (d.pos as Vector2).distance_to(p) < 260.0:
+			elif (d.pos as Vector2).distance_to(p) < (380.0 if mixed else 260.0):
 				ok = false     # round a corner, still too close
 		if ok:
 			return {"side": side, "pos": p, "n": n, "w": w}
@@ -516,6 +654,10 @@ static func _fits(placed: Array[Rect2], lay: Dictionary, taken: Array) -> bool:
 	for d: Dictionary in lay.exits:
 		if _bounds(placed).intersects((d.label as Rect2).grow(20.0)):
 			return false
+	for f: Array in lay.get("fences", []):
+		for r in placed:
+			if _seg_hits(f[0], f[1], r.grow(34.0)):
+				return false
 	for r in placed:
 		if not inside.encloses(r):
 			return false
@@ -569,7 +711,7 @@ static func _spot_for(n: Vector2, need: Array, lay: Dictionary, taken: Array, rn
 		# the floor in front of it: open, and not inside another wall block
 		var front := Rect2(p - tan * half, Vector2.ZERO).expand(p + tan * half + n * deep)
 		front = front.abs()
-		var ok := ROOM.grow(1.0).encloses(front) and not front.intersects(HUD_STRIP) and not front.grow(40.0).intersects(HUD_LORE)
+		var ok := ROOM.grow(1.0).encloses(front) and not front.intersects(HUD_STRIP) and not front.intersects(HUD_LORE)
 		for d: Dictionary in lay.exits:
 			if front.grow(30.0).intersects(d.label):
 				ok = false
@@ -577,7 +719,7 @@ static func _spot_for(n: Vector2, need: Array, lay: Dictionary, taken: Array, rn
 			if r.intersects(front.grow(-1.0)):
 				ok = false
 		for d: Dictionary in taken:
-			if (d.pos as Vector2).distance_to(p) < half + float(d.get("w", DOOR_W)) / 2.0 + 60.0:
+			if (d.pos as Vector2).distance_to(p) < half + float(d.get("w", DOOR_W)) / 2.0 + 30.0:
 				ok = false
 		if ok:
 			return [p, n]
@@ -755,6 +897,56 @@ static func occupancy(lay: Dictionary, walls := true) -> PackedByteArray:
 			for i in range(i0, i1 + 1):
 				g[j * nx + i] = 1
 	return g
+
+
+# Laser fences: `n` pairs of posts, each pair's beam across open floor (clear of
+# every solid but its own posts, of doors, gates and where you start), the
+# two groups taking turns (Lasers). Posts join the cover; beams go in lay.fences.
+static func _fence_up(lay: Dictionary, taken: Array, rng: RandomNumberGenerator, n: int, pid: int) -> bool:
+	for k in n:
+		var done := false
+		for tries in 60:
+			var horiz := rng.randf() < 0.65
+			var len := rng.randf_range(380.0, 760.0)
+			var a := Vector2(rng.randf_range(ROOM.position.x + 140.0, ROOM.end.x - 140.0 - (len if horiz else 0.0)), rng.randf_range(ROOM.position.y + 140.0, ROOM.end.y - 140.0 - (0.0 if horiz else len)))
+			var b := a + (Vector2(len, 0) if horiz else Vector2(0, len))
+			var posts: Array[Rect2] = [Rect2(a - Vector2(POST, POST) / 2.0, Vector2(POST, POST)), Rect2(b - Vector2(POST, POST) / 2.0, Vector2(POST, POST))]
+			if not _fits(posts, lay, taken):
+				continue
+			var ok := true
+			for r: Rect2 in lay.walls + lay.cover:
+				if _seg_hits(a, b, r.grow(30.0)):
+					ok = false
+			for d: Dictionary in taken:
+				if Geometry2D.get_closest_point_to_segment(d.pos, a, b).distance_to(d.pos) < 170.0:
+					ok = false
+			if Geometry2D.get_closest_point_to_segment(lay.start, a, b).distance_to(lay.start) < 220.0:
+				ok = false
+			for f: Array in lay.fences:
+				if (f[0] as Vector2).distance_to(a) < 160.0 or Geometry2D.segment_intersects_segment(a, b, f[0], f[1]) != null:
+					ok = false
+			if not ok:
+				continue
+			for r in posts:
+				lay.cover.append(r)
+				lay.piece.append(pid + k)
+				lay.kinds.append("post")
+			lay.fences.append([a, b, k % 2])
+			done = true
+			break
+		if not done:
+			return false
+	return true
+
+
+static func _seg_hits(a: Vector2, b: Vector2, r: Rect2) -> bool:
+	if r.has_point(a) or r.has_point(b):
+		return true
+	var c := [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]
+	for k in 4:
+		if Geometry2D.segment_intersects_segment(a, b, c[k], c[(k + 1) % 4]) != null:
+			return true
+	return false
 
 
 # ---------------------------------------------------------------- helpers
