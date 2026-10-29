@@ -959,8 +959,8 @@ func _draw_lightboards(dim: float) -> void:
 			if w[0] == "slogan":
 				full = (w[4] if Txt.zh else w[5]).split(" · ")[1]
 		var n := int(ceil(full.length() * clampf(wake * 1.6, 0.0, 1.0)))
-		var fw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-		draw_string(sf, Vector2(r.get_center().x - fw / 2.0, r.position.y + 60.0), full.substr(0, n), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.9 * wake * dim, 1.3))
+		var fw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+		draw_string(sf, Vector2(r.get_center().x - fw / 2.0, r.position.y + 62.0), full.substr(0, n), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.red(0.9 * wake * dim, 1.4))
 	var fr := Rect2(1450, 80, 290, 46)
 	draw_rect(fr, Color(0.03, 0.03, 0.035))
 	draw_rect(fr, Pal.ink(0.45 * dim), false, 1.5)

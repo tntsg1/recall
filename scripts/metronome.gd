@@ -344,6 +344,7 @@ func _draw() -> void:
 		var e := Pal.ease_out(r[1] / 0.9)
 		# a shock ring strikes: red leading edge over a dark band
 		draw_arc(r[0], e * 300.0 - 8.0, 0.0, TAU, 96, Color(0, 0, 0, 0.35 * (1.0 - e)), 12.0, false)
+		draw_arc(r[0], e * 300.0 - 18.0, 0.0, TAU, 96, Pal.red(0.08 * (1.0 - e) * dim, 1.0), 14.0, false)
 		draw_arc(r[0], e * 300.0, 0.0, TAU, 96, Pal.red((1.0 - e) * dim, 2.2), 3.0, false)
 	# its face: the shell smiles, upright, whatever the arm does
 	if state != DYING:
@@ -366,7 +367,7 @@ func _smile(c: Vector2, r: float, dim: float) -> void:
 # The national happiness index, over the pivot: it only goes up.
 func _draw_index(dim: float) -> void:
 	var font := Fonts.get_font("SemiBold")
-	var r := Rect2(Vector2(1255, 98), Vector2(190, 56))
+	var r := Rect2(Vector2(1250, 98), Vector2(186, 56))
 	draw_rect(r, Color(0.02, 0.025, 0.03))
 	draw_rect(r, Pal.foe(0.55 * dim), false, 1.5)
 	var fast := phase >= 2 and state == RUN
@@ -378,4 +379,4 @@ func _draw_index(dim: float) -> void:
 	draw_string(font, r.position + Vector2(10, 48), val, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, vc)
 	var bpm_t := "%d BPM" % int(round(game.sfx.bpm() * game.sfx.tempo))
 	var bw := font.get_string_size(bpm_t, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
-	draw_string(font, Vector2(r.end.x - bw - 10.0, r.position.y + 46.0), bpm_t, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.red(dim, 2.0) if fast else Pal.foe(0.6 * dim))
+	draw_string(font, Vector2(r.end.x - bw - 14.0, r.position.y + 46.0), bpm_t, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.red(dim, 2.0) if fast else Pal.foe(0.6 * dim))
