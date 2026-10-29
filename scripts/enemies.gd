@@ -1032,7 +1032,8 @@ func _draw_fixes(dim: float) -> void:
 		var b = fx_[0]
 		var k: float = fx_[3]
 		var a := 1.0 - clampf((k - FIX_SHOW + 0.5) / 0.5, 0.0, 1.0)
-		var from: Vector2 = fx_[1]
+		# drawn from inside the room: the arc starts at the struck-out spot
+		var from: Vector2 = (fx_[1] as Vector2).clamp(Arena.ROOM.position + Vector2(24, 24), Arena.ROOM.end - Vector2(24, 24))
 		var to: Vector2 = fx_[2]
 		var ctrl: Vector2 = fx_[4]
 		var run := clampf(k / FIX_SLIDE, 0.0, 1.0)
@@ -1055,7 +1056,7 @@ func _draw_fixes(dim: float) -> void:
 			draw_line(head - tan * 4.0, head - tan * 18.0 + tan.orthogonal() * 8.0, Pal.red(0.85 * a * dim, 1.8), 2.5)
 			draw_line(head - tan * 4.0, head - tan * 18.0 - tan.orthogonal() * 8.0, Pal.red(0.85 * a * dim, 1.8), 2.5)
 		# the old spot, struck through, a little in from the wall it was in
-		var xo := from + (Arena.ROOM.get_center() - from).normalized() * 30.0
+		var xo := from
 		draw_line(xo + Vector2(-8, -8), xo + Vector2(8, 8), Pal.red(0.7 * a * dim, 1.6), 2.5)
 		draw_line(xo + Vector2(-8, 8), xo + Vector2(8, -8), Pal.red(0.7 * a * dim, 1.6), 2.5)
 		if k >= FIX_SLIDE * 0.5:
@@ -1072,7 +1073,7 @@ func _draw_fixes(dim: float) -> void:
 			draw_string(font, at, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.red(0.95 * a * dim, 1.8))
 	for b in game.bullets.list:
 		if b.corrected and b.state == Bullets.EMBED:
-			var p: Vector2 = b.pos + Vector2(12, -12)
+			var p: Vector2 = b.pos + (Arena.ROOM.get_center() - b.pos).normalized() * 24.0
 			draw_polyline(PackedVector2Array([p + Vector2(-7, 0), p + Vector2(-2, 5), p + Vector2(8, -7)]), Pal.red(0.9 * dim, 1.6), 2.5)
 
 

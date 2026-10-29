@@ -31,7 +31,7 @@ const KEEP := Rect2(610, 120, 700, 440)    # the cabinet and its drawers: no bar
 # the index terminal and the viewport by it: bars stop short of them
 const CLEAR := [Rect2(70, 196, 190, 208), Rect2(398, 178, 144, 144)]
 const PAGE := Rect2(1218, 162, 452, 296)
-const RAIL_Y := 136.0                      # the gantry its pens and stamp hang from
+const RAIL_Y := 146.0                      # the gantry its pens and stamp hang from
 const REVEAL := 5.0                        # after it falls: R-0's page, restored, held centre stage
 const FILE_N := 6                          # R-0's page: a heading and five lines
 const LINE_EVERY := 3.4
@@ -669,6 +669,10 @@ func _draw() -> void:
 		_draw_stamp(st, dim)
 	_draw_gantry(dim, appear)
 	_draw_cabinet(dim, appear)
+	if file_t >= 0.0 and dead_t < 0.0:
+		# the page's heading stays legible over whatever bar crosses it
+		var hf := Fonts.get_font("SemiBold")
+		draw_string(hf, PAGE.position + Vector2(18.0, 34.0), Txt.t("arc_file_0"), HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Pal.ink(0.6 * dim, 1.3))
 
 
 # The cabinet from above: a card catalogue, rows of little drawers with label
@@ -817,7 +821,7 @@ func _draw_bar(br: Dictionary, dim: float) -> void:
 	var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var span := r.size.x if horiz else r.size.y
 	var s := 60.0
-	while s + lw < span - 20.0:
+	while s + lw < span - 20.0 and left > 0.4:
 		if horiz:
 			draw_string(font, Vector2(r.position.x + s, r.get_center().y + fs * 0.36), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.32 * dim * fade))
 		else:
@@ -928,7 +932,7 @@ func _draw_carriage(x: float, dim: float) -> void:
 # nib, the nib red where it touches the floor.
 func _draw_pen(tip: Vector2, horiz: bool, dim: float) -> void:
 	_draw_carriage(tip.x, dim)
-	draw_line(Vector2(tip.x, RAIL_Y + 10.0), tip + Vector2(0, -18.0), Pal.foe(0.4 * dim), 2.0)
+	draw_line(Vector2(tip.x, RAIL_Y + 10.0), tip + Vector2(0, -18.0), Pal.foe(0.22 * dim), 1.5)
 	var d := Vector2(0, 1)
 	var n := d.orthogonal()
 	var nib := PackedVector2Array([tip, tip - d * 18.0 + n * 7.0, tip - d * 26.0 + n * 7.0, tip - d * 26.0 - n * 7.0, tip - d * 18.0 - n * 7.0, tip])
@@ -949,7 +953,7 @@ func _draw_stamp_arm(st: Dictionary, dim: float) -> void:
 	var drop := Pal.ease_in(clampf((k - 0.8) / 0.2, 0.0, 1.0)) if st.t <= STAMP_WARN else 1.0 - lift
 	var hc := c + Vector2(0, -(STAMP_R + 40.0) * (1.0 - drop))
 	var head := Rect2(hc - Vector2(30, 22), Vector2(60, 44))
-	draw_line(Vector2(c.x, RAIL_Y + 10.0), Vector2(c.x, head.position.y), Pal.foe(0.45 * dim), 3.0)
+	draw_line(Vector2(c.x, RAIL_Y + 10.0), Vector2(c.x, head.position.y), Pal.foe(0.25 * dim), 2.0)
 	draw_rect(head, Color(0.05, 0.05, 0.055, 0.9))
 	draw_rect(head, Pal.foe(0.85 * dim, 1.3), false, 2.0)
 	draw_line(head.position + Vector2(8, head.size.y * 0.5), head.end - Vector2(8, head.size.y * 0.5), Pal.foe(0.5 * dim), 1.5)
