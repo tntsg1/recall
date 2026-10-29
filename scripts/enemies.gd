@@ -16,7 +16,7 @@ const SPEC := {
 	LEECH: {"hp": 45.0, "r": 16.0, "sides": 5, "speed": 125.0},
 	PULSE: {"hp": 70.0, "r": 19.0, "sides": 6, "speed": 0.0},
 	ECHO: {"hp": 40.0, "r": 13.0, "sides": 8, "speed": 0.0},
-	INSPECTOR: {"hp": 55.0, "r": 17.0, "sides": 4, "speed": 110.0},
+	INSPECTOR: {"hp": 55.0, "r": 23.0, "sides": 4, "speed": 110.0},
 }
 const WARN_TIME := 0.55
 const SPAWN_TIME := 0.6
@@ -858,10 +858,13 @@ func _draw() -> void:
 				draw_line(e.pos, e.pos + Vector2.from_angle(a3) * e.r * 0.8, Pal.foe((0.35 + 0.6 * e.shield_flash) * dim, 1.0 + e.shield_flash), 1.0)
 		if e.kind == INSPECTOR:
 			# its badge: a bulb crossed out, and the reach of its hand
-			var bp: Vector2 = e.pos
-			draw_circle(bp, 5.0, Color(0.03, 0.03, 0.035))
-			draw_arc(bp, 5.0, 0.0, TAU, 12, Pal.foe(0.8 * dim, 1.4), 1.5)
-			draw_line(bp + Vector2(-7, -7), bp + Vector2(7, 7), Pal.foe(0.9 * dim, 1.6), 1.5)
+			var bp: Vector2 = e.pos + Vector2(0, -3)
+			draw_circle(bp, 7.5, Color(0.03, 0.03, 0.035))
+			draw_arc(bp, 7.5, PI * 0.75, PI * 2.25, 14, Pal.foe(0.85 * dim, 1.4), 1.5)
+			# the filament and the screw base
+			draw_polyline(PackedVector2Array([bp + Vector2(-3, 2), bp + Vector2(-1.5, -2), bp + Vector2(0, 1), bp + Vector2(1.5, -2), bp + Vector2(3, 2)]), Pal.foe(0.8 * dim, 1.3), 1.2)
+			draw_rect(Rect2(bp + Vector2(-4, 6), Vector2(8, 5)), Pal.foe(0.7 * dim), false, 1.2)
+			draw_line(bp + Vector2(-10, -10), bp + Vector2(10, 12), Pal.red(0.85 * dim, 1.4), 2.0)
 			draw_arc(e.pos, DIM_R, 0.0, TAU, 32, Pal.foe(0.12 * dim), 1.0)
 		if e.kind == CHARGER and e.mode == STUN:
 			for k in 3:

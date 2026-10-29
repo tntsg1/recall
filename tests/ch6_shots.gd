@@ -50,22 +50,26 @@ func _run() -> void:
 	var anchor = game.enemies.spawn(Enemies.GUARD, Arena.ROOM.position + Vector2(1600, 60))
 	anchor.state = Enemies.ALIVE
 	anchor.hp = 1e9
-	# a fan of rounds into the left wall: they arc to each other
-	game.player.pos = Vector2(760, 640)
-	for k in 9:
-		game.bullets.fire(game.player.pos, Vector2.from_angle(PI + (k - 4) * 0.09))
-	for k in 6:
-		game.bullets.fire(game.player.pos, Vector2.from_angle(PI * 0.5 + (k - 2.5) * 0.08))
-	await frames(40)
-	var c = game.enemies.spawn(Enemies.CHASER, Vector2(200, 640))
+	# rounds laid into both faces of the gate between the two low housings:
+	# the arcs close it, and a chaser runs into it
+	game.player.pos = Vector2(960, 640)
+	for k in 4:
+		game.bullets.fire(Vector2(960, 760 + k * 18), Vector2.LEFT)
+		game.bullets.fire(Vector2(960, 768 + k * 18), Vector2.RIGHT)
+		await frames(3)
+	await frames(30)
+	game.player.pos = Vector2(960, 560)
+	var c = game.enemies.spawn(Enemies.CHASER, Vector2(960, 960))
 	c.state = Enemies.ALIVE
+	c.hp = 1e9
 	await frames(8)
 	await shot("2_arcs")
 	# an inspector walks to the rounds and puts them out
-	var ins = game.enemies.spawn(Enemies.INSPECTOR, Vector2(400, 900))
+	c.state = Enemies.DEAD
+	var ins = game.enemies.spawn(Enemies.INSPECTOR, Vector2(700, 960))
 	ins.state = Enemies.ALIVE
 	ins.hp = 1e9
-	await frames(150)
+	await frames(100)
 	await shot("3_inspector")
 	ins.hp = 1.0
 	game.enemies.blast_hit(ins, Vector2.UP, 50.0)
@@ -89,6 +93,7 @@ func _run() -> void:
 	for k in 3:
 		bs.cable_hp[k] = 0.0
 	bs._hurt_cable(0, 0.0, bs.pos)
-	await frames(40)
+	while bs.rings.is_empty() or bs.rings[0][0] < 0.35:
+		await process_frame
 	await shot("8_open")
 	quit()

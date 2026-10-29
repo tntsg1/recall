@@ -13,13 +13,13 @@ enum { OFF, ENTER, RUN, DYING, DEAD }
 enum { IDLE, WARN, FIRE }
 
 const HP := 1400.0
-const HOME := Vector2(960, 470)
-const HALF := 82.0                    # the housing's half-size
+const HOME := Vector2(960, 440)
+const HALF := 118.0                   # the housing's half-size
 const CABLE_HP := 170.0
-const CABINETS := [Vector2(80, 420), Vector2(1840, 420), Vector2(1300, 1010)]
+const CABINETS := [Vector2(80, 420), Vector2(1840, 420), Vector2(1500, 1010)]
 const CABLE_KEYS := ["grid_central", "grid_industry", "grid_13th"]
 const CABLE_SHARE := ["100%", "80%", "0.5%"]
-const ZONES := [Rect2(80, 70, 587, 470), Rect2(1253, 70, 587, 470), Rect2(80, 540, 587, 470), Rect2(667, 540, 586, 470), Rect2(1253, 540, 587, 470)]
+const ZONES := [Rect2(80, 70, 587, 470), Rect2(1253, 70, 587, 470), Rect2(80, 600, 587, 410), Rect2(667, 600, 586, 410), Rect2(1253, 600, 587, 410)]
 const ZONE_EVERY := [4.2, 3.4, 2.8]
 const WARN_TIME := 1.15
 const FIRE_TIME := 0.4
@@ -462,14 +462,23 @@ func _draw() -> void:
 	var fins := PackedVector2Array()
 	for j in 9:
 		var y := r.position.y + 14.0 + j * (r.size.y - 28.0) / 8.0
-		fins.append(Vector2(r.position.x - 12.0 * appear, y))
+		fins.append(Vector2(r.position.x - 22.0 * appear, y))
 		fins.append(Vector2(r.position.x, y))
 		fins.append(Vector2(r.end.x, y))
-		fins.append(Vector2(r.end.x + 12.0 * appear, y))
+		fins.append(Vector2(r.end.x + 22.0 * appear, y))
 	draw_multiline(fins, Pal.foe(0.5 * dim), 2.0)
 	var open := not shielded()
 	var cr := HALF * 0.55 * appear
 	draw_circle(pos, cr, Color(0.03, 0.035, 0.04))
+	for ring in 3:
+		draw_arc(pos, cr * (1.0 - ring * 0.12), 0.0, TAU, 48, Pal.foe((0.35 - ring * 0.08) * dim), 1.5)
+	# bushings at the corners and bolts along the lid
+	for cx: float in [-1.0, 1.0]:
+		for cy: float in [-1.0, 1.0]:
+			var bc := pos + Vector2(cx, cy) * (HALF - 20.0) * appear
+			draw_circle(bc, 9.0, Color(0.06, 0.06, 0.07))
+			draw_arc(bc, 9.0, 0.0, TAU, 14, Pal.foe(0.5 * dim), 1.5)
+			draw_arc(bc, 4.0, 0.0, TAU, 10, Pal.foe(0.4 * dim), 1.0)
 	var coil := PackedVector2Array()
 	for j in 14:
 		var a := TAU * j / 14.0 + t * (2.0 if open else 0.6)
@@ -483,15 +492,16 @@ func _draw() -> void:
 		draw_rect(sh, Pal.foe((0.45 + 0.2 * sin(t * 9.0)) * dim, 1.8), false, 2.0)
 	# the screen on its top face: whom it serves first
 	var font := Fonts.get_font("SemiBold")
-	var sr := Rect2(r.position.x - 40.0, r.position.y - 66.0, r.size.x + 80.0, 46.0)
+	var sr := Rect2(r.position.x - 20.0, r.position.y - 70.0, r.size.x + 40.0, 54.0)
 	draw_rect(sr, Color(0.02, 0.025, 0.03, appear))
 	draw_rect(sr, Pal.foe(0.5 * dim * appear), false, 1.5)
 	var head := Txt.t("grid_screen")
-	var hw := font.get_string_size(head, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-	draw_string(font, Vector2(sr.get_center().x - hw / 2.0, sr.position.y + 20.0), head, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.foe(0.9 * dim * appear, 1.4))
+	var hw := font.get_string_size(head, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+	draw_string(font, Vector2(sr.get_center().x - hw / 2.0, sr.position.y + 21.0), head, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.foe(0.9 * dim * appear, 1.4))
 	var sub := Txt.t("grid_open") if open else Txt.t("grid_shield")
-	var sw := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-	draw_string(font, Vector2(sr.get_center().x - sw / 2.0, sr.position.y + 38.0), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, (Pal.red(dim, 1.8) if open else Pal.foe(0.6 * dim)))
+	var sw := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 19).x
+	var blink := 1.0 if not open or fmod(t * 3.0, 1.0) < 0.7 else 0.55
+	draw_string(font, Vector2(sr.get_center().x - sw / 2.0, sr.position.y + 45.0), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 19, (Pal.red(blink * dim, 2.0) if open else Pal.foe(0.6 * dim)))
 	for b in bolts:
 		var k2: float = 1.0 - b[2] / 0.25
 		_bolt(b[0], b[1], k2, dim)
@@ -521,9 +531,9 @@ func _draw_cable(k: int, dim: float) -> void:
 	draw_line(a, b, Color(0.08, 0.08, 0.09), 11.0)
 	draw_line(a, b, Pal.ink(0.35 * dim), 1.5)
 	if lk > 0.0:
-		var c := Pal.foe(dim, 1.4 + 1.6 * cable_flash[k])
-		draw_line(a, energ, Pal.foe(0.12 * dim, 1.4), 12.0)
-		draw_line(a, energ, c, 2.5)
+		var c := Pal.foe(0.75 * dim, 1.1 + 1.6 * cable_flash[k])
+		draw_line(a, energ, Pal.foe(0.05 * dim, 1.2), 10.0)
+		draw_line(a, energ, c, 2.0)
 		# pulses run from the cabinet into the transformer
 		var span := a.distance_to(energ)
 		var pl := PackedVector2Array()
@@ -534,13 +544,13 @@ func _draw_cable(k: int, dim: float) -> void:
 			pl.append(q - d * 16.0)
 			s += 70.0
 		if pl.size() > 0:
-			draw_multiline(pl, Pal.foe(0.9 * dim, 2.6), 4.0)
-	# its health as a strip of segments along it, near the transformer
-	var segs := 6
-	var left := int(ceil(cable_hp[k] / CABLE_HP * segs))
-	for j in segs:
-		var q0 := a + d * (30.0 + j * 14.0) + n * 16.0
-		draw_line(q0, q0 + d * 9.0, Pal.foe((0.9 if j < left else 0.15) * dim, 1.4), 4.0)
+			draw_multiline(pl, Pal.foe(0.6 * dim, 2.0), 3.0)
+	# its health: a thin bar along its side, the length of the cable's first stretch
+	var span2 := minf(220.0, a.distance_to(b) * 0.45)
+	var hk: float = clampf(cable_hp[k] / CABLE_HP, 0.0, 1.0)
+	var sd := n * (22.0 if n.y <= 0.0 else -22.0)
+	draw_line(a + d * 20.0 + sd, a + d * (20.0 + span2) + sd, Pal.foe(0.18 * dim), 3.0)
+	draw_line(a + d * 20.0 + sd, a + d * (20.0 + span2 * hk) + sd, Pal.foe(0.55 * dim, 1.2), 3.0)
 
 
 func _draw_zones(dim: float) -> void:
@@ -561,8 +571,10 @@ func _draw_zones(dim: float) -> void:
 				x += 34.0
 			draw_multiline(hatch, Pal.red(0.35 * k * dim, 1.4), 2.0)
 			var lab := Txt.t("grid_zone")
-			var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
-			draw_string(font, Vector2(r.get_center().x - lw / 2.0, r.position.y + 34.0), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.red((0.5 + 0.5 * k) * dim, 1.8))
+			var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
+			var lr := Rect2(Vector2(r.get_center().x - lw / 2.0 - 12.0, r.end.y - 80.0), Vector2(lw + 24.0, 38.0))
+			draw_rect(lr, Color(0.05, 0.0, 0.0, 0.85))
+			draw_string(font, Vector2(lr.position.x + 12.0, lr.position.y + 29.0), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Pal.red((0.6 + 0.4 * k) * dim, 2.0))
 		else:
 			var k2 := 1.0 - mode_t / FIRE_TIME
 			draw_rect(r.grow(-6.0), Pal.foe(0.025 * k2, 1.4))

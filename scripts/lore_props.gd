@@ -880,6 +880,8 @@ func _draw_floor_cables(dim: float) -> void:
 	var grid_on: bool = game.boss is GridMaster and game.boss.alive()
 	if grid_on:
 		return
+	if game.hud.intro_t >= 0.0:
+		dim *= clampf((game.hud.intro_t - 2.2) / 0.6, 0.2, 1.0)
 	for k in 3:
 		var to: Vector2 = GridMaster.CABINETS[k]
 		var n := Vector2(1, 0) if to.x < 100.0 else (Vector2(-1, 0) if to.x > 1800.0 else Vector2(0, -1))
@@ -924,7 +926,7 @@ func _draw_cabinets(dim: float) -> void:
 		# its label, out on the floor in front of it
 		var lab: String = Txt.t(GridMaster.CABLE_KEYS[k]) + " · " + GridMaster.CABLE_SHARE[k]
 		var lw := sf.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-		var lp := c + n * 30.0 + side * 92.0 if n.y == 0.0 else c + n * 40.0 + side * 120.0
+		var lp: Vector2 = [Vector2(150, 356), Vector2(1772, 356), Vector2(1378, 994)][k]
 		var poor := k == 2
 		draw_string(sf, Vector2(lp.x - lw / 2.0, lp.y + 5.0), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink((0.95 if poor else 0.6) * dim, 1.3 if poor else 1.0))
 
@@ -1273,6 +1275,8 @@ func _draw_memory() -> void:
 	var txt := memory.substr(0, n)
 	var tw := font.get_string_size(memory, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var p: Vector2 = anchor + Vector2(-tw / 2.0, 92.0)
+	if p.y > Arena.ROOM.end.y - 24.0:
+		p.y = anchor.y - 74.0
 	p.x = clampf(p.x, Arena.ROOM.position.x + 10.0, Arena.ROOM.end.x - tw - 10.0)
 	# keep the plate off cover and floor rails: step it away, one way only
 	var away := 40.0 if p.y < Arena.ROOM.get_center().y else -40.0

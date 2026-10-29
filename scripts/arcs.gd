@@ -116,20 +116,28 @@ func _draw() -> void:
 	for b in game.bullets.list:
 		if b.dark_by != 0 and b.state == Bullets.EMBED:
 			var c: Vector2 = b.pos
-			draw_circle(c, 9.0, Color(0.02, 0.02, 0.025))
-			draw_arc(c, 9.0, 0.0, TAU, 14, Pal.foe(0.6 * dim), 1.5)
-			marks.append_array(PackedVector2Array([c + Vector2(-5, -5), c + Vector2(5, 5), c + Vector2(5, -5), c + Vector2(-5, 5)]))
+			draw_circle(c, 13.0, Color(0.03, 0.03, 0.035))
+			draw_arc(c, 13.0, 0.0, TAU, 18, Pal.foe(0.7 * dim, 1.2), 2.0)
+			marks.append_array(PackedVector2Array([c + Vector2(-7, -7), c + Vector2(7, 7), c + Vector2(7, -7), c + Vector2(-7, 7)]))
 	if marks.size() > 0:
-		draw_multiline(marks, Pal.foe(0.8 * dim, 1.2), 1.5)
+		draw_multiline(marks, Pal.foe(0.95 * dim, 1.4), 3.0)
 	if arcs.is_empty():
 		return
 	var glow := PackedVector2Array()
 	var core := PackedVector2Array()
+	var wglow := PackedVector2Array()
+	var wcore := PackedVector2Array()
+	var room := Arena.ROOM.grow(-8.0)
 	var k := 0
 	for a in arcs:
 		k += 1
 		var p0: Vector2 = a[0]
 		var p1: Vector2 = a[1]
+		# along a wall: both ends on the same edge
+		var on_wall := (p0.x < room.position.x and p1.x < room.position.x) or (p0.x > room.end.x and p1.x > room.end.x) \
+			or (p0.y < room.position.y and p1.y < room.position.y) or (p0.y > room.end.y and p1.y > room.end.y)
+		var gl: PackedVector2Array = wglow if on_wall else glow
+		var co: PackedVector2Array = wcore if on_wall else core
 		var d := p1 - p0
 		var n := d.orthogonal().normalized()
 		var segs := 6
@@ -138,10 +146,20 @@ func _draw() -> void:
 			var u := j / float(segs)
 			var jit := 0.0 if j == segs else sin(t * 47.0 + k * 3.1 + j * 2.3) * 9.0 * (1.0 - absf(u - 0.5) * 1.2)
 			var q := p0 + d * u + n * jit
-			glow.append(prev)
-			glow.append(q)
-			core.append(prev)
-			core.append(q)
+			gl.append(prev)
+			gl.append(q)
+			co.append(prev)
+			co.append(q)
 			prev = q
-	draw_multiline(glow, Pal.ink(0.16 * dim, 1.6), 7.0)
-	draw_multiline(core, Pal.ink(0.9 * dim, 2.6), 1.6)
+		if on_wall:
+			wglow = gl
+			wcore = co
+		else:
+			glow = gl
+			core = co
+	if wglow.size() > 0:
+		draw_multiline(wglow, Pal.ink(0.06 * dim, 1.2), 6.0)
+		draw_multiline(wcore, Pal.ink(0.45 * dim, 1.6), 1.4)
+	if glow.size() > 0:
+		draw_multiline(glow, Pal.ink(0.16 * dim, 1.6), 7.0)
+		draw_multiline(core, Pal.ink(0.95 * dim, 2.8), 2.0)

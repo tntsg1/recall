@@ -49,7 +49,7 @@ func setup(ch: int) -> void:
 		6:
 			# the energy bureau: four low switch housings for cover, the middle
 			# left to the transformer and its cables
-			for c in [Vector2(470, 300), Vector2(1450, 300), Vector2(560, 780), Vector2(1110, 830)]:
+			for c in [Vector2(470, 300), Vector2(1450, 300), Vector2(845, 790), Vector2(1075, 790)]:
 				inner.append(Rect2(c - Vector2(40, 32), Vector2(80, 64)))
 		5:
 			# the laser range: the four posts the beams hang from, two crate stacks low down
