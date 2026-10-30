@@ -303,10 +303,20 @@ func _draw() -> void:
 		if gen7 and ch7 != null and shows.get("w7_chair", 0.0) <= 0.01:
 			_draw_wall_notice(ch7, dim)
 	elif story == 10:
-		_draw_yard(dim)
-		_draw_terminal(Vector2(80, 560), dim, "w10_schedule")
-		if shows.get("w10_tether", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 530), dim)
+		var gen10: bool = game.arena.generated
+		if gen10:
+			_draw_dock_gen(dim)
+		else:
+			_draw_yard(dim)
+		var sch_at = game.rooms.spot("schedule", Vector2(80, 560))
+		if sch_at != null:
+			_draw_terminal(sch_at, dim, "w10_schedule")
+		var teth_at = game.rooms.spot("tether", Vector2(1840, 530))
+		if teth_at != null and shows.get("w10_tether", 0.0) <= 0.01:
+			_draw_wall_notice(teth_at, dim)
+		var sc10 = game.rooms.spot("scrawl", Vector2(1840, 740))
+		if gen10 and sc10 != null:
+			_draw_scrawl(sc10, dim)
 	elif story == 12:
 		_draw_core(dim)
 		_draw_terminal(Vector2(80, 560), dim, "w12_board")
@@ -2705,7 +2715,8 @@ const LIFT_WINDOWS := [Rect2(330, 160, 380, 200), Rect2(1210, 160, 380, 200)]
 # limit before its plaque.
 func _draw_lift_gen(dim: float) -> void:
 	var lay: Dictionary = game.rooms.lay
-	var climb := clampf((_alt() - 28000.0) / 16000.0, 0.0, 1.0)
+	# (the earth curves more room by room: the car is climbing)
+	var climb := clampf(0.15 + 0.17 * int(lay.get("index", 0)) + 0.02 * sin(t * 0.3), 0.0, 1.0)
 	var wins: Array = lay.get("windows", [])
 	for wi in wins.size():
 		_draw_lift_window(wins[wi], wi, climb, dim)
@@ -2720,18 +2731,33 @@ func _draw_lift_gen(dim: float) -> void:
 		var ins := r.grow(-6.0)
 		match kind:
 			"seats":
-				# a row of bolted seats: backs, belts across them
+				# a row of bolted seats from above: each a cushion between two
+				# armrests, its back a bar on the side away from its neighbour row
+				# (two rows back to back share the middle)
+				var back_low := false
+				for j2 in cover.size():
+					var o: Rect2 = cover[j2]
+					if j2 != i and kinds[j2] == "seats" and absf(o.position.y - r.end.y) < 1.0 and o.position.x < r.end.x and o.end.x > r.position.x:
+						back_low = true
 				var span := r.size.x if long_x else r.size.y
 				var ns := maxi(int(span / 44.0), 1)
 				var step := (span - 12.0) / ns
 				for k in ns:
-					var sr := Rect2(ins.position + Vector2(k * step, 0.0), Vector2(step - 5.0, ins.size.y)) if long_x else Rect2(ins.position + Vector2(0.0, k * step), Vector2(ins.size.x, step - 5.0))
-					draw_rect(sr, Pal.ink(0.35 * dim), false, 1.5)
+					var sr := Rect2(ins.position + Vector2(k * step, 0.0), Vector2(step - 6.0, ins.size.y)) if long_x else Rect2(ins.position + Vector2(0.0, k * step), Vector2(ins.size.x, step - 6.0))
 					if long_x:
-						draw_line(Vector2(sr.position.x + 3.0, sr.position.y + 5.0), Vector2(sr.end.x - 3.0, sr.position.y + 5.0), Pal.ink(0.5 * dim), 3.0)
+						var by := sr.end.y - 4.0 if back_low else sr.position.y + 4.0
+						var fy := sr.position.y + 2.0 if back_low else sr.end.y - 2.0
+						draw_line(Vector2(sr.position.x + 2.0, by), Vector2(sr.end.x - 2.0, by), Pal.ink(0.55 * dim), 6.0)
+						draw_line(Vector2(sr.position.x, by), Vector2(sr.position.x, fy), Pal.ink(0.4 * dim), 2.0)
+						draw_line(Vector2(sr.end.x, by), Vector2(sr.end.x, fy), Pal.ink(0.4 * dim), 2.0)
+						draw_line(Vector2(sr.position.x + 5.0, fy), Vector2(sr.end.x - 5.0, fy), Pal.ink(0.22 * dim), 1.5)
 					else:
-						draw_line(Vector2(sr.position.x + 5.0, sr.position.y + 3.0), Vector2(sr.position.x + 5.0, sr.end.y - 3.0), Pal.ink(0.5 * dim), 3.0)
-					draw_line(sr.position + Vector2(6, 8), sr.end - Vector2(6, 4), Pal.ink(0.22 * dim), 1.5)
+						var bx := sr.position.x + 4.0
+						var fx := sr.end.x - 2.0
+						draw_line(Vector2(bx, sr.position.y + 2.0), Vector2(bx, sr.end.y - 2.0), Pal.ink(0.55 * dim), 6.0)
+						draw_line(Vector2(bx, sr.position.y), Vector2(fx, sr.position.y), Pal.ink(0.4 * dim), 2.0)
+						draw_line(Vector2(bx, sr.end.y), Vector2(fx, sr.end.y), Pal.ink(0.4 * dim), 2.0)
+						draw_line(Vector2(fx, sr.position.y + 5.0), Vector2(fx, sr.end.y - 5.0), Pal.ink(0.22 * dim), 1.5)
 			"pillar9":
 				# a pillar: its bolts, its number
 				for q: Vector2 in [ins.position, Vector2(ins.end.x, ins.position.y), ins.end, Vector2(ins.position.x, ins.end.y)]:
@@ -2746,6 +2772,8 @@ func _draw_lift_gen(dim: float) -> void:
 				for k in nc:
 					var cr := Rect2(ins.position + (Vector2(ins.size.x / nc * k, 0.0) if long_x else Vector2(0.0, ins.size.y / nc * k)), (Vector2(ins.size.x / nc, ins.size.y) if long_x else Vector2(ins.size.x, ins.size.y / nc))).grow(-3.0)
 					draw_rect(cr, Pal.ink(0.28 * dim), false, 1.5)
+					# its carry handle
+					draw_arc(cr.get_center(), 6.0, PI, TAU, 8, Pal.ink(0.45 * dim), 2.0)
 				for k in 2:
 					var u := (k + 1) / 3.0
 					if long_x:
@@ -2761,7 +2789,7 @@ func _draw_lift_gen(dim: float) -> void:
 				var meter := "0:%02d" % secs
 				var mw := sf.get_string_size(meter, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
 				draw_string(sf, scr.get_center() + Vector2(-mw / 2.0, 5.0), meter, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.red(0.85 * dim, 1.4))
-				draw_string(sf, Vector2(r.position.x, r.position.y - 6.0), "RAIL 0.30/MIN", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+				draw_string(sf, Vector2(r.position.x, r.position.y - 6.0), "RAIL 0.30/MIN", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.5 * dim))
 				draw_line(Vector2(ins.get_center().x - 12.0, ins.end.y - 12.0), Vector2(ins.get_center().x + 12.0, ins.end.y - 12.0), Pal.ink(0.55 * dim), 3.0)
 	# the handrails, broken at the doors
 	for hr: Array in lay.get("handrails", []):
@@ -2816,6 +2844,9 @@ func _draw_lift_window(r: Rect2, wi: int, climb: float, dim: float) -> void:
 		var cy := cc.y - rr + dy2 + 26.0 + fmod(k * 31.0, 60.0)
 		for m in 7:
 			var q := Vector2(cx + sin(m * 2.1 + k) * 14.0, cy + cos(m * 1.7 + k) * 8.0)
+			# (none near 13th Street's three, low in the first window's corner)
+			if wi == 0 and q.distance_to(Vector2(r.position.x + 57.0, r.end.y - 30.0)) < 60.0:
+				continue
 			if r.has_point(q):
 				draw_circle(q, 1.1, Pal.ink(0.5 * dim, 1.4))
 	if wi == 0:
@@ -2824,8 +2855,10 @@ func _draw_lift_window(r: Rect2, wi: int, climb: float, dim: float) -> void:
 		for m in 3:
 			draw_circle(tq + Vector2(m * 5.0, (m % 2) * 3.0), 0.9, Pal.ink(0.22 * dim))
 	# the frame, its bolts and the glass's glint
-	draw_rect(r, Pal.ink(0.45 * dim), false, 2.5)
-	draw_rect(r.grow(10.0), Pal.ink(0.2 * dim), false, 1.5)
+	# (a generated room's: fainter, glass in the floor, not a thing in the way)
+	var fk := 0.6 if game.arena.generated else 1.0
+	draw_rect(r, Pal.ink(0.45 * fk * dim), false, 2.5)
+	draw_rect(r.grow(10.0), Pal.ink(0.2 * fk * dim), false, 1.5)
 	for k in 6:
 		var bx := r.position.x + r.size.x * k / 5.0
 		draw_circle(Vector2(bx, r.position.y - 5.0), 1.6, Pal.ink(0.35 * dim))
@@ -2871,6 +2904,99 @@ func _draw_lift(dim: float) -> void:
 # The dock open to space: stars where the floor plating stops at the edges,
 # tether anchors along the walls with their lines, the two crates of armour
 # steel, weld scars and hazard marks on the deck.
+# A generated room of the shipyard: the deck's plating seams, tether
+# anchors with their slack lines, weld scars and hazard chevrons, and its
+# furniture by kind (armour-steel crates strapped, cable spools, bollards
+# with a rope's turn, welding rigs with their bottles, a hull section
+# riveted along its rib).
+func _draw_dock_gen(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var room := Arena.ROOM
+	var seams := PackedVector2Array()
+	var x := room.position.x + 80.0
+	while x < room.end.x:
+		seams.append(Vector2(x, room.position.y + 10.0))
+		seams.append(Vector2(x, room.end.y - 10.0))
+		x += 160.0
+	var y := room.position.y + 70.0
+	while y < room.end.y:
+		seams.append(Vector2(room.position.x + 10.0, y))
+		seams.append(Vector2(room.end.x - 10.0, y))
+		y += 160.0
+	draw_multiline(seams, Pal.ink(0.05 * dim), 1.0)
+	for a: Vector2 in lay.get("anchors", []):
+		draw_circle(a, 5.0, Color(0.06, 0.06, 0.065))
+		draw_arc(a, 5.0, 0.0, TAU, 12, Pal.ink(0.5 * dim), 1.5)
+		var sw := sin(t * 0.7 + a.y * 0.01) * 14.0
+		var dirx := 1.0 if a.x < 960.0 else -1.0
+		draw_polyline(PackedVector2Array([a, a + Vector2(26.0 * dirx, 18.0 + sw * 0.4), a + Vector2(48.0 * dirx, 30.0 + sw)]), Pal.ink(0.22 * dim), 1.0)
+	for sc: Array in lay.get("scars", []):
+		var c: Vector2 = sc[0]
+		var ang: float = sc[1]
+		if int(sc[2]) == 0:
+			# a weld scar: a jagged seam, still faintly warm at one end
+			var pts := PackedVector2Array()
+			for k in 7:
+				pts.append(c + Vector2.from_angle(ang) * (k * 14.0 - 42.0) + Vector2.from_angle(ang + PI * 0.5) * (4.0 if k % 2 == 0 else -4.0))
+			draw_polyline(pts, Pal.ink(0.18 * dim), 2.0)
+			draw_circle(pts[pts.size() - 1], 3.0, Pal.red(0.35 * dim, 1.3))
+		else:
+			# hazard chevrons
+			for k in 3:
+				var o := c + Vector2.from_angle(ang) * (k * 22.0 - 22.0)
+				var f := Vector2.from_angle(ang)
+				var sd := f.orthogonal()
+				draw_polyline(PackedVector2Array([o - f * 6.0 + sd * 12.0, o + f * 6.0, o - f * 6.0 - sd * 12.0]), Pal.ink(0.12 * dim), 4.0)
+	var kinds: Array = lay.get("kinds", [])
+	var cover: Array = lay.get("cover", [])
+	for i in cover.size():
+		var r: Rect2 = cover[i]
+		var kind: String = kinds[i] if i < kinds.size() else "steelcrate"
+		var ins := r.grow(-8.0)
+		match kind:
+			"steelcrate":
+				draw_line(ins.position, ins.end, Pal.ink(0.2 * dim), 1.0)
+				draw_line(Vector2(ins.end.x, ins.position.y), Vector2(ins.position.x, ins.end.y), Pal.ink(0.2 * dim), 1.0)
+				var nst := maxi(int(r.size.x / 50.0), 2)
+				for j in nst:
+					var sx := r.position.x + 10.0 + j * (r.size.x - 20.0) / nst
+					draw_line(Vector2(sx, r.position.y + 4.0), Vector2(sx + 20.0, r.position.y + 4.0), Pal.ink(0.5 * dim), 3.0)
+			"spool":
+				var cc := r.get_center()
+				var rr := minf(r.size.x, r.size.y) * 0.5 - 6.0
+				draw_arc(cc, rr, 0.0, TAU, 24, Pal.ink(0.45 * dim), 2.0)
+				draw_arc(cc, rr * 0.7, 0.0, TAU, 20, Pal.ink(0.2 * dim), 4.0)
+				draw_arc(cc, rr * 0.45, 0.0, TAU, 16, Pal.ink(0.2 * dim), 4.0)
+				draw_circle(cc, 5.0, Pal.ink(0.5 * dim))
+			"bollard":
+				var bc := r.get_center()
+				draw_circle(bc, 14.0, Color(0.06, 0.06, 0.065))
+				draw_arc(bc, 14.0, 0.0, TAU, 20, Pal.ink(0.55 * dim), 2.0)
+				draw_arc(bc, 20.0, -0.4, 2.4, 14, Pal.ink(0.25 * dim), 2.0)
+			"weldrig":
+				for k in 2:
+					var gb := Vector2(ins.position.x + 14.0 + k * 22.0, ins.get_center().y)
+					draw_circle(gb, 9.0, Color(0.05, 0.05, 0.055))
+					draw_arc(gb, 9.0, 0.0, TAU, 16, Pal.ink(0.5 * dim), 1.5)
+				draw_line(Vector2(ins.position.x + 50.0, ins.get_center().y), ins.end - Vector2(6, 8), Pal.ink(0.35 * dim), 1.5)
+				draw_circle(ins.end - Vector2(6, 8), 2.5, Pal.red(0.6 * dim, 1.4))
+			"hull":
+				# a curved rib down its length, rivets along both edges
+				var long_x := r.size.x >= r.size.y
+				var rib := PackedVector2Array()
+				for k in 9:
+					var u := k / 8.0
+					rib.append(Vector2(lerpf(ins.position.x, ins.end.x, u), ins.get_center().y + sin(u * PI) * -8.0) if long_x else Vector2(ins.get_center().x + sin(u * PI) * -8.0, lerpf(ins.position.y, ins.end.y, u)))
+				draw_polyline(rib, Pal.ink(0.35 * dim), 2.0)
+				var span := r.size.x if long_x else r.size.y
+				var nr := int(span / 24.0)
+				for k in nr:
+					var u := (k + 0.5) / nr
+					for e in 2:
+						var q := Vector2(lerpf(ins.position.x, ins.end.x, u), ins.position.y + 4.0 + e * (ins.size.y - 8.0)) if long_x else Vector2(ins.position.x + 4.0 + e * (ins.size.x - 8.0), lerpf(ins.position.y, ins.end.y, u))
+						draw_circle(q, 1.6, Pal.ink(0.4 * dim))
+
+
 func _draw_yard(dim: float) -> void:
 	# deck plating seams
 	var seams := PackedVector2Array()

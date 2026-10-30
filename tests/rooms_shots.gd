@@ -162,6 +162,28 @@ func _run() -> void:
 			game.lore.hold["w%d_%s" % [story, w[0]]] = 9.0
 		await frames(50)
 		await shot("08_remnants")
+	# the shipyard's plates at work: one thrown into an enemy
+	if story == 10 and game.plates.active():
+		game.rooms.cseed = 101000
+		game.rooms.build(3, "L", false)
+		game.wave_ctl.phase = Waves.FIGHT
+		var pc: Vector2 = game.plates.pos[0]
+		var foe10 = game.enemies.spawn(Enemies.GUARD, pc + Vector2(220, 0))
+		foe10.state = Enemies.ALIVE
+		foe10.t = 1.0
+		game.player.pos = pc + Vector2(-260, 60)
+		for j10 in 3:
+			game.bullets.fire(game.player.pos, (pc - game.player.pos).normalized().rotated((j10 - 1) * 0.05))
+		await frames(12)
+		await shot("08_plate_shove")
+		game.plates.vel[0] = Vector2(Plates.MAX_SPEED, 0)
+		for k10 in 60:
+			foe10.pos = pc + Vector2(220, 0) if foe10.flash <= 0.0 else foe10.pos
+			await frames(1)
+			if foe10.flash > 0.0:
+				break
+		await frames(3)
+		await shot("08_plate_ram")
 	# the lift's airlock at work: a door marked, then open, the air rushing to it
 	if story == 9 and game.vents.active():
 		game.rooms.cseed = 91000

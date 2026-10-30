@@ -17,6 +17,8 @@ const RAM_DMG := 0.14        # damage per px/s
 
 var on := false
 var game
+var sizes: Array = SIZES.duplicate()   # each plate's size (a generated room's own)
+var starts: Array = STARTS.duplicate()
 var t := 0.0
 var pos: Array = []          # centres
 var vel: Array = []
@@ -41,6 +43,20 @@ static func initial(room: int) -> Array[Rect2]:
 
 func setup(story: int) -> void:
 	on = story == 10
+	set_plates([])
+
+
+# The plates this room starts with, [centre, size] each (none given: the
+# hand-made yard's five).
+func set_plates(list: Array) -> void:
+	sizes = SIZES.duplicate()
+	starts = STARTS.duplicate()
+	if not list.is_empty():
+		sizes.clear()
+		starts.clear()
+		for pl: Array in list:
+			starts.append(pl[0])
+			sizes.append(pl[1])
 	visible = on
 	t = 0.0
 	pos.clear()
@@ -49,12 +65,20 @@ func setup(story: int) -> void:
 	ram_cd.clear()
 	hits.clear()
 	if on:
-		for k in SIZES.size():
-			pos.append(STARTS[k])
+		for k in sizes.size():
+			pos.append(starts[k])
 			vel.append(Vector2.ZERO)
 			spin.append(randf() * TAU)
 			ram_cd.append(0.0)
 	queue_redraw()
+
+
+# A generated room's plates as rects, where they start.
+static func rects_for(list: Array) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for pl: Array in list:
+		out.append(Rect2((pl[0] as Vector2) - (pl[1] as Vector2) * 0.5, pl[1]))
+	return out
 
 
 func active() -> bool:
@@ -62,7 +86,7 @@ func active() -> bool:
 
 
 func rect(k: int) -> Rect2:
-	return Rect2((pos[k] as Vector2) - SIZES[k] * 0.5, SIZES[k])
+	return Rect2((pos[k] as Vector2) - sizes[k] * 0.5, sizes[k])
 
 
 # The plate an arena rect index belongs to, or -1 (the plates follow any
@@ -71,7 +95,7 @@ func plate_of(rect_i: int) -> int:
 	if not on or rect_i < 0:
 		return -1
 	var k: int = rect_i - game.arena.mover_from
-	return k if k >= 0 and k < SIZES.size() else -1
+	return k if k >= 0 and k < sizes.size() else -1
 
 
 # A round struck the plate and stayed in it: the plate takes its push.
@@ -100,7 +124,8 @@ func step(dt: float) -> void:
 	var obstacles: Array[Rect2] = []
 	obstacles.append_array(game.arena.inner)
 	obstacles.append_array(game.arena.soft)
-	for k in SIZES.size():
+	obstacles.append_array(game.arena.walls)
+	for k in sizes.size():
 		ram_cd[k] = maxf(0.0, ram_cd[k] - dt)
 		var v: Vector2 = vel[k]
 		v *= exp(-DRAG * dt)
@@ -108,7 +133,7 @@ func step(dt: float) -> void:
 			v = Vector2.ZERO
 		var before := rect(k)
 		var p: Vector2 = pos[k] + v * dt
-		var r := Rect2(p - SIZES[k] * 0.5, SIZES[k])
+		var r := Rect2(p - sizes[k] * 0.5, sizes[k])
 		# the room's walls
 		var room := Arena.ROOM
 		if r.position.x < room.position.x:
@@ -123,10 +148,10 @@ func step(dt: float) -> void:
 		if r.end.y > room.end.y:
 			p.y -= r.end.y - room.end.y
 			v.y = -absf(v.y) * 0.55
-		r = Rect2(p - SIZES[k] * 0.5, SIZES[k])
+		r = Rect2(p - sizes[k] * 0.5, sizes[k])
 		# fixed cover, the ship, and the other plates
 		var others: Array[Rect2] = obstacles.duplicate()
-		for j in SIZES.size():
+		for j in sizes.size():
 			if j != k:
 				others.append(rect(j))
 		for o: Rect2 in others:
@@ -147,7 +172,7 @@ func step(dt: float) -> void:
 				var sy := 1.0 if r.get_center().y > o.get_center().y else -1.0
 				p.y += oy * sy
 				v.y = absf(v.y) * 0.55 * sy
-			r = Rect2(p - SIZES[k] * 0.5, SIZES[k])
+			r = Rect2(p - sizes[k] * 0.5, sizes[k])
 		# it stops against you rather than pinning you
 		var pl: Vector2 = game.player.pos
 		if r.grow(Player.R).has_point(pl):
@@ -192,7 +217,7 @@ func _draw() -> void:
 	var dim := 1.0 - 0.45 * f
 	if game.hud.intro_t >= 0.0:
 		dim *= clampf((game.hud.intro_t - 2.2) / 0.6, 0.25, 1.0)
-	for k in SIZES.size():
+	for k in sizes.size():
 		_draw_plate(k, dim)
 	for h in hits:
 		var hk: float = h[1] / 0.3

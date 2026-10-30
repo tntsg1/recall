@@ -116,6 +116,8 @@ func build(i: int, entry: String, risky: bool) -> void:
 			game.shelves.set_banks([[Shelves.STARTS[0], Shelves.TOP], [Shelves.STARTS[1], Shelves.TOP]])
 		if game.vents.on:
 			game.vents.set_doors(Vents.DOORS)
+		if game.plates.on:
+			game.plates.set_plates([])
 	else:
 		game.lasers.set_fences(lay.get("fences", []))
 		game.maglev.set_rails(lay.get("maglev", []))
@@ -126,6 +128,8 @@ func build(i: int, entry: String, risky: bool) -> void:
 			game.shelves.set_banks(lay.get("banks", []))
 		if game.vents.on:
 			game.vents.set_doors(lay.get("vents", []))
+		if game.plates.on:
+			game.plates.set_plates(lay.get("plates", []))
 		var crate_at := Rect2()
 		for ci in (lay.cover as Array).size():
 			if lay.kinds[ci] == "reserve":

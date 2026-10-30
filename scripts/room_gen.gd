@@ -26,7 +26,7 @@ const EXIT_APART := 480.0                     # two ways on: this far apart, the
 const FROM_ENTRY := 700.0                     # a way on this far from the way in: the room is crossed
 
 # The chapters that walk room to room; the rest keep their one hand-made room.
-const ON := [1, 2, 3, 4, 5, 6, 7, 8]
+const ON := [1, 2, 3, 4, 5, 6, 7, 8, 9]
 const ARM_W := 200.0       # an arm's footing on its wall
 const RING_R := 92.0       # a mood-scan ring's radius (ScanRings.R)
 const RING_WARN := 66.0    # how far past it the red warning closes in from
@@ -247,15 +247,42 @@ const STYLE := {
 			[2, [Rect2(0, 0, 90, 120)], "kiosk"],                           # the handrail kiosk
 		],
 		"vents": [2, 2, 3, 3, 4, 4],
+		"windows": true,
 		# the hand-made car: two benches and two pillars
 		"count": 4, "area": 22000.0,
 		"themes": [["seats"], ["pillar9", "luggage", "kiosk"]],
-		"props": {"altitude": [220.0, 180.0], "deck": [440.0, 90.0], "rail": [160.0, 150.0], "scrawl": [220.0, 150.0]},
+		# (the notice is a board read across: it stands well out from its side wall)
+		"props": {"altitude": [220.0, 180.0], "deck": [440.0, 90.0], "rail": [130.0, 400.0], "scrawl": [220.0, 150.0]},
+	},
+	10: {
+		# the orbital shipyard: crates of armour steel, cable spools, tether
+		# bollards, welding rigs, a hull section waiting to go on; the
+		# chapter's own are its loose hull plates adrift, three in the first
+		# room and six by the last
+		"shapes": {"hall": 4, "twin": 2, "corner": 2, "bays": 1},
+		"pieces": [
+			[3, [Rect2(0, 0, 120, 60)], "steelcrate"],
+			[2, [Rect2(0, 0, 80, 80)], "spool"],
+			[2, [Rect2(0, 0, 60, 60)], "bollard"],
+			[2, [Rect2(0, 0, 120, 50)], "weldrig"],
+		],
+		"landmarks": [
+			[3, [Rect2(0, 0, 120, 60), Rect2(0, 60, 120, 60)], "steelcrate"],   # two crates stacked
+			[2, [Rect2(0, 0, 240, 56)], "hull"],                                # a hull section
+		],
+		"plates": [3, 3, 4, 4, 5, 6],
+		# the hand-made yard: two crates, the rest is the plates
+		"count": 4, "area": 24000.0,
+		"themes": [["steelcrate", "hull"], ["spool", "bollard", "weldrig"]],
+		"on_cover": {"steel": "steelcrate"},
+		# (the notice is a board read across: it stands well out from its side wall)
+		"props": {"schedule": [220.0, 180.0], "tether": [130.0, 400.0], "scrawl": [220.0, 150.0]},
 	},
 }
 
 
 static var last_why := ""        # tests: where the last try gave up
+static var why_tally := {}        # tests: how often each reason gave a try up
 static var force_off := false     # tests: the hand-made rooms, to compare against
 
 
@@ -271,21 +298,32 @@ static func make(story: int, index: int, cseed: int, entry: String, exits: Array
 	var rng := RandomNumberGenerator.new()
 	for attempt in 150:
 		rng.seed = hash([cseed, story, index, entry, exits.size(), attempt])
+		last_ditch = attempt >= 120
 		var lay := _try(st, story, index, cseed, entry, exits, remnants, rng, attempt >= 60)
 		if lay.is_empty():
+			why_tally[last_why] = int(why_tally.get(last_why, 0)) + 1
 			continue
 		lay["attempt"] = attempt
-		if check(lay).ok:
+		var verdict := check(lay)
+		if verdict.ok:
 			return lay
+		var cw := "check: " + str(verdict.why).left(20)
+		why_tally[cw] = int(why_tally.get(cw, 0)) + 1
 	return {}
 
 
 # `spare`: late tries may leave out a remnant there is no wall for (Rooms
 # carries it on to the next room)
+static var last_ditch := false   # the last tries of make(): settle for less of a chapter's own
+
+
 static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: String, exits: Array, remnants: Array, rng: RandomNumberGenerator, spare := false) -> Dictionary:
 	var sparse := index == 0 and story == 1
 	var shape := "hall" if sparse else _weighted(st.shapes, rng)
 	var walls := _shape(shape, rng)
+	if not _clear_titles(walls):
+		last_why = "titles"
+		return {}
 	var themes: Array = st.get("themes", [[]])
 	var theme: Array = themes[(absi(cseed) + index) % themes.size()]
 	var lay := {"story": story, "index": index, "shape": shape, "walls": walls, "cover": [] as Array[Rect2], "piece": [], "kinds": [], "gates": [], "exits": [], "spots": {}, "sparse": sparse, "theme": theme}
@@ -372,19 +410,9 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 			taken.append(got)
 			lay.arms.append([got.pos, got.n, 3.0 * k])
 	# spawn gates: one on each wall that has room for one, two on the long walls
-	for s in ["T", "B", "L", "R"]:
-		for k in (2 if s == "T" or s == "B" else 1):
-			var g := _door_on(s, walls, taken, rng, GATE_W)
-			if not g.is_empty():
-				lay.gates.append(g)
-				taken.append(g)
-	# (where arms hold two or three walls, two gates will do)
-	if lay.gates.size() < (2 if (lay.arms as Array).size() >= 2 else 3):
-		last_why = "t3"
-		return {}
-	# the remnants on walls first: their stretch of wall and the floor in front
-	# are kept for them, and the cover goes round
-	if not _remnants(lay, st, story, index, e, remnants, taken, rng, spare, false):
+	# (where airlocks take the side walls, the remnants on walls go first:
+	# the airlocks and the gates work round them; the last tries, as elsewhere)
+	if st.has("vents") and not last_ditch and not _remnants(lay, st, story, index, e, remnants, taken, rng, spare, false):
 		last_why = "t6"
 		return {}
 	# the lift's airlock doors: in the side walls, the floor before each kept
@@ -400,16 +428,83 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 				var sp := _spot_for(vn, need_v, lay, taken, rng, true)
 				if sp.is_empty() or (sp[0] as Vector2).distance_to(lay.start) < 320.0:
 					continue
+				# (well apart from the ways in and out on the same wall: a draught
+				# toward a door reads as a way out)
+				var near_door := false
+				for d: Dictionary in lay.exits + lay.gates + [lay.entry]:
+					if d.has("n") and d.n == sp[1] and (d.pos as Vector2).distance_to(sp[0]) < need_v[0] / 2.0 + float(d.get("w", DOOR_W)) / 2.0 + (80.0 if last_ditch else 170.0):
+						near_door = true
+				# (two to a wall at most, well apart, and clear of the room's own wall blocks)
+				var on_wall := 0
+				for v: Array in lay.vents:
+					if v[1] == sp[1]:
+						on_wall += 1
+						if (v[0] as Vector2).distance_to(sp[0]) < need_v[0] + (40.0 if last_ditch else 120.0):
+							near_door = true
+				if on_wall >= 2 and not last_ditch:
+					near_door = true
+				for r: Rect2 in walls:
+					if _dist(r, sp[0]) < need_v[0] / 2.0 + (20.0 if last_ditch else 70.0):
+						near_door = true
+				if near_door:
+					continue
 				lay.vents.append([sp[0], sp[1]])
 				var front := Rect2(sp[0] - Vector2(0, need_v[0] / 2.0), Vector2.ZERO).expand(sp[0] + Vector2(0, need_v[0] / 2.0) + (sp[1] as Vector2) * need_v[1]).abs()
 				taken.append({"pos": sp[0], "n": sp[1], "w": need_v[0], "front": front})
 				done = true
 				break
-			# (late tries: two doors will do)
-			if not done and spare and k >= 2:
+			# (late tries: one door fewer will do; the very last, whatever fits)
+			if not done and spare and k >= (1 if last_ditch else maxi(2, want_v - 1)):
 				break
 			if not done:
 				last_why = "vents"
+				return {}
+	for s in ["T", "B", "L", "R"]:
+		for k in (2 if s == "T" or s == "B" else 1):
+			var g := _door_on(s, walls, taken, rng, GATE_W)
+			if not g.is_empty():
+				lay.gates.append(g)
+				taken.append(g)
+	# (where arms hold two or three walls, or airlocks the sides, two gates will do)
+	if lay.gates.size() < (2 if (lay.arms as Array).size() >= 2 or not (lay.get("vents", []) as Array).is_empty() else 3):
+		last_why = "t3"
+		return {}
+	# the remnants on walls first: their stretch of wall and the floor in front
+	# are kept for them, and the cover goes round
+	if (not st.has("vents") or last_ditch) and not _remnants(lay, st, story, index, e, remnants, taken, rng, spare, false):
+		last_why = "t6"
+		return {}
+	# the car's windows onto the earth: one at least, in the upper half, clear
+	# of the titles and the grade's stamp (placed before the cover, which keeps off them)
+	lay["windows"] = []
+	if st.get("windows", false):
+		for k in (2 if rng.randf() < 0.5 else 1):
+			var got := false
+			for tries in 40:
+				var sz := Vector2(rng.randf_range(280.0, 360.0), rng.randf_range(140.0, 170.0))
+				var wr := Rect2(Vector2(rng.randf_range(ROOM.position.x + 60.0, ROOM.end.x - 60.0 - sz.x), rng.randf_range(ROOM.position.y + 70.0, 560.0 - sz.y)), sz)
+				var ok := not wr.grow(20.0).intersects(HUD_STRIP) and not wr.grow(20.0).intersects(HUD_TOP) and not wr.intersects(TITLES.grow(60.0)) and not wr.intersects(Rect2(800, 220, 320, 240))
+				for r: Rect2 in lay.walls:
+					if r.grow(GAP).intersects(wr):
+						ok = false
+				for d: Dictionary in taken:
+					if _dist(wr, d.pos) < 130.0:
+						ok = false
+					var fr: Rect2 = d.get("front", Rect2())
+					if fr.size.x > 0.0 and fr.intersects(wr.grow(20.0)):
+						ok = false
+				for d: Dictionary in lay.exits:
+					if (d.label as Rect2).grow(30.0).intersects(wr):
+						ok = false
+				for o: Rect2 in lay.windows:
+					if o.grow(80.0).intersects(wr):
+						ok = false
+				if ok:
+					lay.windows.append(wr)
+					got = true
+					break
+			if not got and k == 0 and not last_ditch:
+				last_why = "windows"
 				return {}
 	# the archive's shelving: on the low half of the room, clear of the wave's
 	# title, so the middle stays open floor (placed before the cover, which goes round it)
@@ -534,6 +629,47 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 			if not done:
 				last_why = "rings"
 				return {}
+	# the shipyard's loose plates: in open floor, apart, none by a door
+	lay["plates"] = []
+	if st.has("plates"):
+		var want_p: int = (st.plates as Array)[mini(index, (st.plates as Array).size() - 1)]
+		var plate_sizes := [Vector2(170, 38), Vector2(38, 160), Vector2(150, 38), Vector2(120, 38), Vector2(38, 120)]
+		for k in want_p:
+			var done := false
+			for tries in 60:
+				var sz: Vector2 = plate_sizes[rng.randi() % plate_sizes.size()]
+				var c := Vector2(rng.randf_range(ROOM.position.x + 120.0, ROOM.end.x - 120.0), rng.randf_range(ROOM.position.y + 140.0, ROOM.end.y - 120.0))
+				var r := Rect2(c - sz * 0.5, sz)
+				var ok := true
+				for o: Rect2 in lay.walls + lay.cover:
+					if o.grow(GAP).intersects(r):
+						ok = false
+				for d: Dictionary in taken:
+					if _dist(r, d.pos) < CLEAR:
+						ok = false
+					var fr: Rect2 = d.get("front", Rect2())
+					if fr.size.x > 0.0 and fr.intersects(r.grow(20.0)):
+						ok = false
+				if _dist(r, lay.start) < 220.0:
+					ok = false
+				for pl: Array in lay.plates:
+					if Rect2((pl[0] as Vector2) - (pl[1] as Vector2) * 0.5, pl[1]).grow(90.0).intersects(r):
+						ok = false
+				for z: Rect2 in [HUD_STRIP, HUD_TOP, HUD_FOOT, HUD_LORE, BANNER]:
+					if z.intersects(r):
+						ok = false
+				for d: Dictionary in lay.exits:
+					if (d.label as Rect2).grow(30.0).intersects(r):
+						ok = false
+				if ok:
+					lay.plates.append([c, sz])
+					done = true
+					break
+			if not done and spare and k >= 2:
+				break
+			if not done:
+				last_why = "plates"
+				return {}
 	lay["maglev"] = []
 	if st.has("maglev"):
 		var want_m: int = (st.maglev as Array)[mini(index, (st.maglev as Array).size() - 1)]
@@ -580,7 +716,8 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		return {}
 	# both halves of the room have something in them (the first room: a fair piece each)
 	var halves := [0.0, 0.0]
-	for r: Rect2 in lay.cover:
+	# (the shipyard's loose plates are cover too)
+	for r: Rect2 in lay.cover + Plates.rects_for(lay.get("plates", [])):
 		halves[0 if r.get_center().x < 960.0 else 1] += r.get_area()
 	var least: float = 6000.0 if sparse else 0.18 * (halves[0] + halves[1])
 	if halves[0] < least or halves[1] < least:
@@ -600,6 +737,8 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		_paint_archive(lay, taken, rng)
 	elif story == 9:
 		_paint_lift(lay, taken, rng)
+	elif story == 10:
+		_paint_dock(lay, taken, rng)
 	elif story == 1:
 		_paint(lay, taken, rng)
 	else:
@@ -679,35 +818,52 @@ static func _paint_bureau(lay: Dictionary, taken: Array, rng: RandomNumberGenera
 			break
 
 
+# The shipyard's deck: tether anchors along the side walls clear of their
+# doors, weld scars and hazard chevrons in the open floor.
+static func _paint_dock(lay: Dictionary, taken: Array, rng: RandomNumberGenerator) -> void:
+	lay["quiet"] = _quiet(lay)
+	lay["anchors"] = []
+	for k in 4:
+		for tries in 20:
+			var left := rng.randf() < 0.5
+			var a := Vector2(ROOM.position.x + 12.0 if left else ROOM.end.x - 12.0, rng.randf_range(ROOM.position.y + 120.0, ROOM.end.y - 160.0))
+			var ok := true
+			for d: Dictionary in taken:
+				if (d.pos as Vector2).distance_to(a) < float(d.get("w", DOOR_W)) / 2.0 + 60.0:
+					ok = false
+			for r: Rect2 in lay.walls + lay.cover:
+				if r.grow(40.0).has_point(a):
+					ok = false
+			for o: Vector2 in lay.anchors:
+				if o.distance_to(a) < 200.0:
+					ok = false
+			if HUD_LORE.grow(20.0).has_point(a) or HUD_STRIP.grow(20.0).has_point(a):
+				ok = false
+			if ok:
+				lay.anchors.append(a)
+				break
+	lay["scars"] = []
+	var solid: Array = lay.walls + lay.cover + Plates.rects_for(lay.get("plates", []))
+	for k in 5:
+		for tries in 20:
+			var c := Vector2(rng.randf_range(ROOM.position.x + 100.0, ROOM.end.x - 100.0), rng.randf_range(ROOM.position.y + 100.0, ROOM.end.y - 100.0))
+			var ok := true
+			for r: Rect2 in solid + lay.quiet:
+				if _dist(r, c) < 60.0:
+					ok = false
+			for o: Array in lay.scars:
+				if (o[0] as Vector2).distance_to(c) < 220.0:
+					ok = false
+			if ok:
+				lay.scars.append([c, rng.randf() * TAU, rng.randi() % 2])
+				break
+
+
 # The car's walls and floor: its windows onto the earth along the top wall
 # where it is clear, the handrails down the side walls broken at every door
 # in them.
 static func _paint_lift(lay: Dictionary, taken: Array, rng: RandomNumberGenerator) -> void:
 	lay["quiet"] = _quiet(lay)
-	lay["windows"] = []
-	for k in 2:
-		for tries in 30:
-			var sz := Vector2(rng.randf_range(300.0, 380.0), rng.randf_range(150.0, 190.0))
-			var wr := Rect2(Vector2(rng.randf_range(ROOM.position.x + 60.0, ROOM.end.x - 60.0 - sz.x), ROOM.position.y + rng.randf_range(70.0, 110.0)), sz)
-			var ok := not wr.grow(20.0).intersects(HUD_STRIP) and not wr.grow(20.0).intersects(HUD_TOP)
-			for r: Rect2 in lay.walls + lay.cover:
-				if r.grow(40.0).intersects(wr):
-					ok = false
-			for d: Dictionary in taken:
-				if _dist(wr, d.pos) < 130.0:
-					ok = false
-				var fr: Rect2 = d.get("front", Rect2())
-				if fr.size.x > 0.0 and fr.intersects(wr.grow(20.0)):
-					ok = false
-			for d: Dictionary in lay.exits:
-				if (d.label as Rect2).grow(30.0).intersects(wr):
-					ok = false
-			for o: Rect2 in lay.windows:
-				if o.grow(80.0).intersects(wr):
-					ok = false
-			if ok:
-				lay.windows.append(wr)
-				break
 	# the handrails: what is left of each side wall between its doors and blocks
 	lay["handrails"] = []
 	for side in 2:
@@ -737,7 +893,7 @@ static func _paint_lift(lay: Dictionary, taken: Array, rng: RandomNumberGenerato
 			if free2 and run_from < 0.0:
 				run_from = yy
 			elif not free2 and run_from >= 0.0:
-				if yy - run_from >= 90.0:
+				if yy - run_from >= 160.0:
 					lay.handrails.append([Vector2(x, run_from), Vector2(x, yy - 10.0)])
 				run_from = -1.0
 
@@ -1099,6 +1255,35 @@ static func _remnants(lay: Dictionary, st: Dictionary, story: int, index: int, e
 
 # ---------------------------------------------------------------- shapes
 
+# Where the chapter's title card and each wave's title show, mid-screen: no
+# wall block in it. A spur off the top or bottom of the room is cut back
+# short of it; anything else there and the try is given up.
+const TITLES := Rect2(640, 290, 640, 210)
+
+
+static func _clear_titles(walls: Array[Rect2]) -> bool:
+	var k := 0
+	while k < walls.size():
+		var w: Rect2 = walls[k]
+		if not w.intersects(TITLES):
+			k += 1
+			continue
+		if w.position.y <= ROOM.position.y + 4.0 and w.end.y > TITLES.position.y:
+			w.size.y = TITLES.position.y - 20.0 - w.position.y
+		elif w.end.y >= ROOM.end.y - 4.0 and w.position.y < TITLES.end.y:
+			var e := w.end.y
+			w.position.y = TITLES.end.y + 20.0
+			w.size.y = e - w.position.y
+		else:
+			return false
+		if w.size.y < 60.0:
+			walls.remove_at(k)
+		else:
+			walls[k] = w
+			k += 1
+	return true
+
+
 static func _shape(shape: String, rng: RandomNumberGenerator) -> Array[Rect2]:
 	var out: Array[Rect2] = []
 	var x0 := ROOM.position.x
@@ -1267,7 +1452,7 @@ static func _fits(placed: Array[Rect2], lay: Dictionary, taken: Array) -> bool:
 		for r in placed:
 			if _dist(r, c) < RING_R + RING_WARN:
 				return false
-	for foot: Rect2 in lay.get("bank_feet", []):
+	for foot: Rect2 in lay.get("bank_feet", []) + lay.get("windows", []):
 		for r in placed:
 			if foot.grow(GAP).intersects(r):
 				return false
@@ -1359,6 +1544,7 @@ static func check(lay: Dictionary) -> Dictionary:
 	solids.append_array(lay.walls)
 	solids.append_array(lay.cover)
 	solids.append_array(Shelves.rects_for(lay.get("banks", [])))
+	solids.append_array(Plates.rects_for(lay.get("plates", [])))
 	var nx := int(ROOM.size.x / CELL)
 	var ny := int(ROOM.size.y / CELL)
 	var reach := PackedByteArray()
