@@ -1,13 +1,14 @@
 extends SceneTree
 # Steam trailer footage (off-screen, Movie Maker): the test bot plays a chapter
 # or its boss in English; the first <warm> seconds are cut off afterwards.
-# Usage: tools/run_test.sh tests/store_clip.gd --write-movie <out.avi> --fixed-fps 60 -- <ch 1-12> <wave|boss> <seconds>
+# Usage: tools/run_test.sh tests/store_clip.gd --write-movie <out.avi> --fixed-fps 60 -- <ch 1-12> <wave|boss> <seconds> [max]
 
 var game
 var brain
 var bot := {"move": Vector2.ZERO, "aim": Vector2(960, 300), "fire": false, "focus": false, "dash": false, "possess": false}
 var frame := 0
 var secs := 10.0
+var maxed := false
 
 
 func _initialize() -> void:
@@ -17,6 +18,7 @@ func _initialize() -> void:
 	var ch := int(a[0]) if a.size() > 0 else 1
 	var boss := a.size() > 1 and a[1] == "boss"
 	secs = float(a[2]) if a.size() > 2 else 10.0
+	maxed = "max" in a
 	Txt.zh = false
 	seed(900 + ch * 7 + (1 if boss else 0))
 	Meta.next_seed = 31337 + ch
@@ -34,6 +36,9 @@ func _setup(ch: int, boss: bool) -> void:
 	game.dev_god = true
 	game.lightwalk.tip_done = true
 	game.lv = {"bounce": 1, "split": 1, "orbit": 1, "magnet": 0, "blast": 1, "charge": 0, "shadow": 0, "chain": 1, "possess": 1}
+	if maxed:
+		# a late-run build: every school it can show at once
+		game.lv = {"bounce": 3, "split": 3, "orbit": 2, "magnet": 1, "blast": 2, "charge": 1, "shadow": 1, "chain": 2, "possess": 2}
 	if boss:
 		game.wave_ctl.index = Waves.BOSS - 1
 		game.wave_ctl.phase = Waves.CLEAR
