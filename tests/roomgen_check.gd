@@ -16,7 +16,7 @@ func _ok(cond: bool, what: String) -> void:
 
 # Whether a room's floor has its chapter's long lines (tracks, queue lanes, firing lanes, belts).
 func _lined(lay: Dictionary) -> bool:
-	for k in ["rails", "lanes", "lanes3", "belts", "maglev", "cables", "rings", "banks", "vents", "plates", "fields"]:
+	for k in ["rails", "lanes", "lanes3", "belts", "maglev", "cables", "rings", "banks", "vents", "plates", "fields", "columns"]:
 		if not (lay.get(k, []) as Array).is_empty():
 			return true
 	return false

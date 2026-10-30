@@ -226,7 +226,18 @@ func _draw_field(k: int, dim: float) -> void:
 	var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	# (the lowest field has it above, clear of the floor's own lettering)
 	var sy := R + 32.0 if c.y < 700.0 else -R - 24.0
-	draw_string(font, c + Vector2(-lw * 0.5, sy), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.3 * dim))
+	# (a generated room's: larger and clearer, on the field nearest you only)
+	if game.arena.generated:
+		var near := 0
+		for j2 in fields.size():
+			if (fields[j2] as Vector2).distance_to(game.player.pos) < (fields[near] as Vector2).distance_to(game.player.pos):
+				near = j2
+		if near == k:
+			var fs2 := 14
+			var lw2 := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs2).x
+			draw_string(font, c + Vector2(-lw2 * 0.5, sy), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs2, Pal.ink(0.6 * dim))
+	else:
+		draw_string(font, c + Vector2(-lw * 0.5, sy), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.3 * dim))
 	if wk > 0.0:
 		# warning: ticks closing on the rim, the rim flickering
 		var fl := 0.55 + 0.45 * sin(t * 26.0)

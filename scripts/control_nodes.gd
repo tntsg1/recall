@@ -20,6 +20,7 @@ const CUT_SHOW := 0.8
 
 var on := false
 var game
+var nodes: Array = NODES.duplicate()   # this room's columns' centres
 var t := 0.0
 var clock := 0.0
 var live := -1               # the node powering up or taking over (-1: none)
@@ -39,14 +40,25 @@ func _init() -> void:
 
 
 static func rects() -> Array[Rect2]:
+	return rects_for(NODES)
+
+
+# Columns standing at these centres, as rects.
+static func rects_for(list: Array) -> Array[Rect2]:
 	var out: Array[Rect2] = []
-	for c: Vector2 in NODES:
+	for c: Vector2 in list:
 		out.append(Rect2(c - Vector2(HALF, HALF), Vector2(HALF, HALF) * 2.0))
 	return out
 
 
 func setup(story: int) -> void:
 	on = story == 12
+	set_nodes([])
+
+
+# The columns this room has (none given: the hand-made core's four).
+func set_nodes(list: Array) -> void:
+	nodes = NODES.duplicate() if list.is_empty() else list.duplicate()
 	visible = on
 	t = 0.0
 	clock = 2.5
@@ -68,8 +80,8 @@ func node_of(rect_i: int) -> int:
 	if not on or rect_i < 0:
 		return -1
 	var r: Rect2 = game.arena.rects[rect_i] if rect_i < game.arena.rects.size() else Rect2()
-	for k in NODES.size():
-		if r.get_center().distance_to(NODES[k]) < 2.0:
+	for k in nodes.size():
+		if r.get_center().distance_to(nodes[k]) < 2.0:
 			return k
 	return -1
 
@@ -166,11 +178,11 @@ func step(dt: float) -> void:
 
 func _power() -> void:
 	# the column farthest from you first: you have time to see it coming
-	var order: Array = [0, 1, 2, 3]
-	order.sort_custom(func(a: int, b: int) -> bool: return (NODES[a] as Vector2).distance_to(game.player.pos) > (NODES[b] as Vector2).distance_to(game.player.pos))
+	var order: Array = range(nodes.size())
+	order.sort_custom(func(a: int, b: int) -> bool: return (nodes[a] as Vector2).distance_to(game.player.pos) > (nodes[b] as Vector2).distance_to(game.player.pos))
 	live = order[turn % 2]
 	turn += 1
-	second = order[2] if _boss_on() and game.boss.phase >= 1 else -1
+	second = order[mini(2, order.size() - 1)] if _boss_on() and game.boss.phase >= 1 else -1
 	live_t = 0.0
 	targets.clear()
 	for b in game.bullets.list:
@@ -184,7 +196,7 @@ func _power() -> void:
 # Which powering node reaches p (or -1).
 func _reach(p: Vector2) -> int:
 	for k: int in [live, second]:
-		if k >= 0 and p.distance_to(NODES[k]) < REACH:
+		if k >= 0 and p.distance_to(nodes[k]) < REACH:
 			return k
 	return -1
 
@@ -214,14 +226,14 @@ func _draw() -> void:
 	if game.hud.intro_t >= 0.0:
 		dim *= clampf((game.hud.intro_t - 2.2) / 0.6, 0.25, 1.0)
 	var font := Fonts.get_font("SemiBold")
-	for k in NODES.size():
+	for k in nodes.size():
 		_draw_node(k, dim, font)
 	# reaching for your rounds: a cable of light, then a ring closing round each
 	if live >= 0:
 		var wk := clampf(live_t / WARN, 0.0, 1.0)
 		var tk := clampf((live_t - WARN) / TAKE, 0.0, 1.0)
 		for b in targets:
-			var src: Vector2 = NODES[_reach(b.pos) if _reach(b.pos) >= 0 else live]
+			var src: Vector2 = nodes[_reach(b.pos) if _reach(b.pos) >= 0 else live]
 			var p: Vector2 = b.pos
 			var d := p - src
 			var l := d.length()
@@ -256,7 +268,7 @@ func _draw() -> void:
 # status lights; its reach marked on the floor while it powers, the lights
 # racing, the label lit.
 func _draw_node(k: int, dim: float, font: Font) -> void:
-	var c: Vector2 = NODES[k]
+	var c: Vector2 = nodes[k]
 	var r := Rect2(c - Vector2(HALF, HALF), Vector2(HALF, HALF) * 2.0)
 	var hot := k == live or k == second
 	var wk := clampf(live_t / WARN, 0.0, 1.0) if hot else 0.0

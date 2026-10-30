@@ -26,7 +26,7 @@ const EXIT_APART := 480.0                     # two ways on: this far apart, the
 const FROM_ENTRY := 700.0                     # a way on this far from the way in: the room is crossed
 
 # The chapters that walk room to room; the rest keep their one hand-made room.
-const ON := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+const ON := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 const ARM_W := 200.0       # an arm's footing on its wall
 const RING_R := 92.0       # a mood-scan ring's radius (ScanRings.R)
 const RING_WARN := 66.0    # how far past it the red warning closes in from
@@ -301,6 +301,28 @@ const STYLE := {
 		# (the notice is a board read across: it stands well out from its side wall)
 		"props": {"eliminated": [220.0, 180.0], "sample": [440.0, 90.0], "observe": [130.0, 400.0], "scrawl": [220.0, 150.0]},
 	},
+	12: {
+		# the board's core: server racks, standby-power bars, cable trunks,
+		# the chairman's empty desks; the chapter's own are its server columns,
+		# the control nodes, two in the first room and four by the last
+		"shapes": {"hall": 4, "twin": 2, "corner": 2, "bays": 1},
+		"pieces": [
+			[3, [Rect2(0, 0, 44, 110)], "rack12"],
+			[2, [Rect2(0, 0, 180, 24)], "standby"],
+			[2, [Rect2(0, 0, 90, 60)], "trunk"],
+			[1, [Rect2(0, 0, 140, 60)], "desk12"],
+		],
+		"landmarks": [
+			[3, [Rect2(0, 0, 44, 110), Rect2(44, 0, 44, 110), Rect2(88, 0, 44, 110)], "rack12"],   # a bank of racks
+			[2, [Rect2(0, 0, 200, 70)], "desk12"],                                                 # the board's desk
+		],
+		"columns": [2, 2, 3, 3, 4, 4],
+		# the hand-made core: four standby bars (the columns apart)
+		"count": 4, "area": 17000.0,
+		"themes": [["rack12", "trunk"], ["standby", "desk12", "trunk"]],
+		# (the notice is a board read across: it stands well out from its side wall)
+		"props": {"board": [220.0, 180.0], "protocol": [440.0, 90.0], "quiet": [130.0, 400.0], "scrawl": [220.0, 150.0]},
+	},
 }
 
 
@@ -528,6 +550,47 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 					break
 			if not got and k == 0 and not last_ditch:
 				last_why = "windows"
+				return {}
+	# the core's server columns: in open floor, well apart (each reaches the
+	# rounds in the walls round it), none by a door or the way in
+	lay["columns"] = []
+	if st.has("columns"):
+		var want_c: int = (st.columns as Array)[mini(index, (st.columns as Array).size() - 1)]
+		var ch := ControlNodes.HALF
+		for k in want_c:
+			var done := false
+			for tries in 80:
+				var c := Vector2(rng.randf_range(ROOM.position.x + 200.0, ROOM.end.x - 200.0), rng.randf_range(ROOM.position.y + 150.0, ROOM.end.y - 150.0))
+				var r := Rect2(c - Vector2(ch, ch), Vector2(ch, ch) * 2.0)
+				var ok := true
+				for w: Rect2 in lay.walls:
+					if w.grow(GAP + 20.0).intersects(r):
+						ok = false
+				for d: Dictionary in taken:
+					if _dist(r, d.pos) < CLEAR + 40.0:
+						ok = false
+					var fr: Rect2 = d.get("front", Rect2())
+					if fr.size.x > 0.0 and fr.grow(40.0).intersects(r):
+						ok = false
+				if _dist(r, lay.start) < 300.0:
+					ok = false
+				for z: Rect2 in [HUD_STRIP, HUD_TOP, HUD_LORE, HUD_FOOT, TITLES]:
+					if z.grow(30.0).intersects(r):
+						ok = false
+				for d: Dictionary in lay.exits:
+					if (d.label as Rect2).grow(40.0).intersects(r):
+						ok = false
+				for o: Vector2 in lay.columns:
+					if o.distance_to(c) < 420.0:
+						ok = false
+				if ok:
+					lay.columns.append(c)
+					done = true
+					break
+			if not done and spare and k >= 2:
+				break
+			if not done:
+				last_why = "columns"
 				return {}
 	# the archive's shelving: on the low half of the room, clear of the wave's
 	# title, so the middle stays open floor (placed before the cover, which goes round it)
@@ -779,8 +842,8 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 		return {}
 	# both halves of the room have something in them (the first room: a fair piece each)
 	var halves := [0.0, 0.0]
-	# (the shipyard's loose plates are cover too)
-	for r: Rect2 in lay.cover + Plates.rects_for(lay.get("plates", [])):
+	# (the shipyard's loose plates are cover too, and the core's columns)
+	for r: Rect2 in lay.cover + Plates.rects_for(lay.get("plates", [])) + ControlNodes.rects_for(lay.get("columns", [])):
 		halves[0 if r.get_center().x < 960.0 else 1] += r.get_area()
 	var least: float = 6000.0 if sparse else 0.18 * (halves[0] + halves[1])
 	if halves[0] < least or halves[1] < least:
@@ -1294,8 +1357,14 @@ static func _remnants(lay: Dictionary, st: Dictionary, story: int, index: int, e
 		var words := 22.0 * (w[4] as String).length() + 60.0
 		if w[3] == "scrawl_top":
 			need[0] = maxf(need[0], words)
-		elif w[3] == "scrawl":
+		elif w[3] == "scrawl" and (story < 11 or spare):
 			need[1] = maxf(need[1], minf(words, 520.0))
+		elif w[3] == "scrawl":
+			# (handwriting runs wider than its letters: the jitter, the mark at its end)
+			need[1] = maxf(need[1], minf(25.0 * (w[4] as String).length() + 90.0, 600.0))
+		elif w[3] == "floor" and story >= 11 and not spare:
+			# a floor plaque's words (a generated room sets them at 22px) stand along their wall
+			need[0] = maxf(need[0], 23.0 * (w[4] as String).length() + 40.0)
 		var spot: Array = []
 		if on_kind != "":
 			# on the lid of a piece of that kind, read from above
@@ -1522,7 +1591,7 @@ static func _fits(placed: Array[Rect2], lay: Dictionary, taken: Array) -> bool:
 		for r in placed:
 			if _dist(r, c) < RING_R + RING_WARN:
 				return false
-	for foot: Rect2 in lay.get("bank_feet", []) + lay.get("windows", []) + Plates.rects_for(lay.get("plates", [])):
+	for foot: Rect2 in lay.get("bank_feet", []) + lay.get("windows", []) + Plates.rects_for(lay.get("plates", [])) + ControlNodes.rects_for(lay.get("columns", [])):
 		for r in placed:
 			if foot.grow(GAP).intersects(r):
 				return false
@@ -1615,6 +1684,7 @@ static func check(lay: Dictionary) -> Dictionary:
 	solids.append_array(lay.cover)
 	solids.append_array(Shelves.rects_for(lay.get("banks", [])))
 	solids.append_array(Plates.rects_for(lay.get("plates", [])))
+	solids.append_array(ControlNodes.rects_for(lay.get("columns", [])))
 	var nx := int(ROOM.size.x / CELL)
 	var ny := int(ROOM.size.y / CELL)
 	var reach := PackedByteArray()

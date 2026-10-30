@@ -162,6 +162,24 @@ func _run() -> void:
 			game.lore.hold["w%d_%s" % [story, w[0]]] = 9.0
 		await frames(50)
 		await shot("08_remnants")
+	# the core's columns at work: one powering up, its cables reaching your rounds in the walls
+	if story == 12 and game.nodes.active():
+		game.rooms.cseed = 121000
+		game.rooms.build(3, "L", false)
+		game.wave_ctl.phase = Waves.FIGHT
+		var nc: Vector2 = game.nodes.nodes[0]
+		game.player.pos = nc + Vector2(-260, 120)
+		if not Arena.ROOM.grow(-60).has_point(game.player.pos):
+			game.player.pos = nc + Vector2(260, 120)
+		for j12 in 5:
+			game.bullets.fire(game.player.pos, Vector2.from_angle(j12 * TAU / 5.0 + 0.3))
+		await frames(60)
+		game.nodes.clock = 999.0
+		for k12 in 80:
+			await frames(1)
+			if game.nodes.live >= 0 and game.nodes.live_t >= ControlNodes.WARN + 0.5:
+				break
+		await shot("08_node_take")
 	# the institute's fields at work: rounds flown into a held field stop in mid-air
 	if story == 11 and game.stasis.active():
 		game.rooms.cseed = 111000

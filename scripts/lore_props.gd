@@ -318,10 +318,20 @@ func _draw() -> void:
 		if gen10 and sc10 != null:
 			_draw_scrawl(sc10, dim)
 	elif story == 12:
-		_draw_core(dim)
-		_draw_terminal(Vector2(80, 560), dim, "w12_board")
-		if shows.get("w12_quiet", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 470), dim)
+		var gen12: bool = game.arena.generated
+		if gen12:
+			_draw_core_gen(dim)
+		else:
+			_draw_core(dim)
+		var bd_at = game.rooms.spot("board", Vector2(80, 560))
+		if bd_at != null:
+			_draw_terminal(bd_at, dim, "w12_board")
+		var qt_at = game.rooms.spot("quiet", Vector2(1840, 470))
+		if qt_at != null and shows.get("w12_quiet", 0.0) <= 0.01:
+			_draw_wall_notice(qt_at, dim)
+		var sc12 = game.rooms.spot("scrawl", Vector2(1840, 700))
+		if gen12 and sc12 != null:
+			_draw_scrawl(sc12, dim)
 	elif story == 11:
 		var gen11: bool = game.arena.generated
 		if gen11:
@@ -1548,8 +1558,9 @@ func _remnant_floor(w: Array, shown: String, full: String, k: float, dim: float)
 	# (a generated room's: higher off the wall, clear of the HUD's bottom bar)
 	var at: Vector2 = (w[1] as Vector2) + Vector2(0, -64.0 if game.arena.generated else -36.0)
 	var sf := Fonts.get_font("SemiBold")
-	var tw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
-	draw_string(sf, Vector2(at.x - tw / 2.0, at.y), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Pal.ink(0.8 * k * dim, 1.2))
+	var fsz := 22 if game.arena.generated and game.rooms.lay.get("story", 0) >= 11 else 26
+	var tw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz).x
+	draw_string(sf, Vector2(at.x - tw / 2.0, at.y), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, Pal.ink(0.8 * k * dim, 1.2))
 
 
 # A great registration seal painted on the hall's floor, worn faint.
@@ -3111,9 +3122,19 @@ func _draw_lab_gen(dim: float) -> void:
 		runs.append(mid)
 		runs.append(mid)
 		runs.append(edge)
-	if runs.size() > 0:
-		draw_multiline(runs, Pal.ink(0.1 * dim), 3.0)
-		draw_multiline(runs, Color(0.03, 0.03, 0.035), 1.0)
+	# (dashed and faint: a run under the floor, not a line to stop at)
+	var dash := PackedVector2Array()
+	for j in range(0, runs.size(), 2):
+		var a: Vector2 = runs[j]
+		var b: Vector2 = runs[j + 1]
+		var l := a.distance_to(b)
+		var s0 := 0.0
+		while s0 < l:
+			dash.append(a.lerp(b, s0 / l))
+			dash.append(a.lerp(b, minf(s0 + 10.0, l) / l))
+			s0 += 18.0
+	if dash.size() > 0:
+		draw_multiline(dash, Pal.ink(0.07 * dim), 2.0)
 	var sbf := Fonts.get_font("SemiBold")
 	var inst := 0
 	for i in cover.size():
@@ -3158,9 +3179,9 @@ func _draw_lab_gen(dim: float) -> void:
 					draw_rect(Rect2(r.get_center() + Vector2(-38 + j * 8, 18), Vector2(5, 4)), Pal.ink((0.5 if lit else 0.15) * dim), true)
 			"samplebox":
 				var bl := Txt.t("sample_box")
-				var bw := sbf.get_string_size(bl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+				var bw := sbf.get_string_size(bl, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
 				draw_line(Vector2(r.get_center().x, r.position.y), Vector2(r.get_center().x, r.end.y), Pal.ink(0.3 * dim), 4.0)
-				draw_string(sbf, Vector2(r.get_center().x - bw / 2.0, r.position.y - 5.0), bl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+				draw_string(sbf, Vector2(r.get_center().x - bw / 2.0, r.position.y - 5.0), bl, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Pal.ink(0.5 * dim))
 			"rack11":
 				var rows := int(ins.size.y / 18.0)
 				for j in rows:
@@ -3264,6 +3285,79 @@ func _draw_lab(dim: float) -> void:
 # like a dial; cable runs from each server column in to it, pulsing when that
 # column powers; racks of servers along the top and bottom walls, their lights
 # ticking over; the board's motto stencilled across the seal.
+# A generated room of the board's core: cable trunks run along the floor
+# from each column to the nearest wall (lit red while it powers), and the
+# furniture by kind (server racks with their blinking units, the standby
+# bars stencilled for the board alone, cable trunks, the chairman's desk
+# with one chair and its motto).
+func _draw_core_gen(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var room := Arena.ROOM
+	var nodes = game.nodes
+	var cols: Array = lay.get("columns", [])
+	for k in cols.size():
+		var p: Vector2 = cols[k]
+		# to the nearest side of the room
+		var ends := [Vector2(room.position.x, p.y), Vector2(room.end.x, p.y), Vector2(p.x, room.position.y), Vector2(p.x, room.end.y)]
+		var best: Vector2 = ends[0]
+		for e: Vector2 in ends:
+			if e.distance_to(p) < best.distance_to(p):
+				best = e
+		var a := p + (best - p).normalized() * (ControlNodes.HALF + 8.0)
+		var hot: bool = nodes.active() and (nodes.live == k or nodes.second == k)
+		draw_line(a, best, Pal.ink(0.12 * dim), 4.0)
+		draw_line(a, best, Color(0.03, 0.03, 0.035), 2.0)
+		if hot:
+			var u := best - a
+			var l := u.length()
+			var s0 := fmod(t * 260.0, 40.0)
+			while s0 < l:
+				draw_line(a + u / l * s0, a + u / l * minf(s0 + 14.0, l), Pal.red(0.7 * dim, 1.8), 2.0)
+				s0 += 40.0
+	var sf := Fonts.get_font("SemiBold")
+	var kinds: Array = lay.get("kinds", [])
+	var cover: Array = lay.get("cover", [])
+	for i in cover.size():
+		var r: Rect2 = cover[i]
+		var kind: String = kinds[i] if i < kinds.size() else "rack12"
+		var ins := r.grow(-5.0)
+		match kind:
+			"rack12":
+				var long_y := r.size.y >= r.size.x
+				var nu := int((r.size.y if long_y else r.size.x) / 14.0)
+				for j in nu:
+					var ur := Rect2(ins.position + Vector2(0, j * 14.0), Vector2(ins.size.x, 10.0)) if long_y else Rect2(ins.position + Vector2(j * 14.0, 0), Vector2(10.0, ins.size.y))
+					draw_rect(ur, Pal.ink(0.2 * dim), false, 1.0)
+					var blink := int(t * 3.0 + j * 1.3 + i) % 5 != 0
+					var lp := Vector2(ur.end.x - 4.0, ur.get_center().y) if long_y else Vector2(ur.get_center().x, ur.end.y - 4.0)
+					draw_circle(lp, 1.6, (Pal.red(0.8 * dim, 1.5) if j % 4 == 1 else Pal.ink(0.6 * dim, 1.3)) if blink else Pal.ink(0.12 * dim))
+			"standby":
+				var spw := Txt.t("spare_power")
+				var sw := sf.get_string_size(spw, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+				if r.size.x >= r.size.y:
+					draw_string(sf, r.get_center() + Vector2(-sw * 0.5, 4.0), spw, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.45 * dim))
+				else:
+					draw_set_transform(r.get_center() + Vector2(4.0, -sw * 0.5), PI * 0.5, Vector2.ONE)
+					draw_string(sf, Vector2.ZERO, spw, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.45 * dim))
+					draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			"trunk":
+				# a cable trunk: its lid ribbed, the cables spilling at one end
+				var ribs := int(ins.size.x / 12.0)
+				for j in ribs:
+					var x := ins.position.x + 6.0 + j * 12.0
+					draw_line(Vector2(x, ins.position.y + 3.0), Vector2(x, ins.end.y - 3.0), Pal.ink(0.2 * dim), 1.0)
+				for j in 3:
+					draw_arc(Vector2(r.end.x, ins.position.y + 12.0 + j * 14.0), 8.0 + j * 2.0, -PI * 0.5, PI * 0.5, 8, Pal.ink(0.25 * dim), 1.5)
+			"desk12":
+				# the board's desk: one chair, one name plate, the motto
+				var chair := Vector2(r.get_center().x, r.position.y - 16.0)
+				draw_arc(chair, 12.0, PI, TAU, 10, Pal.ink(0.5 * dim), 3.0)
+				draw_rect(Rect2(r.get_center() - Vector2(26, 8), Vector2(52, 14)), Pal.ink(0.5 * dim), false, 1.5)
+				var motto := Txt.t("core_motto")
+				var mw := sf.get_string_size(motto, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
+				draw_string(sf, Vector2(r.get_center().x - mw * 0.5, r.end.y + 16.0), motto, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.35 * dim))
+
+
 func _draw_core(dim: float) -> void:
 	var c := Vector2(960, 540)
 	draw_arc(c, 250.0, 0.0, TAU, 128, Pal.ink(0.1 * dim), 2.0)

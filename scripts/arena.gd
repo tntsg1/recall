@@ -57,6 +57,8 @@ func setup(ch: int, lay := {}) -> void:
 				mirrors.append(lay.cover[i])
 			else:
 				inner.append(lay.cover[i])
+		# (the core's server columns, where the room stood them)
+		inner.append_array(ControlNodes.rects_for(lay.get("columns", [])))
 		rects.append_array(walls)
 		ch = -1
 	match ch:
