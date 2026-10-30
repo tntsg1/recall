@@ -15,6 +15,8 @@ var shows := {}              # remnant id -> 0..1 shown, fading
 var hold := {}               # remnant id -> seconds left at full
 var memory := ""             # a shell's memory, shown beside it
 var memory_t := -1.0
+var mem_rows: Array = []      # the memory broken into lines (measured once per text)
+var mem_rows_of := ""
 var memory_at: Node2D = null
 var memory_fixed := Vector2.INF   # a memory pinned where it was found (a fallen inspector)
 var seize_n := 0
@@ -90,7 +92,7 @@ func step(dt: float) -> void:
 			shows[id] = maxf(0.0, shows.get(id, 0.0) - dt / 0.6)
 	if memory_t >= 0.0:
 		memory_t += dt
-		if memory_t > 3.4 or not is_instance_valid(memory_at):
+		if memory_t > mem_hold() + 0.6 or not is_instance_valid(memory_at):
 			memory_t = -1.0
 			memory_fixed = Vector2.INF
 		mem_layer.queue_redraw()
@@ -2580,20 +2582,25 @@ func _draw_memory() -> void:
 		if sh == null:
 			return
 		anchor = sh.pos
-	var a := clampf(memory_t / 0.3, 0.0, 1.0) * (1.0 - clampf((memory_t - 2.8) / 0.6, 0.0, 1.0))
+	var a := clampf(memory_t / 0.3, 0.0, 1.0) * (1.0 - clampf((memory_t - mem_hold()) / 0.6, 0.0, 1.0))
 	var size := 18
-	# typed out, a few characters at a time, like a log being read
-	var n := int(memory.length() * clampf(memory_t / 0.5, 0.0, 1.0))
-	var txt := memory.substr(0, n)
-	var tw := font.get_string_size(memory, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	# (long memories wrap onto more lines)
+	if mem_rows_of != memory + str(Txt.zh):
+		mem_rows_of = memory + str(Txt.zh)
+		mem_rows = Txt.wrap(font, memory, size, 620.0)
+	var rows := mem_rows
+	var tw := 0.0
+	for r in rows:
+		tw = maxf(tw, font.get_string_size(r, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
+	var ph := 34.0 + (rows.size() - 1) * 26.0
 	var p: Vector2 = anchor + Vector2(-tw / 2.0, 92.0)
-	if p.y > Arena.ROOM.end.y - 24.0:
-		p.y = anchor.y - 74.0
+	if p.y + ph - 34.0 > Arena.ROOM.end.y - 24.0:
+		p.y = anchor.y - 74.0 - (ph - 34.0)
 	p.x = clampf(p.x, Arena.ROOM.position.x + 10.0, Arena.ROOM.end.x - tw - 10.0)
 	# keep the plate off cover and floor rails: step it away, one way only
 	var away := 40.0 if p.y < Arena.ROOM.get_center().y else -40.0
 	for k in 8:
-		var plate := Rect2(p + Vector2(-12, -24), Vector2(tw + 24, 34))
+		var plate := Rect2(p + Vector2(-12, -24), Vector2(tw + 24, ph))
 		var hit := false
 		for rr: Rect2 in game.arena.inner:
 			if plate.intersects(rr.grow(4.0)):
@@ -2605,10 +2612,22 @@ func _draw_memory() -> void:
 		if not hit:
 			break
 		p.y += away
-	mem_layer.draw_rect(Rect2(p + Vector2(-12, -24), Vector2(tw + 24, 34)), Color(0.01, 0.015, 0.02, 0.94 * a))
-	mem_layer.draw_rect(Rect2(p + Vector2(-12, -24), Vector2(tw + 24, 34)), Possess.cyan(0.25 * a, 1.0), false, 1.0)
-	mem_layer.draw_line(p + Vector2(-12, -24), p + Vector2(-12, 10), Possess.cyan(a, 1.8), 2.0)
-	mem_layer.draw_string(font, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Possess.cyan(0.95 * a, 1.4))
+	mem_layer.draw_rect(Rect2(p + Vector2(-12, -24), Vector2(tw + 24, ph)), Color(0.01, 0.015, 0.02, 0.94 * a))
+	mem_layer.draw_rect(Rect2(p + Vector2(-12, -24), Vector2(tw + 24, ph)), Possess.cyan(0.25 * a, 1.0), false, 1.0)
+	mem_layer.draw_line(p + Vector2(-12, -24), p + Vector2(-12, ph - 24.0), Possess.cyan(a, 1.8), 2.0)
+	# typed out, a few characters at a time, like a log being read
+	var left := int(memory.length() * clampf(memory_t / maxf(0.5, memory.length() * 0.012), 0.0, 1.0))
+	for ri in rows.size():
+		var row: String = rows[ri]
+		mem_layer.draw_string(font, p + Vector2(0, ri * 26.0), row.substr(0, left), HORIZONTAL_ALIGNMENT_LEFT, -1, size, Possess.cyan(0.95 * a, 1.4))
+		left -= row.length()
+		if left <= 0:
+			break
+
+
+# How long a memory stays up: longer lines are given time to be read.
+func mem_hold() -> float:
+	return clampf(1.4 + memory.length() * 0.05, 2.8, 7.5)
 
 
 # ---------------------------------------------------------------- the deep archive

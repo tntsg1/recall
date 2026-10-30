@@ -252,7 +252,7 @@ func step(dt: float) -> void:
 		game.player.modulate.a = 1.0 - clampf((over_t - 1.2) / 0.6, 0.0, 1.0)
 	if radio_t >= 0.0:
 		radio_t += dt
-		if radio_t > 7.0:
+		if radio_t > radio_hold() + 0.8:
 			radio_t = -1.0
 	if found_t >= 0.0:
 		found_t += dt
@@ -422,8 +422,19 @@ func _draw_view() -> void:
 		var hint_keys := ["hint_fire", "hint_recall", "hint_dash"]
 		if game.lightwalk != null and game.lightwalk.available():
 			hint_keys.append("hint_lightwalk")
-		var hs: String = "    ·    ".join(hint_keys.map(func(k: String) -> String: return Txt.t(k)))
-		view.draw_string(font_s, Vector2(BAND_EDGE, vp.y - 40.0), hs, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.42 * hint_a))
+		# the row stops short of the cracks in the middle; what does not fit goes on a line above
+		var room_w := vp.x / 2.0 - 260.0 - BAND_EDGE
+		var rows: Array = [""]
+		for k: String in hint_keys:
+			var part := Txt.t(k)
+			var cur: String = rows[rows.size() - 1]
+			var test := part if cur == "" else cur + "    ·    " + part
+			if cur != "" and font_s.get_string_size(test, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x > room_w:
+				rows.append(part)
+			else:
+				rows[rows.size() - 1] = test
+		for ri in rows.size():
+			view.draw_string(font_s, Vector2(BAND_EDGE, vp.y - 40.0 - (rows.size() - 1 - ri) * 22.0), rows[ri], HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.42 * hint_a))
 	_draw_lines()
 	_draw_tip(vp)
 	_draw_motion(vp)
@@ -550,9 +561,14 @@ func _draw_title(vp: Vector2) -> void:
 	if title_note != "":
 		var na := clampf((t - 0.45) / 0.3, 0.0, 1.0) * a
 		# its own plate: the rooms put cover anywhere, even under it
-		var nw := font_s.get_string_size(Txt.t(title_note), HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
-		view.draw_rect(Rect2(cx - nw / 2.0 - 12.0, bot + 10.0, nw + 24.0, 28.0), Color(0, 0, 0, 0.55 * na))
-		_text_c(font_s, Txt.t(title_note), Vector2(cx, bot + 30.0), 17, Pal.ink(0.7 * na))
+		# (longer notes wrap onto more lines under the title)
+		var rows := _wrap(Txt.t(title_note), 17, 1080.0)
+		var nw := 0.0
+		for r in rows:
+			nw = maxf(nw, font_s.get_string_size(r, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x)
+		view.draw_rect(Rect2(cx - nw / 2.0 - 12.0, bot + 10.0, nw + 24.0, 6.0 + rows.size() * 24.0), Color(0, 0, 0, 0.55 * na))
+		for ri in rows.size():
+			_text_c(font_s, rows[ri], Vector2(cx, bot + 30.0 + ri * 24.0), 17, Pal.ink(0.7 * na))
 	var tick := Pal.ease_out(clampf((t - 0.2) / 0.5, 0.0, 1.0))
 	for sd in [-1.0, 1.0]:
 		var x: float = cx + sd * (half + 14.0)
@@ -749,6 +765,11 @@ func game_over() -> void:
 	over_line = Lore.death_line(int(Meta.load_data().runs))
 
 
+# How long a broadcast stays up: longer ones are given time to be read.
+func radio_hold() -> float:
+	return clampf(2.0 + radio_text.length() * 0.06, 6.2, 9.0)
+
+
 func radio(text: String, who: String = "radio_tag") -> void:
 	radio_text = text
 	radio_t = 0.0
@@ -762,12 +783,16 @@ func lore_found() -> void:
 
 func _draw_radio(vp: Vector2) -> void:
 	if radio_t >= 0.0:
-		var a := clampf(radio_t / 0.3, 0.0, 1.0) * (1.0 - clampf((radio_t - 6.2) / 0.8, 0.0, 1.0))
-		var n := int(radio_text.length() * clampf((radio_t - 0.4) / 2.2, 0.0, 1.0))
+		var a := clampf(radio_t / 0.3, 0.0, 1.0) * (1.0 - clampf((radio_t - radio_hold()) / 0.8, 0.0, 1.0))
+		var n := int(radio_text.length() * clampf((radio_t - 0.4) / maxf(2.2, radio_text.length() * 0.03), 0.0, 1.0))
 		var x := BAND_EDGE + 56.0
 		var y := 112.0
-		var pw := font_s.get_string_size(radio_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
-		view.draw_rect(Rect2(BAND_EDGE + 12.0, y - 36.0, pw + 64.0, 56.0), Color(0, 0, 0, 0.62 * a))
+		# (long broadcasts wrap onto more lines)
+		var rows := _wrap(radio_text, 18, 860.0)
+		var pw := 0.0
+		for r in rows:
+			pw = maxf(pw, font_s.get_string_size(r, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x)
+		view.draw_rect(Rect2(BAND_EDGE + 12.0, y - 36.0, pw + 64.0, 56.0 + (rows.size() - 1) * 24.0), Color(0, 0, 0, 0.62 * a))
 		# a loudspeaker: a box and its horn, with waves while it speaks
 		var sp := Vector2(BAND_EDGE + 34.0, y - 10.0)
 		view.draw_rect(Rect2(sp + Vector2(-8, -5), Vector2(6, 10)), Pal.ink(0.7 * a))
@@ -778,7 +803,13 @@ func _draw_radio(vp: Vector2) -> void:
 				if on:
 					view.draw_arc(sp + Vector2(8, 0), 6.0 + j * 5.0, -0.7, 0.7, 8, Pal.ink(0.6 * a), 1.5, false)
 		view.draw_string(font_b, Vector2(x, y - 14.0), Txt.t(radio_who), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.55 * a) if radio_who == "radio_tag" else Pal.red(0.85 * a, 1.6))
-		view.draw_string(font_s, Vector2(x, y + 10.0), radio_text.substr(0, n), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.88 * a))
+		var left := n
+		for ri in rows.size():
+			var row: String = rows[ri]
+			view.draw_string(font_s, Vector2(x, y + 10.0 + ri * 24.0), row.substr(0, left), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.88 * a))
+			left -= row.length()
+			if left <= 0:
+				break
 	if found_t >= 0.0:
 		var fa := clampf(found_t / 0.2, 0.0, 1.0) * (1.0 - clampf((found_t - 1.8) / 0.6, 0.0, 1.0))
 		var rise := (1.0 - Pal.ease_out(clampf(found_t / 0.4, 0.0, 1.0))) * 8.0
@@ -1634,16 +1665,23 @@ func _wrap(txt: String, size: int, width: float) -> Array:
 
 func _wrap_lines(txt: String, size: int, width: float) -> Array:
 	var out: Array = []
-	var cur := ""
-	for ch in txt:
-		var test := cur + ch
-		if font_s.get_string_size(test, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width and cur != "":
+	# a "\n" in the text always starts a new line; English breaks between words when it can
+	for para in txt.split("\n"):
+		var cur := ""
+		for ch in para:
+			var test := cur + ch
+			if font_s.get_string_size(test, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width and cur != "":
+				var sp := cur.rfind(" ")
+				if ch != " " and sp > cur.length() / 2:
+					out.append(cur.substr(0, sp))
+					cur = cur.substr(sp + 1) + ch
+				else:
+					out.append(cur)
+					cur = ch.strip_edges(true, false)
+			else:
+				cur = test
+		if cur != "":
 			out.append(cur)
-			cur = ch.strip_edges(true, false)
-		else:
-			cur = test
-	if cur != "":
-		out.append(cur)
 	return out
 
 
