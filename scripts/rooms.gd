@@ -299,6 +299,7 @@ func _swap() -> void:
 	game.player.position = game.player.pos
 	game.player.queue_redraw()
 	game.fx.clear_room()
+	game.lightwalk.stop()
 	game.possess.residue.clear()
 
 

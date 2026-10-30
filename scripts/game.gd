@@ -38,6 +38,8 @@ var fx: Fx
 var cam: Cam
 var player: Player
 var possess: Possess
+var lightwalk: Lightwalk
+var lightwalk_taught := false
 var possess_prev := false
 var trial := false            # 训练场: dummies, number keys to any shell, nothing ends, nothing saved
 var trial_cd := 0.0
@@ -231,6 +233,9 @@ func _ready() -> void:
 	possess = Possess.new()
 	possess.game = self
 	add_child(possess)
+	lightwalk = Lightwalk.new()
+	lightwalk.game = self
+	add_child(lightwalk)
 	for pair in [["lockdown", Lockdown], ["warden", Warden], ["testbed", Testbed], ["grid", GridMaster], ["devourer", Devourer], ["train", Boss], ["metronome", Metronome], ["archivist", Archivist], ["counterweight", Counterweight], ["peace", Peace], ["observed", Observed], ["zero", Zero]]:
 		var bn = pair[1].new()
 		bn.game = self
@@ -1057,7 +1062,10 @@ func _run_frame(dt: float) -> void:
 		possess.press()
 	possess_prev = pnow
 	var dash := _in_dash() and not possess.busy()
-	if dash and not dash_prev and player.try_dash(move):
+	# (holding recall, a dodge that strikes a lit line runs it at light speed instead)
+	if dash and not dash_prev and lightwalk.try_start(move):
+		pass
+	elif dash and not dash_prev and not lightwalk.on and player.try_dash(move):
 		if tutorial != null:
 			tutorial.dashed = true
 		sfx.play("dash", randf_range(0.95, 1.05), -6.0)
@@ -1066,7 +1074,8 @@ func _run_frame(dt: float) -> void:
 	if possess.hosting():
 		possess.host_step(sdt, dt, move, aim_world(), _in_ability() and not picking)
 	elif not possess.busy():
-		player.step(sdt, dt, move, aim_world())
+		player.step(sdt, dt, move if not lightwalk.on else Vector2.ZERO, aim_world())
+	lightwalk.step(dt)
 	possess.step(sdt, dt)
 	lore.step(dt)
 	lasers.step(sdt)
@@ -1420,6 +1429,9 @@ func on_target_die(p: Vector2, kind: int) -> void:
 # Returns true when the hit landed (not during invulnerability).
 func on_player_hit(dir: Vector2, _e) -> bool:
 	if tutorial != null:
+		return false
+	# running a line as light: nothing lands
+	if lightwalk.on:
 		return false
 	if possess.busy():
 		# seized: the shell takes it (and costs no crack); in flight, nothing lands
@@ -1847,6 +1859,7 @@ func _resume(snap: Dictionary) -> void:
 
 func next_chapter() -> void:
 	chapter += 1
+	lightwalk.stop()
 	ammo = mini(mag, ammo + bullets.clear_for_chapter())
 	for e in enemies.list:
 		e.state = Enemies.DEAD
@@ -1907,6 +1920,10 @@ func on_wave_title(index: int, note: String) -> void:
 	if resume_note:
 		resume_note = false
 		note = "resumed"
+	# the second chapter's first wave: the power R-0 has found again, told once
+	if lightwalk.available() and not lightwalk_taught and index == 0 and tutorial == null:
+		lightwalk_taught = true
+		note = "note_lightwalk"
 	hud.wave_title(index, note)
 	sfx.play("title", 1.0, -4.0)
 

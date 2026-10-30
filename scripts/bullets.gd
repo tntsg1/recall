@@ -72,6 +72,7 @@ class B:
 	var curve_acc := 0.0        # turning in an airlock's draught since its last path point
 	var plate := -1             # the hull plate it is embedded in (it rides, and yanks it when recalled)
 	var stasis := -1            # the stasis field holding it in mid-air
+	var walked := false         # its line has been run at light speed (once only)
 
 	func total() -> float:
 		return cum[cum.size() - 1]
@@ -1210,7 +1211,10 @@ func _draw_paths() -> void:
 				_poly_w(b.path, Pal.you(0.5 + 0.4 * sin(game.real_time * 24.0), 1.6))
 		if b.state == EMBED:
 			var rem := life_max - b.life
-			if b.light > 0.0:
+			if b.walked and b.light > 0.0:
+				# a line run as light: spent, it shows only as a cold trace
+				_poly_w(b.path, Pal.you(0.12))
+			elif b.light > 0.0:
 				var tot := b.total()
 				var pv := Pal.ease_io(b.preview)
 				_poly_r(b.path if pv >= 1.0 else b.sub(tot, tot * (1.0 - pv)), Pal.red(0.55 * b.light, 1.8))

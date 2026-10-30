@@ -419,7 +419,10 @@ func _draw_view() -> void:
 	# hints
 	if hint_a > 0.0:
 		# one line in the band, left-aligned to the arena's edge
-		var hs: String = "    ·    ".join([Txt.t("hint_fire"), Txt.t("hint_recall"), Txt.t("hint_dash")])
+		var hint_keys := ["hint_fire", "hint_recall", "hint_dash"]
+		if game.lightwalk != null and game.lightwalk.available():
+			hint_keys.append("hint_lightwalk")
+		var hs: String = "    ·    ".join(hint_keys.map(func(k: String) -> String: return Txt.t(k)))
 		view.draw_string(font_s, Vector2(BAND_EDGE, vp.y - 40.0), hs, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.42 * hint_a))
 	_draw_lines()
 	_draw_tip(vp)
