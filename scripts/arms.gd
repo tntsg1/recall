@@ -330,7 +330,9 @@ func _draw_belts(dim: float) -> void:
 	draw_multiline(rails, Pal.ink(0.3 * dim), 2.0)
 
 
-# Before a sweep: the floor it will cover, hatched, its edge closing in.
+# Before a sweep: the floor it will cover goes dark inside a ring of hazard
+# tape, a ghost of the arm runs the sweep ahead of time to show the way
+# it will go. During the sweep a short wake trails the arm.
 func _draw_sector(arm: Dictionary, dim: float) -> void:
 	if arm.mode != RISE and arm.mode != SWEEP:
 		return
@@ -338,107 +340,164 @@ func _draw_sector(arm: Dictionary, dim: float) -> void:
 	var face: Vector2 = arm.face
 	var a0: float = face.angle() - HALF
 	var a1: float = face.angle() + HALF
-	var k: float = clampf(arm.t / RISE_TIME, 0.0, 1.0) if arm.mode == RISE else 1.0
+	var k: float = Pal.ease_out(clampf(arm.t / 0.35, 0.0, 1.0)) if arm.mode == RISE else 1.0
+	var room := Arena.ROOM.grow(-2.0)
+	var n := 48
+	var r_out := L * (0.85 + 0.15 * k)
 	var pts := PackedVector2Array([base])
-	var n := 24
 	for j in n + 1:
-		pts.append(base + Vector2.from_angle(lerpf(a0, a1, j / float(n))) * L)
-	# in a generated room the reach is a dark field inside the room, its rim
-	# the one bright line, so the crate, your lines and the arm read over it
-	var quiet: bool = game != null and game.arena.generated
-	if quiet:
-		var rp := Arena.ROOM
-		var box := PackedVector2Array([rp.position, Vector2(rp.end.x, rp.position.y), rp.end, Vector2(rp.position.x, rp.end.y)])
-		for poly: PackedVector2Array in Geometry2D.intersect_polygons(pts, box):
-			draw_colored_polygon(poly, Color(0, 0, 0, 0.18 + 0.12 * k))
-			draw_colored_polygon(poly, Pal.foe(0.01 + 0.02 * k))
-		var rim2 := PackedVector2Array()
-		for q in pts.slice(1):
-			if rp.grow(1.0).has_point(q):
-				rim2.append(q)
-		if rim2.size() >= 2:
-			draw_polyline(rim2, Pal.foe((0.25 + 0.45 * k) * dim, 1.4), 2.0)
-	else:
-		draw_colored_polygon(pts, Pal.foe(0.004 + 0.01 * k))
-		var rim := pts.slice(1)
-		draw_polyline(rim, Pal.foe((0.3 + 0.6 * k) * dim, 1.6), 2.0)
-	# hatch lines across the slice, thickening as the sweep nears
-	var hatch := PackedVector2Array()
-	for j in 9:
-		var aj := lerpf(a0, a1, (j + 0.5) / 9.0)
-		var h0 := base + Vector2.from_angle(aj) * 40.0
-		var h1 := base + Vector2.from_angle(aj) * L * (0.35 + 0.65 * k)
-		if quiet and not Arena.ROOM.has_point(h1):
+		pts.append(base + Vector2.from_angle(lerpf(a0, a1, j / float(n))) * r_out)
+	var box := PackedVector2Array([room.position, Vector2(room.end.x, room.position.y), room.end, Vector2(room.position.x, room.end.y)])
+	for poly: PackedVector2Array in Geometry2D.intersect_polygons(pts, box):
+		draw_colored_polygon(poly, Color(0, 0, 0, 0.32 * k))
+		draw_colored_polygon(poly, Pal.foe(0.01 * k))
+	# the tape: red blocks round the rim, slanted like paint on a factory floor
+	var tape := 46
+	var live: bool = arm.mode == SWEEP
+	var crawl := fmod(t * (0.6 if live else 0.25), 1.0)
+	for j in tape:
+		var u0 := (j + crawl) / float(tape)
+		var u1 := u0 + 0.5 / float(tape)
+		if u1 > 1.0:
 			continue
-		hatch.append(h0)
-		hatch.append(h1)
-	if hatch.size() > 0:
-		draw_multiline(hatch, Pal.foe((0.08 if quiet else 0.2) * k * dim, 1.1), 1.0 + k * (0.5 if quiet else 1.0))
-	if arm.mode == SWEEP:
-		# the swept part goes dark behind the arm
-		var done := PackedVector2Array([base])
-		var steps := 12
-		for j in steps + 1:
-			done.append(base + Vector2.from_angle(lerpf(a0, arm.a, j / float(steps))) * L)
-		draw_colored_polygon(done, Color(0, 0, 0, 0.25))
+		var g0 := lerpf(a0, a1, u0)
+		var g1 := lerpf(a0, a1, u1)
+		var q0 := base + Vector2.from_angle(g0) * (r_out - 9.0)
+		var q1 := base + Vector2.from_angle(g1) * r_out
+		if not room.has_point(q0) or not room.has_point(q1):
+			continue
+		var quad := PackedVector2Array([q0, base + Vector2.from_angle(g0 + 0.012) * r_out, q1, base + Vector2.from_angle(g1 - 0.012) * (r_out - 9.0)])
+		draw_colored_polygon(quad, Pal.red((0.35 + 0.35 * k) * dim, 1.3))
+	var rim := PackedVector2Array()
+	for j in n + 1:
+		var q := base + Vector2.from_angle(lerpf(a0, a1, j / float(n))) * (r_out + 4.0)
+		if room.has_point(q):
+			rim.append(q)
+		else:
+			if rim.size() >= 2:
+				draw_polyline(rim, Pal.ink(0.35 * k * dim), 1.0)
+			rim = PackedVector2Array()
+	if rim.size() >= 2:
+		draw_polyline(rim, Pal.ink(0.35 * k * dim), 1.0)
+	if not live:
+		# a ghost of the sweep, run ahead of time, shows the way it will go
+		var u := fmod(arm.t * 1.4, 1.0)
+		var ga := lerpf(a0, a1, Pal.ease_io(u))
+		_wake(base, ga, 0.6, 0.22 * k * dim * (1.0 - u * 0.5))
+	else:
+		_wake(base, arm.a, 0.45, 0.32 * dim)
 
 
-# An arm: a plate bolted to the wall, a shoulder, an elbow, a two-pronged claw.
+# A fan behind the arm at angle a (the sweep runs toward larger angles),
+# bright at the arm, fading out over span radians.
+func _wake(base: Vector2, a: float, span: float, alpha: float) -> void:
+	var steps := 10
+	var poly := PackedVector2Array([base])
+	var cols := PackedColorArray([Pal.foe(0.0)])
+	for j in steps + 1:
+		var u := j / float(steps)
+		poly.append(base + Vector2.from_angle(a - span * (1.0 - u)) * L)
+		cols.append(Pal.foe(alpha * u * u, 1.3))
+	draw_polygon(poly, cols)
+	draw_line(base, base + Vector2.from_angle(a) * L, Pal.foe(alpha * 1.6, 1.6), 1.5)
+
+
+# One limb: a tapered beam with rounded ends, dark inside, outlined, with a
+# seam and a row of bolts down it.
+func _limb(p0: Vector2, p1: Vector2, w0: float, w1: float, col: Color, dim: float) -> void:
+	var d := (p1 - p0).normalized()
+	var nn := d.orthogonal()
+	var poly := PackedVector2Array()
+	for j in 9:
+		var g := -PI * 0.5 + PI * j / 8.0
+		poly.append(p1 + (d * cos(g) + nn * sin(g)) * w1)
+	for j in 9:
+		var g := PI * 0.5 + PI * j / 8.0
+		poly.append(p0 + (d * cos(g) + nn * sin(g)) * w0)
+	draw_colored_polygon(poly, Color(0.075, 0.075, 0.085))
+	poly.append(poly[0])
+	draw_polyline(poly, col, 2.0)
+	draw_line(p0 + d * w0, p1 - d * w1, Pal.ink(0.18 * dim), 1.0)
+	var span := p0.distance_to(p1)
+	var b := w0 + 10.0
+	while b < span - w1 - 6.0:
+		var q := p0 + d * b
+		var w := lerpf(w0, w1, b / span) - 4.0
+		draw_circle(q + nn * w, 1.5, Pal.ink(0.35 * dim))
+		draw_circle(q - nn * w, 1.5, Pal.ink(0.35 * dim))
+		b += 26.0
+
+
+# An arm: a hazard-striped mount on the wall, a turntable, a tapered upper arm
+# with its hydraulic ram, an elbow, a forearm and a heavy two-jaw gripper.
 func _draw_arm(arm: Dictionary, dim: float) -> void:
 	var base: Vector2 = arm.base
 	var face: Vector2 = arm.face
 	var side := face.orthogonal()
-	var plate := PackedVector2Array([base - side * 40.0 - face * 6.0, base + side * 40.0 - face * 6.0, base + side * 40.0 + face * 26.0, base - side * 40.0 + face * 26.0])
+	var live: bool = arm.mode == SWEEP
+	var warn: bool = arm.mode == RISE
+	var col := Pal.foe(dim, 1.7) if live else Pal.ink((0.95 if warn else 0.7) * dim)
+	# the wall mount
+	var plate := PackedVector2Array([base - side * 46.0 - face * 6.0, base + side * 46.0 - face * 6.0, base + side * 46.0 + face * 20.0, base - side * 46.0 + face * 20.0])
 	draw_colored_polygon(plate, Pal.WALL)
+	for j in 9:
+		var s0 := base + side * (-40.0 + j * 10.0) - face * 4.0
+		draw_line(s0, s0 + side * 6.0 + face * 10.0, Pal.red(0.45 * dim, 1.2), 3.0)
 	plate.append(plate[0])
 	draw_polyline(plate, Pal.ink(0.55 * dim), 1.5)
-	for s: float in [-1.0, 1.0]:
-		draw_circle(base + side * 30.0 * s + face * 10.0, 3.0, Pal.ink(0.4 * dim))
 	var dir := Vector2.from_angle(arm.a)
-	var sh := base + face * 14.0
+	var sh := base + face * 18.0
 	var ext: float = arm.ext
-	# folded, the forearm comes back on the upper arm; unfolded it reaches out
 	var up_len := L * 0.52
 	var elbow := sh + dir * up_len + dir.orthogonal() * 16.0
 	# folding always brings the forearm back over the floor, never into the wall
 	var fs := 1.0 if dir.rotated(2.4).dot(face) >= dir.rotated(-2.4).dot(face) else -1.0
 	var fore := dir.rotated(fs * lerpf(2.4, 0.0, (ext - 0.45) / 0.55))
 	var cl := elbow + fore * (L - up_len) if ext < 0.999 else base + dir * L
-	var live: bool = arm.mode == SWEEP
-	var col := Pal.foe(dim, 1.6) if live else Pal.ink(0.75 * dim)
-	# each segment a framed beam: dark body, two edges, a hydraulic line down it
-	for seg in [[sh, elbow, 11.0], [elbow, cl, 8.0]]:
-		var p0: Vector2 = seg[0]
-		var p1: Vector2 = seg[1]
-		var w: float = seg[2]
-		var sn := (p1 - p0).normalized().orthogonal()
-		var body := PackedVector2Array([p0 + sn * w, p1 + sn * w, p1 - sn * w, p0 - sn * w])
-		draw_colored_polygon(body, Color(0.07, 0.07, 0.08))
-		draw_line(p0 + sn * w, p1 + sn * w, col, 2.0)
-		draw_line(p0 - sn * w, p1 - sn * w, col, 2.0)
-		draw_line(p0 + sn * w * 0.3, p1 + sn * w * 0.3, Pal.ink(0.25 * dim), 1.0)
-	draw_circle(sh, 17.0, Color(0.1, 0.1, 0.11))
-	draw_arc(sh, 17.0, 0.0, TAU, 24, col, 2.0)
-	draw_circle(sh, 6.0, col)
-	draw_circle(elbow, 12.0, Color(0.1, 0.1, 0.11))
-	draw_arc(elbow, 12.0, 0.0, TAU, 20, col, 2.0)
-	draw_circle(elbow, 4.0, col)
-	# the claw: a wrist block and two heavy prongs, open on the way in
-	var wn := dir.orthogonal()
-	var wrist := PackedVector2Array([cl - dir * 6.0 + wn * 12.0, cl + dir * 8.0 + wn * 12.0, cl + dir * 8.0 - wn * 12.0, cl - dir * 6.0 - wn * 12.0])
-	draw_colored_polygon(wrist, Color(0.1, 0.1, 0.11))
+	var fd := (cl - elbow).normalized()
+	# the hydraulic ram: a cylinder off the turntable, its rod into the upper arm
+	var ud := (elbow - sh).normalized()
+	var un := ud.orthogonal() * -fs
+	var ram0 := sh + un * 22.0
+	var ram1 := sh + ud * up_len * 0.62 + un * 13.0
+	var ram_mid := ram0.lerp(ram1, 0.55)
+	draw_line(ram0, ram_mid, Color(0.075, 0.075, 0.085), 11.0)
+	draw_line(ram0, ram_mid, Pal.ink(0.55 * dim), 7.0)
+	draw_line(ram0, ram_mid, Color(0.075, 0.075, 0.085), 4.0)
+	draw_line(ram_mid, ram1, Pal.ink(0.8 * dim, 1.2), 3.0)
+	draw_circle(ram1, 3.5, Pal.ink(0.7 * dim))
+	_limb(sh, elbow, 17.0, 12.0, col, dim)
+	_limb(elbow, cl - fd * 6.0, 11.0, 9.0, col, dim)
+	# the turntable
+	draw_circle(sh, 26.0, Color(0.09, 0.09, 0.1))
+	draw_arc(sh, 26.0, 0.0, TAU, 32, col, 2.0)
+	for j in 8:
+		draw_circle(sh + Vector2.from_angle(arm.a + TAU * j / 8.0) * 20.0, 1.8, Pal.ink(0.5 * dim))
+	draw_circle(sh, 9.0, Color(0.12, 0.12, 0.13))
+	draw_arc(sh, 9.0, 0.0, TAU, 16, col, 1.5)
+	# the elbow
+	draw_circle(elbow, 14.0, Color(0.09, 0.09, 0.1))
+	draw_arc(elbow, 14.0, 0.0, TAU, 24, col, 2.0)
+	draw_circle(elbow, 4.5, col)
+	# the gripper: a wrist block and two jaws, open on the way in
+	var wn := fd.orthogonal()
+	var wrist := PackedVector2Array([cl - fd * 12.0 + wn * 13.0, cl + fd * 6.0 + wn * 15.0, cl + fd * 6.0 - wn * 15.0, cl - fd * 12.0 - wn * 13.0])
+	draw_colored_polygon(wrist, Color(0.09, 0.09, 0.1))
 	wrist.append(wrist[0])
 	draw_polyline(wrist, col, 2.0)
-	var open := 0.55 if live else 0.25
+	var open := (0.5 if live else (0.32 if warn else 0.12)) + (0.05 * sin(t * 9.0) if live else 0.0)
 	for s2: float in [-1.0, 1.0]:
-		var root := cl + dir * 8.0 + wn * 8.0 * s2
-		var prong := dir.rotated(open * s2)
-		var tip := root + prong * 28.0
-		var hook := tip + dir.rotated(-0.7 * s2) * 13.0
-		draw_line(root, tip, Color(0.1, 0.1, 0.11), 9.0)
-		draw_line(root, tip, col, 3.5)
-		draw_line(tip, hook, Color(0.1, 0.1, 0.11), 8.0)
-		draw_line(tip, hook, col, 3.5)
-		draw_circle(hook, 3.0, Pal.ink(0.95 * dim, 1.6))
-	if live:
-		draw_circle(cl + dir * 14.0, 5.0, Pal.foe(dim, 2.4))
+		var root := cl + fd * 6.0 + wn * 10.0 * s2
+		var jd := fd.rotated(open * s2)
+		var jn := jd.orthogonal() * s2
+		var tip := root + jd * 30.0 - jn * 4.0
+		var jaw := PackedVector2Array([root + jn * 5.0, root + jd * 24.0 + jn * 3.0, tip, root + jd * 22.0 - jn * 6.0, root - jn * 5.0])
+		draw_colored_polygon(jaw, Color(0.09, 0.09, 0.1))
+		jaw.append(jaw[0])
+		draw_polyline(jaw, col, 2.0)
+	# its warning light: blinking while it rises, steady while it sweeps
+	var lamp := cl - fd * 3.0
+	var on := live or (warn and fmod(arm.t, 0.25) < 0.14)
+	draw_circle(lamp, 4.0, Pal.red(dim, 3.0) if on else Pal.red(0.3 * dim, 1.0))
+	if on:
+		draw_circle(lamp, 11.0, Pal.red(0.18 * dim, 2.0))
