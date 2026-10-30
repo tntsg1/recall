@@ -74,6 +74,7 @@ func _ready() -> void:
 	if not OS.has_feature("web"):
 		get_window().title = "霓虹行者 NEON RAID"
 	Settings.load_all()
+	SteamBridge.init()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	font_l = Fonts.get_font("Light")

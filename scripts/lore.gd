@@ -12,7 +12,7 @@ const SEIZE := {
 	1: {
 		Enemies.CHASER: [["目标：擅入禁区的维修工一名。处置：积分清零。", "TARGET: ONE MAINTENANCE WORKER IN A SEALED ZONE. ACTION: CREDITS ZEROED."],
 			["我追的人跑得很慢。他欠了四十年的劳动积分。", "THE MAN I CHASED RAN SLOWLY. HE OWED FORTY YEARS OF LABOUR CREDIT."]],
-		Enemies.GUARD: [["盾牌朝向人民。这是安装手册第一页。", "THE SHIELD FACES THE PEOPLE. PAGE ONE OF THE MANUAL."]],
+		Enemies.GUARD: [["盾牌朝向股东。这是安装手册第一页。", "THE SHIELD FACES THE SHAREHOLDERS. PAGE ONE OF THE MANUAL."]],
 		Enemies.CHARGER: [["运往中央的车，从来不在第十三街停。", "THE TRAINS TO THE CENTRE NEVER STOP AT 13TH STREET."]],
 	},
 	2: {
@@ -130,7 +130,7 @@ const WALL := {
 	3: [
 		["log", Vector2(80, 600), Vector2(1, 0), "screen", "第 4127 次测试：目标为非武装人员。结果：合格。", "TEST 4127: TARGET UNARMED. RESULT: PASSED."],
 		["target", Vector2(1840, 600), Vector2(-1, 0), "sheet", "C 型靶标：成人 · 手无寸铁 · 排队姿势", "TARGET TYPE C: ADULT · UNARMED · QUEUEING"],
-		["crate", Vector2(285, 860), Vector2(0, -1), "crate", "人民卫士 Ⅳ 型 · 仅限国内使用", "PEOPLE'S GUARDIAN MK IV · DOMESTIC USE ONLY"],
+		["crate", Vector2(285, 860), Vector2(0, -1), "crate", "股东卫士 Ⅳ 型 · 仅限国内使用", "SHAREHOLDER GUARDIAN MK IV · DOMESTIC USE ONLY"],
 		["safety", Vector2(1490, 1010), Vector2(0, -1), "notice", "试射期间请勿抗议。抗议者将被视为测试目标。", "DO NOT PROTEST DURING LIVE FIRE. PROTESTERS WILL BE TREATED AS TARGETS."],
 	],
 	4: [
