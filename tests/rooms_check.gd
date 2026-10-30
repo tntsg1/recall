@@ -167,13 +167,18 @@ func _run() -> void:
 			# (the boss's room, hand-made, shows every remnant where it was written)
 			_ok(missing.size() <= 1, "story %d seed %d: the remnants in the rooms (%s; boss room only: %s)" % [story, sd, str(placed.keys()), str(missing)])
 		q.queue_free()
-	# chapters not yet laid out fresh keep their room
+	# chapters not yet laid out fresh keep their room (every chapter is now:
+	# the switch that turns them all off for comparison does the same)
+	var all_on := RoomGen.on(Chapters.story(Chapters.count() - 1))
+	if all_on:
+		RoomGen.force_off = true
 	var h = _game(9)
 	await frames(3)
 	while RoomGen.on(Chapters.story(h.chapter)) and h.chapter + 1 < Chapters.count():
 		h.next_chapter()
 	await frames(3)
-	_ok(not h.rooms.active and not h.arena.generated, "a chapter not laid out fresh keeps its hand-made room (story %d)" % Chapters.story(h.chapter))
+	_ok(not h.rooms.active and not h.arena.generated, "a chapter not laid out fresh keeps its hand-made room (story %d%s)" % [Chapters.story(h.chapter), ", rooms switched off" if all_on else ""])
+	RoomGen.force_off = false
 	h.queue_free()
 	print("ROOMS CHECK ", "PASS" if fails == 0 else "FAIL %d" % fails)
 	quit(1 if fails > 0 else 0)

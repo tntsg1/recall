@@ -26,7 +26,7 @@ const EXIT_APART := 480.0                     # two ways on: this far apart, the
 const FROM_ENTRY := 700.0                     # a way on this far from the way in: the room is crossed
 
 # The chapters that walk room to room; the rest keep their one hand-made room.
-const ON := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+const ON := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 const ARM_W := 200.0       # an arm's footing on its wall
 const RING_R := 92.0       # a mood-scan ring's radius (ScanRings.R)
 const RING_WARN := 66.0    # how far past it the red warning closes in from
@@ -570,7 +570,7 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 					if _dist(r, d.pos) < CLEAR + 40.0:
 						ok = false
 					var fr: Rect2 = d.get("front", Rect2())
-					if fr.size.x > 0.0 and fr.grow(40.0).intersects(r):
+					if fr.size.x > 0.0 and fr.grow(80.0).intersects(r):
 						ok = false
 				if _dist(r, lay.start) < 300.0:
 					ok = false
@@ -1581,8 +1581,11 @@ static func arm_zone(base: Vector2, n: Vector2) -> Rect2:
 
 static func _fits(placed: Array[Rect2], lay: Dictionary, taken: Array) -> bool:
 	var inside := ROOM.grow(-GAP)
-	# nothing under the wave's title (a gantry's beam spans the gap between its legs)
+	# nothing under the wave's title (a gantry's beam spans the gap between its legs;
+	# the last chapter keeps the whole title card clear)
 	if _bounds(placed).intersects(BANNER.grow(30.0)):
+		return false
+	if int(lay.get("story", 0)) >= 12 and _bounds(placed).intersects(TITLES.grow(60.0)):
 		return false
 	for z: Rect2 in lay.get("arm_zones", []):
 		if _bounds(placed).intersects(z):

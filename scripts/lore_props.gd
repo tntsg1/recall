@@ -3305,8 +3305,16 @@ func _draw_core_gen(dim: float) -> void:
 				best = e
 		var a := p + (best - p).normalized() * (ControlNodes.HALF + 8.0)
 		var hot: bool = nodes.active() and (nodes.live == k or nodes.second == k)
-		draw_line(a, best, Pal.ink(0.12 * dim), 4.0)
-		draw_line(a, best, Color(0.03, 0.03, 0.035), 2.0)
+		# (it runs under the floor: dashed and faint; never under the broadcast or the titles)
+		var cable := Rect2(a, Vector2.ZERO).expand(best).grow(2.0)
+		if cable.intersects(RoomGen.HUD_STRIP.grow(10.0)) or cable.intersects(RoomGen.TITLES) or cable.intersects(RoomGen.HUD_TOP):
+			continue
+		var cu := best - a
+		var cl := cu.length()
+		var s1 := 0.0
+		while s1 < cl:
+			draw_line(a + cu / cl * s1, a + cu / cl * minf(s1 + 10.0, cl), Pal.ink(0.08 * dim), 2.0)
+			s1 += 18.0
 		if hot:
 			var u := best - a
 			var l := u.length()
@@ -3349,10 +3357,17 @@ func _draw_core_gen(dim: float) -> void:
 				for j in 3:
 					draw_arc(Vector2(r.end.x, ins.position.y + 12.0 + j * 14.0), 8.0 + j * 2.0, -PI * 0.5, PI * 0.5, 8, Pal.ink(0.25 * dim), 1.5)
 			"desk12":
-				# the board's desk: one chair, one name plate, the motto
-				var chair := Vector2(r.get_center().x, r.position.y - 16.0)
-				draw_arc(chair, 12.0, PI, TAU, 10, Pal.ink(0.5 * dim), 3.0)
-				draw_rect(Rect2(r.get_center() - Vector2(26, 8), Vector2(52, 14)), Pal.ink(0.5 * dim), false, 1.5)
+				# the board's desk: its one tall-backed chair, a lamp's pool of
+				# light, the name plate, the motto
+				var chair := Vector2(r.get_center().x, r.position.y - 22.0)
+				draw_rect(Rect2(chair - Vector2(16, 12), Vector2(32, 24)), Color(0.05, 0.05, 0.055))
+				draw_rect(Rect2(chair - Vector2(16, 12), Vector2(32, 24)), Pal.ink(0.5 * dim), false, 1.5)
+				draw_line(chair + Vector2(-18, -14), chair + Vector2(18, -14), Pal.ink(0.7 * dim), 5.0)
+				var lamp := ins.position + Vector2(14, 14)
+				draw_texture_rect(Fx.make_glow_texture(), Rect2(lamp - Vector2(44, 44), Vector2(88, 88)), false, Color(1, 1, 1, 0.08 * dim))
+				draw_circle(lamp, 5.0, Pal.ink(0.75 * dim, 1.4))
+				draw_rect(Rect2(r.get_center() - Vector2(30, 6), Vector2(60, 16)), Pal.ink(0.12 * dim))
+				draw_rect(Rect2(r.get_center() - Vector2(30, 6), Vector2(60, 16)), Pal.ink(0.55 * dim), false, 1.5)
 				var motto := Txt.t("core_motto")
 				var mw := sf.get_string_size(motto, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
 				draw_string(sf, Vector2(r.get_center().x - mw * 0.5, r.end.y + 16.0), motto, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.35 * dim))

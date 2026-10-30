@@ -276,8 +276,23 @@ func _draw_node(k: int, dim: float, font: Font) -> void:
 	if hot:
 		# its reach on the floor
 		var fl := 0.6 + 0.4 * sin(t * (10.0 + 16.0 * tk))
-		draw_circle(c, REACH, Color(0.5, 0.05, 0.05, 0.05 * wk * dim))
-		draw_arc(c, REACH, 0.0, TAU, 96, Pal.red((0.25 + 0.45 * tk) * fl * dim, 1.5), 1.5 + 1.5 * tk)
+		if game.arena.generated:
+			# (a generated room's: only the edge, cut where it would leave the room)
+			var inside := Arena.ROOM.grow(-4.0)
+			var arc := PackedVector2Array()
+			for s3 in 129:
+				var q := c + Vector2.from_angle(TAU * s3 / 128.0) * REACH
+				if inside.has_point(q):
+					arc.append(q)
+				else:
+					if arc.size() > 1:
+						draw_polyline(arc, Pal.red((0.25 + 0.45 * tk) * fl * dim, 1.5), 1.5 + 1.5 * tk)
+					arc = PackedVector2Array()
+			if arc.size() > 1:
+				draw_polyline(arc, Pal.red((0.25 + 0.45 * tk) * fl * dim, 1.5), 1.5 + 1.5 * tk)
+		else:
+			draw_circle(c, REACH, Color(0.5, 0.05, 0.05, 0.05 * wk * dim))
+			draw_arc(c, REACH, 0.0, TAU, 96, Pal.red((0.25 + 0.45 * tk) * fl * dim, 1.5), 1.5 + 1.5 * tk)
 	draw_rect(r, Color(0.045, 0.045, 0.05))
 	for j in 5:
 		var y := r.position.y + 10.0 + j * 12.0
@@ -286,6 +301,9 @@ func _draw_node(k: int, dim: float, font: Font) -> void:
 		draw_rect(Rect2(Vector2(r.end.x - 16.0, y - 3.0), Vector2(6, 4)), Pal.red(0.9 * dim, 2.0) if lit else Pal.ink(0.3 * dim), true)
 	draw_rect(r, Pal.red(0.9 * dim, 1.8) if hot else Pal.ink(0.6 * dim), false, 2.0 + (1.0 if hot else 0.0))
 	var lab := Txt.t("node_taking") if tk > 0.0 else Txt.t("node_tag")
+	# (a generated room: only the powering column says what it is, and larger)
+	if game.arena.generated and not hot:
+		return
 	var fs := 16 if hot else 12
 	var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var ly := r.end.y + 22.0 if c.y < 540.0 else r.position.y - 12.0
