@@ -12,7 +12,8 @@ var rects: Array[Rect2] = []   # every solid; mirrors last
 var inner: Array[Rect2] = []   # pillars and bars (drawn with full outline)
 var mirrors: Array[Rect2] = [] # panels that reflect instead of holding a round
 var mirror_from := 9999        # index in rects where mirrors begin
-var movers: Array[Rect2] = []  # the archive's shelves: solid, moved by Shelves (drawn there)
+var movers: Array[Rect2] = []
+var nav_tracks: Array[Rect2] = []   # the shelving's whole tracks, kept for refresh_nav()  # the archive's shelves: solid, moved by Shelves (drawn there)
 var mover_from := 9999         # index in rects where movers begin
 var soft: Array[Rect2] = []    # solid to bodies only (the archivist's cabinet and bars)
 var walls: Array[Rect2] = []   # a generated room's wall blocks (drawn as the room's own wall)
@@ -144,7 +145,14 @@ func setup(ch: int, lay := {}) -> void:
 	queue_redraw()
 
 
+# The way round the shipyard's plates changes as they drift: Plates calls
+# this now and then to lay the grid again where they lie.
+func refresh_nav() -> void:
+	_build_nav(nav_tracks)
+
+
 func _build_nav(tracks: Array[Rect2] = []) -> void:
+	nav_tracks = tracks
 	nav_cache.clear()
 	nav_order.clear()
 	nav_nx = int(ROOM.size.x / NAV)
@@ -156,7 +164,7 @@ func _build_nav(tracks: Array[Rect2] = []) -> void:
 	for j in nav_ny:
 		for i in nav_nx:
 			var c := ROOM.position + Vector2(i + 0.5, j + 0.5) * NAV
-			for r: Rect2 in walls + inner + mirrors + tracks:
+			for r: Rect2 in walls + inner + mirrors + tracks + (movers if game and game.plates.active() else ([] as Array[Rect2])):
 				if r.grow(18.0).has_point(c):
 					nav_block[j * nav_nx + i] = 1
 					break

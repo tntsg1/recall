@@ -18,6 +18,8 @@ const INSET := 22.0           # a caught round stops this far inside the rim
 
 var on := false
 var game
+var fields: Array = FIELDS.duplicate()   # this room's field centres
+var pair: Array = PAIR.duplicate()       # which of the two turns each takes
 var t := 0.0
 var clock := 0.0
 var held: Array = [0.0, 0.0, 0.0, 0.0]   # 0..1 how fully each field holds (eased)
@@ -32,14 +34,28 @@ func _init() -> void:
 
 func setup(story: int) -> void:
 	on = story == 11
+	set_fields([])
+
+
+# The fields this room has (none given: the hand-made institute's four); they
+# take turns in two sets, every other one.
+func set_fields(list: Array) -> void:
+	fields = FIELDS.duplicate() if list.is_empty() else list.duplicate()
+	pair = PAIR.duplicate() if list.is_empty() else []
+	if not list.is_empty():
+		for k in fields.size():
+			pair.append(k % 2)
 	visible = on
 	t = 0.0
 	clock = PERIOD * 0.5 - 0.6     # both resting; the far pair warns soon after the fight starts
-	held = [0.0, 0.0, 0.0, 0.0]
-	caught_n = [0, 0, 0, 0]
+	held.clear()
+	caught_n.clear()
+	for k in fields.size():
+		held.append(0.0)
+		caught_n.append(0)
 	motes.clear()
 	if on:
-		for k in FIELDS.size():
+		for k in fields.size():
 			for j in 14:
 				motes.append([k, Vector2.from_angle(randf() * TAU) * sqrt(randf()) * (R - 12.0), randf() * TAU])
 	queue_redraw()
@@ -56,18 +72,18 @@ func _pair_t(p: int) -> float:
 
 
 func warn_k(k: int) -> float:
-	var pt := _pair_t(PAIR[k])
+	var pt := _pair_t(pair[k])
 	return clampf(pt / WARN, 0.0, 1.0) if pt >= 0.0 and pt < WARN else 0.0
 
 
 func is_on(k: int) -> bool:
-	var pt := _pair_t(PAIR[k])
+	var pt := _pair_t(pair[k])
 	return pt >= WARN
 
 
 # Seconds left on a holding field (0 when not holding).
 func left(k: int) -> float:
-	var pt := _pair_t(PAIR[k])
+	var pt := _pair_t(pair[k])
 	return WARN + ON - pt if pt >= WARN else 0.0
 
 
@@ -76,10 +92,10 @@ func slow_at(p: Vector2) -> float:
 	if not on:
 		return 1.0
 	var s := 1.0
-	for k in FIELDS.size():
+	for k in fields.size():
 		if held[k] <= 0.0:
 			continue
-		var d: float = p.distance_to(FIELDS[k])
+		var d: float = p.distance_to(fields[k])
 		if d < R:
 			s = minf(s, lerpf(1.0, SLOW, held[k] * clampf((R - d) / 24.0, 0.0, 1.0)))
 	return s
@@ -89,10 +105,10 @@ func slow_at(p: Vector2) -> float:
 func catch(a: Vector2, b: Vector2) -> Dictionary:
 	var best := {}
 	var bt := 2.0
-	for k in FIELDS.size():
+	for k in fields.size():
 		if not is_on(k):
 			continue
-		var c: Vector2 = FIELDS[k]
+		var c: Vector2 = fields[k]
 		if a.distance_to(c) <= R:
 			continue        # fired from inside: it flies out
 		var ht := Geometry2D.segment_intersects_circle(a, b, c, R)
@@ -117,22 +133,22 @@ func step(dt: float) -> void:
 	t += dt
 	var fighting: bool = game.wave_ctl.phase == Waves.FIGHT and game.hud.intro_t < 0.0
 	var was: Array = []
-	for k in FIELDS.size():
+	for k in fields.size():
 		was.append(is_on(k))
 	var wwarn: Array = []
-	for k in FIELDS.size():
+	for k in fields.size():
 		wwarn.append(warn_k(k) > 0.0)
 	if fighting:
 		clock += dt
-	for k in FIELDS.size():
+	for k in fields.size():
 		var now := is_on(k)
 		held[k] = minf(1.0, held[k] + dt / 0.18) if now else maxf(0.0, held[k] - dt / 0.25)
-		if warn_k(k) > 0.0 and not wwarn[k] and k % 2 == 0:
+		if warn_k(k) > 0.0 and not wwarn[k] and pair.find(pair[k]) == k:
 			game.sfx.play("windup", 0.62, -9.0)
 		if now and not was[k]:
 			caught_n[k] = 0
-			game.fx.ring(FIELDS[k], R, R + 30.0, 0.35, Pal.ink(0.7, 1.6), 2.0)
-			if k % 2 == 0:
+			game.fx.ring(fields[k], R, R + 30.0, 0.35, Pal.ink(0.7, 1.6), 2.0)
+			if pair.find(pair[k]) == k:
 				game.sfx.play("focus", 0.55, -8.0)
 		if was[k] and not now:
 			_release(k)
@@ -158,8 +174,8 @@ func _release(k: int) -> void:
 			game.fx.sparks(b.pos, -b.dir, 2, Pal.ink(0.8, 1.6), 200.0, 0.12, 0.6)
 	if n > 0:
 		game.bullets.faint_dirty = true
-	game.fx.ring(FIELDS[k], R * 0.4, R + 10.0, 0.3, Pal.ink(0.5, 1.4), 1.5)
-	if k % 2 == 0:
+	game.fx.ring(fields[k], R * 0.4, R + 10.0, 0.3, Pal.ink(0.5, 1.4), 1.5)
+	if pair.find(pair[k]) == k:
 		game.sfx.play("release", 1.3, -8.0)
 
 
@@ -172,7 +188,7 @@ func _draw() -> void:
 	var dim := 1.0 - 0.45 * f
 	if game.hud.intro_t >= 0.0:
 		dim *= clampf((game.hud.intro_t - 2.2) / 0.6, 0.25, 1.0)
-	for k in FIELDS.size():
+	for k in fields.size():
 		_draw_field(k, dim)
 	# rounds held in mid-air: a small still frame round each
 	for b in game.bullets.list:
@@ -189,7 +205,7 @@ func _draw() -> void:
 # disc goes still and pale, its motes stop, and a rim arc counts down what
 # is left of the hold.
 func _draw_field(k: int, dim: float) -> void:
-	var c: Vector2 = FIELDS[k]
+	var c: Vector2 = fields[k]
 	var hk: float = held[k]
 	var wk := warn_k(k)
 	# the floor ring and its posts

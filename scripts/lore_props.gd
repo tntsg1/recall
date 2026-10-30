@@ -323,10 +323,20 @@ func _draw() -> void:
 		if shows.get("w12_quiet", 0.0) <= 0.01:
 			_draw_wall_notice(Vector2(1840, 470), dim)
 	elif story == 11:
-		_draw_lab(dim)
-		_draw_terminal(Vector2(80, 560), dim, "w11_eliminated")
-		if shows.get("w11_observe", 0.0) <= 0.01:
-			_draw_wall_notice(Vector2(1840, 470), dim)
+		var gen11: bool = game.arena.generated
+		if gen11:
+			_draw_lab_gen(dim)
+		else:
+			_draw_lab(dim)
+		var el_at = game.rooms.spot("eliminated", Vector2(80, 560))
+		if el_at != null:
+			_draw_terminal(el_at, dim, "w11_eliminated")
+		var ob_at = game.rooms.spot("observe", Vector2(1840, 470))
+		if ob_at != null and shows.get("w11_observe", 0.0) <= 0.01:
+			_draw_wall_notice(ob_at, dim)
+		var sc11 = game.rooms.spot("scrawl", Vector2(1840, 690))
+		if gen11 and sc11 != null:
+			_draw_scrawl(sc11, dim)
 	elif story == 9:
 		var gen9: bool = game.arena.generated
 		if gen9:
@@ -2923,7 +2933,7 @@ func _draw_dock_gen(dim: float) -> void:
 		seams.append(Vector2(room.position.x + 10.0, y))
 		seams.append(Vector2(room.end.x - 10.0, y))
 		y += 160.0
-	draw_multiline(seams, Pal.ink(0.05 * dim), 1.0)
+	draw_multiline(seams, Pal.ink(0.03 * dim), 1.0)
 	for a: Vector2 in lay.get("anchors", []):
 		draw_circle(a, 5.0, Color(0.06, 0.06, 0.065))
 		draw_arc(a, 5.0, 0.0, TAU, 12, Pal.ink(0.5 * dim), 1.5)
@@ -2938,8 +2948,8 @@ func _draw_dock_gen(dim: float) -> void:
 			var pts := PackedVector2Array()
 			for k in 7:
 				pts.append(c + Vector2.from_angle(ang) * (k * 14.0 - 42.0) + Vector2.from_angle(ang + PI * 0.5) * (4.0 if k % 2 == 0 else -4.0))
-			draw_polyline(pts, Pal.ink(0.18 * dim), 2.0)
-			draw_circle(pts[pts.size() - 1], 3.0, Pal.red(0.35 * dim, 1.3))
+			draw_polyline(pts, Pal.ink(0.09 * dim), 2.0)
+			draw_circle(pts[pts.size() - 1], 3.0, Pal.red(0.3 * dim, 1.2))
 		else:
 			# hazard chevrons
 			for k in 3:
@@ -2974,12 +2984,21 @@ func _draw_dock_gen(dim: float) -> void:
 				draw_arc(bc, 14.0, 0.0, TAU, 20, Pal.ink(0.55 * dim), 2.0)
 				draw_arc(bc, 20.0, -0.4, 2.4, 14, Pal.ink(0.25 * dim), 2.0)
 			"weldrig":
+				# two gas bottles strapped in their cradle, caps on, hoses
+				# curling over to the torch laid at the far end
 				for k in 2:
 					var gb := Vector2(ins.position.x + 14.0 + k * 22.0, ins.get_center().y)
 					draw_circle(gb, 9.0, Color(0.05, 0.05, 0.055))
 					draw_arc(gb, 9.0, 0.0, TAU, 16, Pal.ink(0.5 * dim), 1.5)
-				draw_line(Vector2(ins.position.x + 50.0, ins.get_center().y), ins.end - Vector2(6, 8), Pal.ink(0.35 * dim), 1.5)
-				draw_circle(ins.end - Vector2(6, 8), 2.5, Pal.red(0.6 * dim, 1.4))
+					draw_rect(Rect2(gb - Vector2(3, 3), Vector2(6, 6)), Pal.ink(0.6 * dim))
+					var hose := PackedVector2Array()
+					for j in 7:
+						var u := j / 6.0
+						hose.append(gb.lerp(ins.end - Vector2(12, 8), u) + Vector2(0, -sin(u * PI) * (10.0 + k * 6.0)))
+					draw_polyline(hose, Pal.ink(0.3 * dim), 1.2)
+				draw_line(Vector2(ins.position.x + 2.0, ins.get_center().y), Vector2(ins.position.x + 50.0, ins.get_center().y), Pal.ink(0.4 * dim), 2.0)
+				draw_line(ins.end - Vector2(22, 8), ins.end - Vector2(4, 8), Pal.ink(0.55 * dim), 3.0)
+				draw_circle(ins.end - Vector2(4, 8), 2.5, Pal.red(0.6 * dim, 1.4))
 			"hull":
 				# a curved rib down its length, rivets along both edges
 				var long_x := r.size.x >= r.size.y
@@ -3054,6 +3073,109 @@ func _draw_yard(dim: float) -> void:
 # The institute's floor: lab tiling, cable runs from the instrument plinths
 # to the field posts, a sensor on each plinth sweeping the room, and the
 # banner over the door with the year's count of anomalies.
+# A generated room of the institute: the lab tiling, a cable run in right
+# angles from each plinth to its nearest field, and its furniture by kind
+# (the plinths' instruments in turn: a sweeping dish, an oscilloscope, a
+# clock that will not settle, a pendulum swinging the wrong way; sample
+# boxes stencilled and taped; racks of blinking units; benches of glassware).
+func _draw_lab_gen(dim: float) -> void:
+	var lay: Dictionary = game.rooms.lay
+	var room := Arena.ROOM
+	var tiles := PackedVector2Array()
+	var x := room.position.x + 120.0
+	while x < room.end.x:
+		tiles.append(Vector2(x, room.position.y + 10.0))
+		tiles.append(Vector2(x, room.end.y - 10.0))
+		x += 120.0
+	var y := room.position.y + 60.0
+	while y < room.end.y:
+		tiles.append(Vector2(room.position.x + 10.0, y))
+		tiles.append(Vector2(room.end.x - 10.0, y))
+		y += 120.0
+	draw_multiline(tiles, Pal.ink(0.03 * dim), 1.0)
+	var fields: Array = lay.get("fields", [])
+	var kinds: Array = lay.get("kinds", [])
+	var cover: Array = lay.get("cover", [])
+	var runs := PackedVector2Array()
+	for i in cover.size():
+		if i >= kinds.size() or kinds[i] != "plinth" or fields.is_empty():
+			continue
+		var p: Vector2 = (cover[i] as Rect2).get_center()
+		var best: Vector2 = fields[0]
+		for fc: Vector2 in fields:
+			if fc.distance_to(p) < best.distance_to(p):
+				best = fc
+		var edge: Vector2 = best + (p - best).normalized() * (Stasis.R + 8.0)
+		var mid := Vector2(p.x, edge.y)
+		runs.append(p)
+		runs.append(mid)
+		runs.append(mid)
+		runs.append(edge)
+	if runs.size() > 0:
+		draw_multiline(runs, Pal.ink(0.1 * dim), 3.0)
+		draw_multiline(runs, Color(0.03, 0.03, 0.035), 1.0)
+	var sbf := Fonts.get_font("SemiBold")
+	var inst := 0
+	for i in cover.size():
+		var r: Rect2 = cover[i]
+		var kind: String = kinds[i] if i < kinds.size() else "plinth"
+		var ins := r.grow(-6.0)
+		match kind:
+			"plinth":
+				var p: Vector2 = r.get_center() + Vector2(0, -4)
+				match inst % 4:
+					0:
+						var a := t * 0.5
+						draw_arc(p, 16.0, a - 0.9, a + 0.9, 14, Pal.ink(0.6 * dim, 1.2), 2.5)
+						draw_line(p, p + Vector2.from_angle(a) * 20.0, Pal.ink(0.5 * dim), 1.5)
+						draw_circle(p, 3.0, Pal.ink(0.6 * dim))
+					1:
+						var sc := Rect2(p - Vector2(30, 14), Vector2(60, 28))
+						draw_rect(sc, Color(0.03, 0.03, 0.035))
+						draw_rect(sc, Pal.ink(0.4 * dim), false, 1.0)
+						var wv := PackedVector2Array()
+						for j in 25:
+							var wx := sc.position.x + 3.0 + j * 2.25
+							wv.append(Vector2(wx, sc.get_center().y + sin(j * 0.7 - t * 6.0) * 7.0 * (1.0 if j % 9 != 4 else 0.2)))
+						draw_polyline(wv, Pal.ink(0.7 * dim, 1.4), 1.2)
+					2:
+						draw_arc(p, 15.0, 0.0, TAU, 24, Pal.ink(0.55 * dim), 1.5)
+						for j in 12:
+							var d := Vector2.from_angle(TAU * j / 12.0)
+							draw_line(p + d * 12.0, p + d * 14.5, Pal.ink(0.4 * dim), 1.0)
+						var ha := -PI * 0.5 + sin(t * 3.1) * 0.6 + sin(t * 7.3) * 0.25
+						draw_line(p, p + Vector2.from_angle(ha) * 12.0, Pal.ink(0.75 * dim, 1.3), 1.5)
+					3:
+						var top := p + Vector2(0, -18)
+						var sw := sin(-t * 1.7) * 0.7
+						var bob := top + Vector2.from_angle(PI * 0.5 + sw) * 30.0
+						draw_line(top + Vector2(-10, 0), top + Vector2(10, 0), Pal.ink(0.5 * dim), 2.0)
+						draw_line(top, bob, Pal.ink(0.55 * dim), 1.2)
+						draw_circle(bob, 4.0, Pal.ink(0.7 * dim, 1.3))
+				inst += 1
+				for j in 5:
+					var lit := int(t * 3.0 + j + i) % 5 != 0
+					draw_rect(Rect2(r.get_center() + Vector2(-38 + j * 8, 18), Vector2(5, 4)), Pal.ink((0.5 if lit else 0.15) * dim), true)
+			"samplebox":
+				var bl := Txt.t("sample_box")
+				var bw := sbf.get_string_size(bl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+				draw_line(Vector2(r.get_center().x, r.position.y), Vector2(r.get_center().x, r.end.y), Pal.ink(0.3 * dim), 4.0)
+				draw_string(sbf, Vector2(r.get_center().x - bw / 2.0, r.position.y - 5.0), bl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Pal.ink(0.5 * dim))
+			"rack11":
+				var rows := int(ins.size.y / 18.0)
+				for j in rows:
+					var ry := ins.position.y + 4.0 + j * 18.0
+					draw_rect(Rect2(ins.position.x + 2.0, ry, ins.size.x - 4.0, 13.0), Pal.ink(0.25 * dim), false, 1.0)
+					var blink := int(t * 2.0 + j * 1.7 + i) % 4 != 0
+					draw_circle(Vector2(ins.end.x - 8.0, ry + 6.5), 2.0, Pal.ink((0.7 if blink else 0.15) * dim, 1.4))
+			"bench11":
+				var nb := maxi(int(ins.size.x / 30.0), 2)
+				for j in nb:
+					var bx := ins.position.x + 14.0 + j * (ins.size.x - 28.0) / maxf(nb - 1, 1)
+					draw_arc(Vector2(bx, ins.get_center().y), 7.0, 0.0, TAU, 12, Pal.ink(0.4 * dim), 1.5)
+					draw_circle(Vector2(bx, ins.get_center().y + 2.0), 3.0, Pal.ink((0.25 + 0.2 * sin(t * 2.0 + j)) * dim, 1.2))
+
+
 func _draw_lab(dim: float) -> void:
 	var tiles := PackedVector2Array()
 	var x := 200.0

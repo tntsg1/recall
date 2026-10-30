@@ -162,6 +162,25 @@ func _run() -> void:
 			game.lore.hold["w%d_%s" % [story, w[0]]] = 9.0
 		await frames(50)
 		await shot("08_remnants")
+	# the institute's fields at work: rounds flown into a held field stop in mid-air
+	if story == 11 and game.stasis.active():
+		game.rooms.cseed = 111000
+		game.rooms.build(3, "L", false)
+		game.wave_ctl.phase = Waves.FIGHT
+		var fc: Vector2 = game.stasis.fields[0]
+		game.stasis.clock = Stasis.WARN * 0.5
+		await frames(2)
+		await shot("08_field_warn")
+		game.stasis.clock = Stasis.WARN + 0.3
+		game.player.pos = fc + Vector2(-Stasis.R - 200.0, 40.0)
+		if not Arena.ROOM.grow(-60).has_point(game.player.pos):
+			game.player.pos = fc + Vector2(Stasis.R + 200.0, 40.0)
+		await frames(12)
+		for j11 in 4:
+			game.bullets.fire(game.player.pos, (fc - game.player.pos).normalized().rotated((j11 - 1.5) * 0.12))
+			await frames(4)
+		await frames(30)
+		await shot("08_field_hold")
 	# the shipyard's plates at work: one thrown into an enemy
 	if story == 10 and game.plates.active():
 		game.rooms.cseed = 101000

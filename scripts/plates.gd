@@ -24,7 +24,9 @@ var pos: Array = []          # centres
 var vel: Array = []
 var spin: Array = []         # a little drawn wobble
 var ram_cd: Array = []
-var hits: Array = []         # [pos, t]: recent impacts, drawn as rings
+var hits: Array = []
+var nav_t := 0.0
+var nav_dirty := true         # [pos, t]: recent impacts, drawn as rings
 
 
 func _init() -> void:
@@ -64,6 +66,7 @@ func set_plates(list: Array) -> void:
 	spin.clear()
 	ram_cd.clear()
 	hits.clear()
+	nav_dirty = true
 	if on:
 		for k in sizes.size():
 			pos.append(starts[k])
@@ -125,6 +128,14 @@ func step(dt: float) -> void:
 	obstacles.append_array(game.arena.inner)
 	obstacles.append_array(game.arena.soft)
 	obstacles.append_array(game.arena.walls)
+	# (a generated room's doors: a plate drifting into one would shut it, so it
+	# glances off the floor before each)
+	if game.arena.generated:
+		var lay: Dictionary = game.rooms.lay
+		for d: Dictionary in lay.get("exits", []) + ([lay.entry] if lay.has("entry") else []):
+			var dp: Vector2 = d.pos
+			var dn: Vector2 = d.n
+			obstacles.append(Rect2(dp - Vector2(100, 100) + dn * 60.0, Vector2(200, 200)))
 	for k in sizes.size():
 		ram_cd[k] = maxf(0.0, ram_cd[k] - dt)
 		var v: Vector2 = vel[k]
@@ -198,6 +209,18 @@ func step(dt: float) -> void:
 					b.pos += delta
 					b.set_head(b.pos)
 					game.bullets.faint_dirty = true
+	# (now and then, where the plates lie now becomes the way round them)
+	if game.arena.generated:
+		nav_t += dt
+		if nav_t >= 0.4:
+			nav_t = 0.0
+			var moved := false
+			for k in sizes.size():
+				if (vel[k] as Vector2).length() > 1.0:
+					moved = true
+			if moved or nav_dirty:
+				nav_dirty = false
+				game.arena.refresh_nav()
 	var i := 0
 	while i < hits.size():
 		hits[i][1] += dt
@@ -235,27 +258,38 @@ func _draw_plate(k: int, dim: float) -> void:
 		for j in 3:
 			var o := back * (14.0 + j * 16.0) * clampf(sp / 240.0, 0.3, 1.0)
 			draw_rect(Rect2(r.position + o, r.size), Pal.ink(0.12 * (1.0 - j / 3.0) * dim), false, 1.0)
-	draw_rect(r, Color(0.06, 0.06, 0.065))
+	# (a generated room's plates read as adrift: tilted a little with their
+	# wobble, a shadow beneath them on the deck, their edges fainter than the
+	# fixed crates')
+	var gen: bool = game.arena.generated
+	var rot := sin(float(spin[k])) * 0.07 if gen else 0.0
+	var c := r.get_center()
+	var lr := Rect2(-r.size * 0.5, r.size)
+	if gen:
+		draw_set_transform(c + Vector2(9, 12), rot, Vector2.ONE)
+		draw_rect(lr.grow(2.0), Color(0, 0, 0, 0.55))
+	draw_set_transform(c, rot, Vector2.ONE)
+	draw_rect(lr, Color(0.06, 0.06, 0.065))
 	var hot := clampf((sp - RAM_SPEED) / 120.0, 0.0, 1.0)
-	draw_rect(r, Pal.ink((0.62 + 0.3 * hot) * dim, 1.0 + 0.6 * hot), false, 2.0)
-	draw_rect(r.grow(-6.0), Pal.ink(0.18 * dim), false, 1.0)
+	draw_rect(lr, Pal.ink(((0.45 if gen else 0.62) + 0.3 * hot) * dim, 1.0 + 0.6 * hot), false, 2.0)
+	draw_rect(lr.grow(-6.0), Pal.ink(0.18 * dim), false, 1.0)
 	var long_x := r.size.x > r.size.y
 	var span := r.size.x if long_x else r.size.y
 	var s := 12.0
 	while s < span - 8.0:
-		var q := r.position + (Vector2(s, 4) if long_x else Vector2(4, s))
-		var q2 := r.position + (Vector2(s, r.size.y - 4) if long_x else Vector2(r.size.x - 4, s))
+		var q := lr.position + (Vector2(s, 4) if long_x else Vector2(4, s))
+		var q2 := lr.position + (Vector2(s, r.size.y - 4) if long_x else Vector2(r.size.x - 4, s))
 		draw_circle(q, 1.5, Pal.ink(0.45 * dim))
 		draw_circle(q2, 1.5, Pal.ink(0.45 * dim))
 		s += 18.0
 	var sf := Fonts.get_font("SemiBold")
 	var lab := "H-%02d" % (k * 7 + 11)
 	if long_x:
-		draw_string(sf, r.get_center() + Vector2(-16, 5), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.6 * dim))
+		draw_string(sf, Vector2(-16, 5), lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.6 * dim))
 	else:
-		draw_set_transform(r.get_center() + Vector2(4, -16), PI * 0.5, Vector2.ONE)
+		draw_set_transform(c + Vector2(4, -16).rotated(rot), rot + PI * 0.5, Vector2.ONE)
 		draw_string(sf, Vector2.ZERO, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.6 * dim))
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# a tether ring at one end, its cut line drifting
 	var tq := r.position + (Vector2(6, r.size.y * 0.5) if long_x else Vector2(r.size.x * 0.5, 6))
 	draw_arc(tq, 4.0, 0.0, TAU, 10, Pal.ink(0.5 * dim), 1.5)

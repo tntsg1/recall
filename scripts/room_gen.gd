@@ -26,7 +26,7 @@ const EXIT_APART := 480.0                     # two ways on: this far apart, the
 const FROM_ENTRY := 700.0                     # a way on this far from the way in: the room is crossed
 
 # The chapters that walk room to room; the rest keep their one hand-made room.
-const ON := [1, 2, 3, 4, 5, 6, 7, 8, 9]
+const ON := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 const ARM_W := 200.0       # an arm's footing on its wall
 const RING_R := 92.0       # a mood-scan ring's radius (ScanRings.R)
 const RING_WARN := 66.0    # how far past it the red warning closes in from
@@ -270,13 +270,36 @@ const STYLE := {
 			[3, [Rect2(0, 0, 120, 60), Rect2(0, 60, 120, 60)], "steelcrate"],   # two crates stacked
 			[2, [Rect2(0, 0, 240, 56)], "hull"],                                # a hull section
 		],
-		"plates": [3, 3, 4, 4, 5, 6],
+		"plates": [3, 3, 4, 4, 5, 5],
 		# the hand-made yard: two crates, the rest is the plates
-		"count": 4, "area": 24000.0,
+		"count": 3, "area": 17000.0,
 		"themes": [["steelcrate", "hull"], ["spool", "bollard", "weldrig"]],
 		"on_cover": {"steel": "steelcrate"},
 		# (the notice is a board read across: it stands well out from its side wall)
 		"props": {"schedule": [220.0, 180.0], "tether": [130.0, 400.0], "scrawl": [220.0, 150.0]},
+	},
+	11: {
+		# the anomalous physics institute: instrument plinths, sample boxes
+		# taped shut, equipment racks, lab benches; the chapter's own are its
+		# stasis fields set in the floor, taking turns in two sets, two in the
+		# first room and four by the last
+		"shapes": {"hall": 4, "twin": 2, "corner": 2, "bays": 1},
+		"pieces": [
+			[3, [Rect2(0, 0, 96, 56)], "plinth"],
+			[2, [Rect2(0, 0, 70, 40)], "samplebox"],
+			[2, [Rect2(0, 0, 60, 110)], "rack11"],
+			[2, [Rect2(0, 0, 150, 50)], "bench11"],
+		],
+		"landmarks": [
+			[3, [Rect2(0, 0, 96, 56), Rect2(96, 0, 96, 56)], "plinth"],   # two plinths side by side
+			[2, [Rect2(0, 0, 220, 60)], "bench11"],                        # a long lab bench
+		],
+		"fields": [2, 2, 3, 3, 4, 4],
+		# the hand-made institute: four plinths and two sample boxes
+		"count": 5, "area": 24000.0,
+		"themes": [["plinth", "samplebox"], ["rack11", "bench11", "samplebox"]],
+		# (the notice is a board read across: it stands well out from its side wall)
+		"props": {"eliminated": [220.0, 180.0], "sample": [440.0, 90.0], "observe": [130.0, 400.0], "scrawl": [220.0, 150.0]},
 	},
 }
 
@@ -629,6 +652,46 @@ static func _try(st: Dictionary, story: int, index: int, cseed: int, entry: Stri
 			if not done:
 				last_why = "rings"
 				return {}
+	# the institute's stasis fields: in open floor, apart, clear of the doors,
+	# the titles and the HUD (their rings are floor, not cover)
+	lay["fields"] = []
+	if st.has("fields"):
+		var want_f2: int = (st.fields as Array)[mini(index, (st.fields as Array).size() - 1)]
+		var fr2 := Stasis.R
+		for k in want_f2:
+			var done := false
+			for tries in 80:
+				var c := Vector2(rng.randf_range(ROOM.position.x + fr2 + 30.0, ROOM.end.x - fr2 - 30.0), rng.randf_range(ROOM.position.y + fr2 + 30.0, ROOM.end.y - fr2 - 30.0))
+				var ok := true
+				for r: Rect2 in lay.walls + lay.cover:
+					if _dist(r, c) < fr2 + 30.0:
+						ok = false
+				for d: Dictionary in taken:
+					if (d.pos as Vector2).distance_to(c) < fr2 + 120.0:
+						ok = false
+					var frt: Rect2 = d.get("front", Rect2())
+					if frt.size.x > 0.0 and _dist(frt, c) < fr2 + 20.0:
+						ok = false
+				if c.distance_to(lay.start) < fr2 + 140.0:
+					ok = false
+				for z: Rect2 in [HUD_STRIP, HUD_TOP, HUD_LORE, HUD_FOOT, TITLES]:
+					if _dist(z, c) < fr2 + 10.0:
+						ok = false
+				for d: Dictionary in lay.exits:
+					if _dist(d.label, c) < fr2 + 20.0:
+						ok = false
+				for o: Vector2 in lay.fields:
+					if o.distance_to(c) < fr2 * 2.0 + 80.0:
+						ok = false
+				if ok:
+					lay.fields.append(c)
+					done = true
+					break
+			if not done and spare and k >= 2:
+				break
+			if not done:
+				last_why = "fields"
+				return {}
 	# the shipyard's loose plates: in open floor, apart, none by a door
 	lay["plates"] = []
 	if st.has("plates"):
@@ -844,9 +907,16 @@ static func _paint_dock(lay: Dictionary, taken: Array, rng: RandomNumberGenerato
 				break
 	lay["scars"] = []
 	var solid: Array = lay.walls + lay.cover + Plates.rects_for(lay.get("plates", []))
-	for k in 5:
+	var rigs: Array = []
+	for ci in (lay.cover as Array).size():
+		if lay.kinds[ci] == "weldrig":
+			rigs.append((lay.cover[ci] as Rect2).get_center())
+	for k in 3:
 		for tries in 20:
 			var c := Vector2(rng.randf_range(ROOM.position.x + 100.0, ROOM.end.x - 100.0), rng.randf_range(ROOM.position.y + 100.0, ROOM.end.y - 100.0))
+			# (a weld's scars lie round where the welding went on)
+			if not rigs.is_empty() and tries < 15:
+				c = (rigs[k % rigs.size()] as Vector2) + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(110.0, 200.0)
 			var ok := true
 			for r: Rect2 in solid + lay.quiet:
 				if _dist(r, c) < 60.0:
@@ -1448,11 +1518,11 @@ static func _fits(placed: Array[Rect2], lay: Dictionary, taken: Array) -> bool:
 	for z: Rect2 in lay.get("arm_zones", []):
 		if _bounds(placed).intersects(z):
 			return false
-	for c: Vector2 in lay.get("rings", []):
+	for c: Vector2 in lay.get("rings", []) + lay.get("fields", []):
 		for r in placed:
 			if _dist(r, c) < RING_R + RING_WARN:
 				return false
-	for foot: Rect2 in lay.get("bank_feet", []) + lay.get("windows", []):
+	for foot: Rect2 in lay.get("bank_feet", []) + lay.get("windows", []) + Plates.rects_for(lay.get("plates", [])):
 		for r in placed:
 			if foot.grow(GAP).intersects(r):
 				return false
