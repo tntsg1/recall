@@ -121,6 +121,7 @@ var leap_t := -1.0
 var leap_from := Vector2.ZERO
 var leap_to := Vector2.ZERO
 var afterlines: Array = []      # [from, to, age] — the streak a blink leaves
+var signals: Array = []         # [from, to, age] — the neon signal you sent into a shell
 # echo
 var clones: Array = []          # {pos, path, replay, idx, hit, done}
 var clone_t := 0.0
@@ -276,14 +277,15 @@ func _begin_host() -> void:
 	game.player.pos = shell.pos
 	game.player.position = shell.pos
 	game.sfx.play("p_grow", 1.0, -3.0)
-	game.fx.ring(shell.pos, 12.0, 150.0, 0.45, cyan(1.0, 2.4), 3.0)
-	game.fx.flash(shell.pos, 90.0, 0.25, cyan(0.5, 2.0))
+	game.fx.ring(shell.pos, 12.0, 90.0, 0.45, cyan(1.0, 2.4), 2.5)
+	game.fx.flash(shell.pos, 42.0, 0.25, cyan(0.4, 1.8))
 	infect_patch(shell.pos, 200.0)
 	game.fx.sparks(shell.pos, Vector2.UP, 18, cyan(1.0, 2.4), 520.0, 0.35, PI)
 	game.cam.add_trauma(0.3)
 	game.cam.punch(0.03)
 	game.post.shock(game.screen_uv(shell.pos), 0.8, 1.6)
-	bursts.append([shell.pos, 150.0, 0.0])
+	bursts.append([shell.pos, 110.0, 0.0])
+	signals.append([flow_from, shell.pos, 0.0])
 	for e in game.enemies.list:
 		if e.state == Enemies.ALIVE and e.pos.distance_to(shell.pos) < 150.0:
 			e.knock += (e.pos - shell.pos).normalized() * 420.0
@@ -432,6 +434,13 @@ func step(sdt: float, dt: float) -> void:
 		bursts[i][2] += dt
 		if bursts[i][2] > 0.4:
 			bursts.remove_at(i)
+		else:
+			i += 1
+	i = 0
+	while i < signals.size():
+		signals[i][2] += dt
+		if signals[i][2] > 0.5:
+			signals.remove_at(i)
 		else:
 			i += 1
 	queue_redraw()
@@ -1404,6 +1413,21 @@ func _draw() -> void:
 		var wa: Vector2 = w[0]
 		var wv: Vector2 = w[1]
 		_px_line(wa - wv.normalized() * 34.0, wa, cyan(1.0 - w[2] / w[4], 2.4), 1.0)
+	# the signal you broke in by: a jagged line of cyan light, then its afterglow
+	for sg in signals:
+		var sk: float = 1.0 - float(sg[2]) / 0.5
+		var a: Vector2 = sg[0]
+		var b: Vector2 = sg[1]
+		# bent like a run of tube: out along one axis, across, and in
+		var d := b - a
+		var run := PackedVector2Array([a, a + Vector2(d.x * 0.5, 0.0), a + Vector2(d.x * 0.5, d.y), b]) if absf(d.x) >= absf(d.y) else PackedVector2Array([a, a + Vector2(0.0, d.y * 0.5), a + Vector2(d.x, d.y * 0.5), b])
+		Fx.tube(self, run, cyan(0.95 * sk, 2.4), 2.5, 14.0, 0.14)
+		# where you were: your body's outline going out as the mind leaves it
+		draw_arc(a, Player.R + 9.0, 0.0, TAU, 28, cyan(0.9 * sk, 2.2), 2.5)
+		draw_arc(a, Player.R + 9.0 + 12.0 * (1.0 - sk), 0.0, TAU, 28, cyan(0.35 * sk, 1.8), 1.0)
+		# and the light that carried you, a bright bead running ahead to the shell
+		var bead := clampf(float(sg[2]) / 0.18, 0.0, 1.0)
+		draw_circle(a.lerp(b, bead), 4.0 * sk, cyan(sk, 3.0))
 	for bst in bursts:
 		var bk: float = bst[2] / 0.4
 		_px_ring(bst[0], bst[1] * Pal.ease_out(bk), cyan(1.0 - bk, 2.4))

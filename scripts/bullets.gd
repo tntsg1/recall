@@ -980,7 +980,7 @@ func _head(b: B) -> Array:
 	var t: float = game.real_time
 	match b.state:
 		FLY:
-			return [b.pos - b.dir * 8.0, b.dir, 22.0, 3.6, Pal.you(1.0, 1.9)]
+			return [b.pos - b.dir * 8.0, b.dir, 26.0, 4.4, Pal.you(1.0, 2.2)]
 		EMBED when b.foe:
 			var zl := 0.5 + 0.5 * sin(game.real_time * 20.0) if b.zlight > 0.0 else 0.0
 			return [b.pos - b.dir * 6.0, b.dir, 16.0, 3.0, Pal.foe(0.45 + 0.55 * zl, 1.0 + 1.2 * zl).lerp(Pal.red(1.0, 2.8), b.light)]
@@ -991,7 +991,9 @@ func _head(b: B) -> Array:
 			var sink := lerpf(-8.0, 3.0, settle)
 			var wob := sin(b.t * 70.0) * exp(-b.t * 14.0) * 2.4
 			var breath := 0.5 + 0.5 * sin(t * 2.4 + b.seed)
-			var c := Pal.you(1.0, 1.0 + 0.3 * breath)
+			# a length of lit tube in the wall: white-hot as it lands, cooling as it waits
+			var cool := exp(-b.t / 2.2)
+			var c := Pal.you(1.0, 1.0 + 0.3 * breath + 1.6 * cool)
 			if b.light > 0.0:
 				c = c.lerp(Pal.red(1.0, 2.8 + 0.6 * breath), Pal.ease_out(b.light))
 			var rem := life_max - b.life
@@ -1050,39 +1052,45 @@ func _update_mesh() -> void:
 	mm.visible_instance_count = n
 
 
-var _ts := [PackedVector2Array(), PackedVector2Array(), PackedVector2Array()]
-var _tc := [PackedColorArray(), PackedColorArray(), PackedColorArray()]
+var _ts := [PackedVector2Array(), PackedVector2Array(), PackedVector2Array(), PackedVector2Array()]
+var _tc := [PackedColorArray(), PackedColorArray(), PackedColorArray(), PackedColorArray()]
 
 
 # Trails, under the heads, batched by width.
 func _draw() -> void:
-	for g in 3:
+	for g in 4:
 		_ts[g] = PackedVector2Array()
 		_tc[g] = PackedColorArray()
 	for b in list:
 		match b.state:
 			FLY:
-				var tl := 90.0 if b.child else 150.0
+				var tl := 110.0 if b.child else 190.0
 				var n := b.path.size()
 				# straight leg (the usual case): no path walk needed
+				# a round in flight is a streak of light: a bright core in a soft sheath
 				if b.pos.distance_to(b.path[n - 2]) >= tl:
-					_trail(0, PackedVector2Array([b.pos, b.pos - b.dir * tl]), Pal.you(0.55, 1.4))
+					_trail(0, PackedVector2Array([b.pos, b.pos - b.dir * tl]), Pal.you(0.8, 2.0))
+					_trail(3, PackedVector2Array([b.pos, b.pos - b.dir * tl * 0.7]), Pal.you(0.16, 1.6))
 				else:
 					var s := b.total()
-					_trail(0, b.sub(s, maxf(0.0, s - tl)), Pal.you(0.55, 1.4))
+					_trail(0, b.sub(s, maxf(0.0, s - tl)), Pal.you(0.8, 2.0))
+					_trail(3, b.sub(s, maxf(0.0, s - tl * 0.7)), Pal.you(0.16, 1.6))
 			RETURN:
 				var s2 := b.s
 				# the head carries the light; the tail behind it stays a quiet line,
 				# so a flock coming home never buries you or what it is cutting
 				var tc := (Pal.red(1.0, 2.6) if game.boss is Observed or game.nodes.active() else Pal.you(0.9, 2.4)) if b.zero_pass else (Pal.you(0.35, 1.2) if b.shadow else Pal.red(0.55, 1.7))
 				_trail(1, b.sub(s2, minf(b.total(), s2 + 160.0)), tc)
+				# the light running back to you: a soft sheath the length of its tail
+				if not b.shadow:
+					_trail(3, b.sub(s2, minf(b.total(), s2 + 160.0)), Color(tc.r, tc.g, tc.b, 0.2))
 			HOME, ORBIT:
 				if b.hist.size() > 1:
 					var pts := b.hist.duplicate()
 					pts.reverse()
 					_trail(2, pts, Pal.red(0.55, 2.0))
-	var widths := [2.0, 3.0, 1.6]
-	for g in 3:
+	var widths := [3.5, 3.0, 1.6, 8.0]
+	for g in [3, 0, 1, 2]:
 		if _ts[g].size() > 0:
 			draw_multiline_colors(_ts[g], _tc[g], widths[g])
 
@@ -1227,7 +1235,7 @@ func _draw_paths() -> void:
 		elif b.state == PULL or b.state == RETURN:
 			var upto := b.s if b.state == RETURN else b.total()
 			if upto > 0.0:
-				_poly_r(b.sub(upto, 0.0), Pal.red(0.18, 1.2))
+				_poly_r(b.sub(upto, 0.0), Pal.red(0.3, 1.4))
 			var key2 := Vector2i(roundi(b.path[0].x / 3.0), roundi(b.path[0].y / 3.0))
 			origins[key2] = 1.0
 			_so.append(b.path[0])
@@ -1244,7 +1252,12 @@ func _draw_paths() -> void:
 	if _sw.size() > 0:
 		paths.draw_multiline_colors(_sw, _cw, -1.0)
 	if _sr.size() > 0:
-		paths.draw_multiline_colors(_sr, _cr, 1.6)
+		# (the red ways home are tubes too: a faint sheath under each line)
+		var sheath := PackedColorArray()
+		for cc in _cr:
+			sheath.append(Color(cc.r, cc.g, cc.b, cc.a * 0.3))
+		paths.draw_multiline_colors(_sr, sheath, 6.0)
+		paths.draw_multiline_colors(_sr, _cr, 2.0)
 	if _sd.size() > 0:
 		paths.draw_multiline(_sd, Pal.red(0.95, 3.0), 4.0)
 
@@ -1266,7 +1279,9 @@ func _draw_glow() -> void:
 	var share := clampf(sqrt(4.0 / maxf(1.0, homing)), 0.4, 1.0)
 	for b in list:
 		if b.state == RETURN:
-			glow.draw_texture_rect(glow_tex, Rect2(b.pos - Vector2(22, 22), Vector2(44, 44)), false, Pal.red(0.55 * share, 1.6))
+			# (thinning as they reach you: the light comes into you white, not as a red fog)
+			var near := clampf(b.pos.distance_to(game.player.pos) / 140.0, 0.25, 1.0)
+			glow.draw_texture_rect(glow_tex, Rect2(b.pos - Vector2(22, 22), Vector2(44, 44)), false, Pal.red(0.55 * share * near, 1.6))
 		elif b.state == EMBED and b.light > 0.0:
 			var p := b.pos - b.dir * 9.0
 			var r := 18.0 + 4.0 * sin(game.real_time * 6.0 + b.seed)
@@ -1274,6 +1289,9 @@ func _draw_glow() -> void:
 		elif b.state == EMBED:
 			var p2 := b.pos - b.dir * 9.0
 			var k2 := Pal.ease_out(b.t / 0.3) * clampf((life_max - b.life) / 1.0, 0.0, 1.0)
-			glow.draw_texture_rect(glow_tex, Rect2(p2 - Vector2(13, 13), Vector2(26, 26)), false, Pal.you(0.16 * k2))
+			# (hot as it lands, the glow wide; it cools to an ember)
+			var cool2 := exp(-b.t / 2.2)
+			var gr := 12.0 + 30.0 * cool2
+			glow.draw_texture_rect(glow_tex, Rect2(p2 - Vector2(gr, gr), Vector2(gr, gr) * 2.0), false, Pal.you((0.14 + 0.3 * cool2) * k2, 1.0 + 0.9 * cool2))
 		elif b.state == FLY:
-			glow.draw_texture_rect(glow_tex, Rect2(b.pos - Vector2(14, 14), Vector2(28, 28)), false, Pal.you(0.18))
+			glow.draw_texture_rect(glow_tex, Rect2(b.pos - Vector2(20, 20), Vector2(40, 40)), false, Pal.you(0.26, 1.4))

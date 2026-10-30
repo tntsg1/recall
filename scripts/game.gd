@@ -2009,8 +2009,9 @@ func on_ammo_home(_b) -> void:
 		if best != null:
 			bullets.twin(player.muzzle(), (best.pos - player.pos).normalized())
 	player.pop_tick(ammo, true)
+	player.absorb()
 	ammo += 1
 	home_streak += 1
 	hud.ammo_in()
 	sfx.play("home", minf(2.2, 0.9 + home_streak * 0.03), -9.0)
-	fx.flash(player.pos, 34.0, 0.1, Pal.red(0.4, 1.8))
+	fx.flash(player.pos, 26.0, 0.1, Pal.red(0.2, 1.6))

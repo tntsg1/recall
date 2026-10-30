@@ -407,6 +407,11 @@ func _die(e: E, dir: Vector2) -> void:
 	var tr := Transform2D(e.rot, e.pos)
 	var col := Pal.foe(1.0, 1.6).lerp(Pal.red(1.0, 2.6), e.red)
 	var pts := _poly(e)
+	# its tubes go out where it stood, as the pieces fly
+	var ghost := PackedVector2Array()
+	for k in e.sides + 1:
+		ghost.append(tr * pts[k % e.sides])
+	game.fx.power_off(ghost, Pal.foe(1.0, 1.6), 0.7)
 	for k in e.sides:
 		var a := pts[k]
 		var b := pts[k + 1]
@@ -422,7 +427,8 @@ func _die(e: E, dir: Vector2) -> void:
 			game.fx.shard(e.pos + m2, a2 - m2, b2 - m2, m2.normalized() * randf_range(200, 300) + dir * 200.0, randf_range(-8, 8), 0.8, Pal.foe(1.0, 1.4), 4.0)
 	game.fx.ring(e.pos, e.r * 0.6, e.r * 4.0, 0.45, col, 2.0)
 	game.fx.ring(e.pos, e.r * 0.3, e.r * 2.2, 0.3, Pal.foe(0.6), 1.0)
-	game.fx.flash(e.pos, e.r * 3.0, 0.26, Color(col.r, col.g, col.b, 0.4))
+	# (a short flash: the tube's outline going out has to read through it)
+	game.fx.flash(e.pos, e.r * 2.2, 0.16, Color(col.r, col.g, col.b, 0.22))
 	game.fx.sparks(e.pos, dir, 10 + e.sides * 2, col, 700.0, 0.4, 1.3)
 	game.on_target_die(e.pos, e.kind)
 
@@ -1131,13 +1137,20 @@ func _draw() -> void:
 			for k in pts.size() - 1:
 				draw_line(gt * pts[k], gt * pts[k + 1], Pal.foe(0.3 * gk * gk), 1.5)
 		if e.state == SPAWN:
+			# its edges fly in dark, then the tube strikes: a stutter, a surge, held
+			var strike := Pal.starter(e.t - 0.36, 0.3, e.seed)
+			var surge := clampf(1.0 - absf(e.t - 0.72) / 0.14, 0.0, 1.0)
+			if surge > 0.0:
+				var hs: float = e.r * 3.2
+				draw_texture_rect(halo_tex, Rect2(e.pos - Vector2(hs, hs), Vector2(hs, hs) * 2.0), false, Pal.foe(0.45 * surge * dim, 1.8))
 			for k in e.sides:
 				var kk := Pal.back(clampf((e.t - k * 0.06) / 0.42, 0.0, 1.0), 2.0)
 				var o: Array = e.offs[k]
 				var off: Vector2 = o[0] * (1.0 - kk)
 				var lt := Transform2D(float(o[1]) * (1.0 - kk), Vector2.ZERO)
 				var mid := (pts[k] + pts[k + 1]) * 0.5
-				draw_line(tr * (mid + off + lt * (pts[k] - mid)), tr * (mid + off + lt * (pts[k + 1] - mid)), Pal.foe(clampf(kk * 1.4, 0.0, 1.0) * dim), 2.0)
+				var lit := lerpf(0.3, 1.0, strike) if e.t > 0.36 else 0.3
+				draw_line(tr * (mid + off + lt * (pts[k] - mid)), tr * (mid + off + lt * (pts[k + 1] - mid)), Pal.foe(clampf(kk * 1.4, 0.0, 1.0) * lit * dim, 1.0 + 1.6 * surge), 2.0 + 1.5 * surge)
 			var core := Pal.ease_out(clampf((e.t - 0.4) / 0.35, 0.0, 1.0))
 			if core > 0.0:
 				_core(e, tr, core, col)
@@ -1168,6 +1181,8 @@ func _draw() -> void:
 				for j in 3:
 					draw_line(a.lerp(b, j / 3.0), a.lerp(b, j / 3.0 + 0.18), col, 1.5)
 			elif k < whole:
+				# a tube: its soft light round a bright core
+				draw_line(a, b, Color(col.r, col.g, col.b, col.a * 0.13), 7.0)
 				draw_line(a, b, col, 2.0)
 			else:
 				var m := (a + b) * 0.5

@@ -64,6 +64,18 @@ static func ease_io(x: float) -> float:
 	return 4.0 * x * x * x if x < 0.5 else 1.0 - pow(-2.0 * x + 2.0, 3.0) / 2.0
 
 
+# A neon tube striking: `t` seconds after the switch, how lit it is (0..1).
+# It stutters on and off as the starter clicks, then holds.
+static func starter(t: float, dur: float = 0.38, seed: float = 0.0) -> float:
+	if t <= 0.0:
+		return 0.0
+	if t >= dur:
+		return 1.0
+	var u := t / dur
+	var on := sin(t * 61.0 + seed * 7.0) > 0.25 - u * 0.9
+	return (0.25 + 0.75 * u) if on else 0.06
+
+
 static func back(x: float, k: float = 1.7) -> float:
 	x = clampf(x, 0.0, 1.0) - 1.0
 	return 1.0 + x * x * ((k + 1.0) * x + k)

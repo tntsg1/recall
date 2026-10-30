@@ -29,6 +29,8 @@ var stun := 0.0
 var hurt_t := 0.0
 var cracks: Array = []   # [from, to] in local space, shown while hurt
 var gone := false
+var light := 0.0         # the light you have just taken back (0..1)
+var streak: Array = []   # [pos, age]: the line of light a dodge leaves
 
 
 func _ready() -> void:
@@ -56,6 +58,7 @@ func step(dt: float, real_dt: float, move: Vector2, aim_at: Vector2) -> void:
 		if ghost_cd <= 0.0:
 			ghost_cd = 0.022
 			ghosts.append([pos, 0.0])
+		streak.append([pos, 0.0])
 		if dash_t <= 0.0:
 			vel = dash_dir * SPEED
 	else:
@@ -71,6 +74,14 @@ func step(dt: float, real_dt: float, move: Vector2, aim_at: Vector2) -> void:
 			ghosts.remove_at(i)
 		else:
 			i += 1
+	i = 0
+	while i < streak.size():
+		streak[i][1] += real_dt
+		if streak[i][1] > 0.35:
+			streak.remove_at(i)
+		else:
+			i += 1
+	light = maxf(0.0, light - real_dt / 0.55)
 	for k in 40:
 		tick_pop[k] = maxf(0.0, tick_pop[k] - real_dt / 0.3)
 		tick_red[k] = maxf(0.0, tick_red[k] - real_dt / 0.45)
@@ -121,6 +132,11 @@ func shatter() -> void:
 	game.fx.flash(pos, 160.0, 0.5, Pal.you(0.6, 1.4))
 
 
+# A round's light has come home into you.
+func absorb() -> void:
+	light = minf(1.0, light + 0.45)
+
+
 func kick() -> void:
 	recoil = 1.0
 
@@ -145,9 +161,25 @@ func _draw() -> void:
 	# and a dark rim, so you read over any words you stand on
 	draw_circle(Vector2.ZERO, R + 5.0, Color(0, 0, 0, 0.6))
 	var f: float = game.focus
-	for g in ghosts:
-		var k: float = 1.0 - g[1] / 0.28
-		draw_arc(g[0] - pos, R * (0.8 + 0.2 * k), 0.0, TAU, 28, Pal.you(0.32 * k * k), 1.5, false)
+	# a dodge is a burst of your light: the line it runs leaves a fading tube
+	if streak.size() > 1:
+		# drawn as one tube that fades from its head: segment by segment, each a little dimmer
+		var sn := streak.size() - 1
+		for j in sn:
+			var sk: float = 1.0 - float(streak[j][1]) / 0.35
+			# (the tail's first 40% thins and fades to nothing)
+			var tail := clampf(float(j) / maxf(sn * 0.4, 1.0), 0.0, 1.0)
+			Fx.tube(self, PackedVector2Array([streak[j][0] - pos, streak[j + 1][0] - pos]), Pal.you(0.9 * sk * tail, 2.4), 1.0 + 4.0 * sk * tail, 13.0, 0.09)
+	# lit from inside while dodging, or as light comes home
+	var glow_k := maxf(light, clampf(dash_t / DASH_TIME, 0.0, 1.0) * 0.8)
+	if glow_k > 0.0:
+		# a tight white glow, and the rim lit as a ring of tube (red only at its edge)
+		var gr := 22.0 + 14.0 * glow_k
+		draw_texture_rect(Fx.make_glow_texture(), Rect2(-Vector2(gr, gr), Vector2(gr, gr) * 2.0), false, Pal.you(0.3 * glow_k, 2.0))
+		var rim := PackedVector2Array()
+		for j in 29:
+			rim.append(Vector2.from_angle(TAU * j / 28.0) * (R + 3.0))
+		Fx.tube(self, rim, Pal.you(0.95 * glow_k, 2.6).lerp(Pal.red(0.95 * glow_k, 2.6), light * 0.35), 2.0, 9.0, 0.25)
 	var speed := vel.length()
 	var stretch := clampf(speed / DASH_SPEED, 0.0, 1.0) * 0.45 + clampf(speed / SPEED, 0.0, 1.0) * 0.06
 	var vdir := vel.normalized() if speed > 1.0 else aim

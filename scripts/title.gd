@@ -27,6 +27,8 @@ const PAGE_T := 0.42
 
 var t := 0.0
 var rounds: Array = []
+var stroke_letter: Array = []   # which letter each stroke belongs to
+var tube_glow: Texture2D = Fx.make_glow_texture()
 var strokes: Array = []
 var page := "menu"
 var assist_panel: AssistPanel
@@ -155,6 +157,7 @@ func _build_word() -> void:
 			for p in line:
 				pts.append(origin + Vector2(i * 6 * UNIT, 0) + (p as Vector2) * UNIT)
 			strokes.append(pts)
+			stroke_letter.append(i)
 			for k in pts.size() - 1:
 				var a: Vector2 = pts[k]
 				var b: Vector2 = pts[k + 1]
@@ -162,7 +165,7 @@ func _build_word() -> void:
 				for j in n:
 					var to := a.lerp(b, float(j) / n)
 					var from := to + Vector2.from_angle(randf() * TAU) * randf_range(900, 1400)
-					rounds.append([from, to, randf_range(0.2, 1.4)])
+					rounds.append([from, to, randf_range(0.2, 1.4), i])
 		i += 1
 
 
@@ -639,10 +642,11 @@ func _draw_searchlight(vp: Vector2, on: float) -> void:
 	if k <= 0.01:
 		return
 	# a soft beam: a bright core and wider, fainter skirts that fade to nothing
-	for layer in [[0.16, 0.005], [0.09, 0.007], [0.04, 0.009]]:
-		var w: float = layer[0]
+	# (many thin layers, so it falls off smoothly instead of in bands)
+	for li in 12:
+		var w: float = lerpf(0.18, 0.02, li / 11.0)
 		var pts := PackedVector2Array([o, o + Vector2.from_angle(a - w) * len, o + Vector2.from_angle(a + w) * len])
-		draw_polygon(pts, PackedColorArray([Color(1, 1, 1, layer[1] * k), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
+		draw_polygon(pts, PackedColorArray([Color(1, 1, 1, 0.0009 * k), Color(1, 1, 1, 0.0), Color(1, 1, 1, 0.0)]))
 
 
 func _draw_word(vp: Vector2) -> void:
@@ -675,12 +679,36 @@ func _draw_word(vp: Vector2) -> void:
 				q += dv / sqrt(dd) * (1.0 - dd / 4900.0) * 9.0
 			# a slow band of light runs across the word
 			var lit := exp(-pow((to.x - sweep) / 46.0, 2.0)) * sweep_a
-			_dot(q, 2.8 + 0.6 * lit, Pal.ink(minf(1.0, 0.5 + 0.5 * settle + 0.4 * lit), 1.0 + 0.6 * (1.0 - settle) + 1.6 * lit))
+			# (the rounds hold the letter's shape until its tube strikes; then the tube is the light)
+			var tube_on := Pal.starter(t - 2.5 - int(r[3]) * 0.11, 0.42, int(r[3])) if r.size() > 3 else 0.0
+			var da := minf(1.0, 0.5 + 0.5 * settle + 0.4 * lit) * (1.0 - tube_on)
+			if da > 0.02:
+				_dot(q, 2.8 + 0.6 * lit, Pal.ink(da, 1.0 + 0.6 * (1.0 - settle) + 1.6 * lit))
 	var whole := clampf((t - 2.4) / 0.6, 0.0, 1.0)
 	if whole > 0.0:
 		draw_set_transform(par, 0.0, Vector2.ONE)
-		for s in strokes:
-			draw_polyline(s, Pal.ink(0.35 * whole, 1.2), 2.0, false)
+		# the sign powers on letter by letter, each tube stuttering as it strikes;
+		# now and then one letter falters and comes back
+		for si in strokes.size():
+			var s: PackedVector2Array = strokes[si]
+			var li: int = stroke_letter[si] if si < stroke_letter.size() else 0
+			var on := Pal.starter(t - 2.5 - li * 0.11, 0.42, li)
+			var falter_c := fmod(t, 9.0)
+			if t > 4.5 and li == int(t / 9.0) % 9 and falter_c < 0.3:
+				on *= 0.25 if sin(falter_c * 70.0) > 0.0 else 1.0
+			# (the I's tube has a bad contact: it never quite holds)
+			if li == 7 and t > 3.6 and sin(t * 23.0) * sin(t * 3.1) > 0.82:
+				on *= 0.35
+			# (its light falls off softly outward: a glow laid along the tube)
+			if on > 0.05:
+				for k in s.size() - 1:
+					var l := s[k].distance_to(s[k + 1])
+					var nk := maxi(1, int(l / 9.0))
+					for j in nk:
+						var q := s[k].lerp(s[k + 1], (j + 0.5) / nk)
+						draw_texture_rect(tube_glow, Rect2(q - Vector2(24, 24), Vector2(48, 48)), false, Pal.ink(0.06 * on, 1.6))
+			draw_polyline(s, Pal.ink(0.12 * on, 1.8), 5.0, false)
+			draw_polyline(s, Pal.ink(0.2 + 0.75 * on, 1.2 + 1.2 * on), 2.2, false)
 		var g := clampf(glint / 0.8, 0.0, 1.0)
 		if g < 1.0 and strokes.size() > 0:
 			var st: PackedVector2Array = strokes[glint_stroke]
@@ -698,11 +726,16 @@ func _draw_word(vp: Vector2) -> void:
 				acc += l
 	if whole > 0.0:
 		_draw_camera(par, whole)
-	_text_c(font_s, "霓虹行者", Vector2(vp.x / 2.0, 395), 22, Pal.ink(0.55 * whole))
+	# the subtitle, a small sign of its own, lit once the word is
+	var sub_on := Pal.starter(t - 3.6, 0.35, 3.0) * whole
+	var sw := font_s.get_string_size("霓虹行者", HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+	for gl: Array in [[14, 0.03], [8, 0.05], [4, 0.08]]:
+		draw_string_outline(font_s, Vector2(vp.x / 2.0 - sw / 2.0, 395), "霓虹行者", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, gl[0], Pal.ink(gl[1] * sub_on, 1.6))
+	_text_c(font_s, "霓虹行者", Vector2(vp.x / 2.0, 395), 22, Pal.ink(0.45 + 0.45 * sub_on, 1.0 + 0.6 * sub_on))
 	# where and when: the world in one line, lit a beat after the word
 	var era := clampf((t - 3.0) / 0.8, 0.0, 1.0)
 	if era > 0.0:
-		_text_c(font_s, Txt.t("t_era"), Vector2(vp.x / 2.0, 432), 17, Pal.ink(0.5 * era * whole))
+		_text_c(font_s, Txt.t("t_era"), Vector2(vp.x / 2.0, 432), 17, Pal.ink(0.62 * era * whole))
 
 
 # The highlight: a soft band that springs between rows, a red underline that

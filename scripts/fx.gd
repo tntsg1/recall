@@ -10,6 +10,7 @@ var rings: Array = []    # [pos, r0, r1, t, dur, color, width]
 var shards: Array = []   # [pos, a, b, rot, vel, spin, t, dur, color, width]
 var numbers: Array = []  # [text, pos, vel, t, dur, size, color, pop, value]
 var flashes: Array = []  # [pos, r, t, dur, color]
+var offs: Array = []     # [points, t, dur, color]: an outline losing its power
 var motes: Array = []    # [pos, vel, phase, size]
 var add_layer: Node2D
 var glow_tex: Texture2D
@@ -76,6 +77,23 @@ static func make_ring_texture() -> Texture2D:
 	return _ring_tex
 
 
+# A neon tube along `pts`: a soft halo laid along it, round a bright core.
+# Everything that is light (a dodge, a signal, a tube going out) is drawn so.
+static func tube(ci: CanvasItem, pts: PackedVector2Array, c: Color, core: float = 2.5, halo: float = 24.0, halo_a: float = 0.14) -> void:
+	if pts.size() < 2 or c.a <= 0.003:
+		return
+	var tex := make_glow_texture()
+	var hc := Color(c.r, c.g, c.b, c.a * halo_a)
+	var step := halo * 0.4
+	for k in pts.size() - 1:
+		var l := pts[k].distance_to(pts[k + 1])
+		var nk := maxi(1, int(l / step))
+		for j in nk:
+			var q := pts[k].lerp(pts[k + 1], (j + 0.5) / nk)
+			ci.draw_texture_rect(tex, Rect2(q - Vector2(halo, halo), Vector2(halo, halo) * 2.0), false, hc)
+	ci.draw_polyline(pts, c, core)
+
+
 static func make_glow_texture() -> Texture2D:
 	if _glow_tex != null:
 		return _glow_tex
@@ -132,6 +150,12 @@ func number(pos: Vector2, value: float, ret: bool) -> void:
 	numbers.append([str(int(round(value))), pos + Vector2(randf_range(-8, 8), -10), v, 0.0, 0.75 if ret else 0.6, size, c, 1.0, value])
 
 
+# A shape's outline going out like a tube switched off: it stutters, holds a
+# dim afterglow, and fades.
+func power_off(pts: PackedVector2Array, c: Color, dur: float = 0.5) -> void:
+	offs.append([pts, 0.0, dur, c])
+
+
 func flash(pos: Vector2, r: float, dur: float, c: Color) -> void:
 	if flashes.size() >= 300:
 		return
@@ -157,6 +181,7 @@ func clear_room() -> void:
 	shards.clear()
 	numbers.clear()
 	flashes.clear()
+	offs.clear()
 
 
 func step(dt: float, real_dt: float) -> void:
@@ -176,6 +201,7 @@ func step(dt: float, real_dt: float) -> void:
 		n[1] += n[2] * dt
 		n[2] *= exp(-5.0 * dt)
 	_age(flashes, 2, 3, dt)
+	_age(offs, 1, 2, dt)
 	var room := Arena.ROOM
 	for m in motes:
 		m[2] += dt
@@ -223,6 +249,24 @@ func _draw() -> void:
 		var c2: Color = r[5]
 		var rad := lerpf(r[1], r[2], e)
 		draw_arc(r[0], rad, 0.0, TAU, maxi(16, int(rad * 0.6)), Color(c2.r, c2.g, c2.b, c2.a * (1.0 - e)), r[6] * (1.0 - 0.6 * e), false)
+	for o in offs:
+		var ot: float = o[1]
+		var ok := 1.0 - ot / float(o[2])
+		var stut := 1.0 if ot > 0.16 or sin(ot * 90.0) > -0.3 else 0.15
+		var oc: Color = o[3]
+		var pts: PackedVector2Array = o[0]
+		if ot < 0.16:
+			# the power failing: the outline jumps, thin, three places at once
+			for j in 3:
+				var jo := Vector2(sin(j * 2.1 + ot * 90.0), cos(j * 1.7 + ot * 70.0)) * 5.0
+				var shifted := PackedVector2Array()
+				for q in pts:
+					shifted.append(q + jo)
+				draw_polyline(shifted, Color(oc.r, oc.g, oc.b, 0.4 * stut), 1.5)
+		else:
+			# then a dim afterglow that fades
+			var lvl := lerpf(0.5, 0.0, (ot - 0.16) / (float(o[2]) - 0.16))
+			tube(self, pts, Color(oc.r, oc.g, oc.b, oc.a * lvl), 2.0, 9.0, 0.08)
 	for s in shards:
 		var k2: float = 1.0 - s[6] / s[7]
 		var c3: Color = s[8]
