@@ -1256,6 +1256,8 @@ func _update_fire(sdt: float, dt: float) -> void:
 	if h:
 		at = h.point - dir * 1.0
 	bullets.fire(at, dir)
+	if boss is Warden:
+		boss.on_player_fire(at, dir)
 	if Loadout.gun == "scatter":
 		for side in [-1.0, 1.0]:
 			if ammo > 0:

@@ -132,7 +132,9 @@ const S := {
 	"note_leech": ["吸附者 · 会把墙上的子弹拔走（最多 4 颗），打死它就掉回来", "LEECH · PULLS ROUNDS OUT OF THE WALLS (UP TO 4) — KILL IT TO DROP THEM"],
 	"chapter_4": ["中央生产联合体", "CENTRAL PRODUCTION UNION"],
 	"chapter_4_sub": ["这里每天生产的一切，都不属于做出它的人。", "EVERYTHING MADE HERE EACH DAY BELONGS TO SOMEONE OTHER THAN ITS MAKERS."],
-	"note_boss_2": ["正面的镜子会把子弹弹回去 · 它转身很慢，让回收从背后打穿它", "ITS MIRROR THROWS ROUNDS BACK · IT TURNS SLOWLY — RECALL INTO ITS BACK"],
+	"note_boss_2": ["正面的镜子会把子弹弹回去 · 它转身很慢，让回收从背后打穿它
+红色印章盖到的子弹会被它没收 · 光束扫来时冲刺穿过", "ITS MIRROR THROWS ROUNDS BACK · IT TURNS SLOWLY — RECALL INTO ITS BACK
+ROUNDS UNDER A RED STAMP GET CONFISCATED · DASH THROUGH THE BEAM"],
 	"note_prism": ["棱镜 · 把打中它的子弹折出 60°，回收会沿着折线回来", "PRISM · BENDS ROUNDS BY 60° — RECALLS FOLLOW THE BEND BACK"],
 	"chapter_3": ["仿生军械研究院", "BIONIC ORDNANCE INSTITUTE"],
 	"chapter_3_sub": ["这里造的每一件武器，都是为了保护股东。", "EVERY WEAPON MADE HERE IS MADE TO PROTECT THE SHAREHOLDERS."],
@@ -292,6 +294,8 @@ const S := {
 	"chapter_2": ["国民资产管理中心", "NATIONAL ASSET CENTRE"],
 	"chapter_2_sub": ["每一个公民，出生那天都在这里登记成一笔资产。", "EVERY CITIZEN IS REGISTERED HERE, ON THE DAY OF BIRTH, AS AN ASSET."],
 	"note_mirror": ["镜面会把子弹弹开 · 打到墙才嵌住", "MIRRORS TURN ROUNDS AWAY · ONLY WALLS HOLD THEM"],
+	"radio_warden_stamp": ["资产登记开始。被盖章的子弹，归董事会所有。", "ASSET REGISTRATION. ANY ROUND WE STAMP BELONGS TO THE BOARD."],
+	"warden_filed": ["已登记", "FILED"],
 	"radio_warden": ["品牌安全检查开始。请面向镜子，保持微笑。", "BRAND SAFETY INSPECTION BEGINS. FACE THE MIRROR AND SMILE."],
 	"crossfire": ["交叉", "CROSS"],
 	"card_school": ["流派", "SCHOOL"],

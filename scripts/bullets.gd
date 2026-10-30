@@ -73,6 +73,7 @@ class B:
 	var plate := -1             # the hull plate it is embedded in (it rides, and yanks it when recalled)
 	var stasis := -1            # the stasis field holding it in mid-air
 	var walked := false         # its line has been run at light speed (once only)
+	var filed := false          # the warden stamped it: recalled, it flies into the warden's keeping
 
 	func total() -> float:
 		return cum[cum.size() - 1]
@@ -218,6 +219,7 @@ func capture(b: B, holder) -> void:
 		b.settled = false
 		faint_dirty = true
 	b.state = CAPTURED
+	b.filed = false
 	b.holder = holder
 	b.hold_a = randf() * TAU
 	b.hold_t = 0.0
@@ -902,6 +904,11 @@ func _return(b: B, dt: float) -> void:
 		b.dir = (np - b.pos).normalized()
 	b.pos = np
 	if s1 <= 0.0:
+		if b.filed and game.boss is Warden and game.boss.holds():
+			# registered as the Bureau's asset: it is taken in, not handed back
+			capture(b, game.boss)
+			game.fx.flash(b.pos, 22.0, 0.18, Pal.red(0.8, 2.4))
+			return
 		game.on_return_arrive(b)
 		if game.lv.blast > 0 and b.charge > 0:
 			game.blast(b.last_hit, b.charge)
