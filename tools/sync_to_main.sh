@@ -5,7 +5,7 @@
 set -e
 SRC=/e/godot/cshi_dev
 DST=/e/godot/cshi
-for d in scripts shaders assets scenes tests tools design; do
+for d in scripts shaders assets scenes tests tools design addons; do
 	rm -rf "$DST/$d"
 	cp -r "$SRC/$d" "$DST/$d"
 done
