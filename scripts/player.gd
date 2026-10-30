@@ -175,7 +175,7 @@ func _draw() -> void:
 	if glow_k > 0.0:
 		# a tight white glow, and the rim lit as a ring of tube (red only at its edge)
 		var gr := 22.0 + 14.0 * glow_k
-		draw_texture_rect(Fx.make_glow_texture(), Rect2(-Vector2(gr, gr), Vector2(gr, gr) * 2.0), false, Pal.you(0.3 * glow_k, 2.0))
+		draw_texture_rect(Fx.make_glow_texture(), Rect2(-Vector2(gr, gr), Vector2(gr, gr) * 2.0), false, Pal.you(0.26 * glow_k, 1.5))
 		var rim := PackedVector2Array()
 		for j in 29:
 			rim.append(Vector2.from_angle(TAU * j / 28.0) * (R + 3.0))
@@ -210,7 +210,7 @@ func _draw() -> void:
 		var on := k < full
 		var c := Pal.you(0.62 if on else 0.1)
 		if tick_red[k] > 0.0:
-			c = c.lerp(Pal.red(1.0, 3.0), tick_red[k])
+			c = c.lerp(Pal.red(1.0, 1.7), tick_red[k])
 		if empty_pulse > 0.0 and not on:
 			c = c.lerp(Pal.you(0.6), empty_pulse)
 		var d := Vector2.from_angle(a)

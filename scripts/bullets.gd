@@ -1083,13 +1083,15 @@ func _draw() -> void:
 				_trail(1, b.sub(s2, minf(b.total(), s2 + 160.0)), tc)
 				# the light running back to you: a soft sheath the length of its tail
 				if not b.shadow:
-					_trail(3, b.sub(s2, minf(b.total(), s2 + 160.0)), Color(tc.r, tc.g, tc.b, 0.2))
+					# (thinning as it reaches you, so a flock home does not pool into a red fog)
+					var near2 := clampf(b.pos.distance_to(game.player.pos) / 140.0, 0.2, 1.0)
+					_trail(3, b.sub(s2, minf(b.total(), s2 + 160.0)), Color(tc.r, tc.g, tc.b, 0.22 * near2))
 			HOME, ORBIT:
 				if b.hist.size() > 1:
 					var pts := b.hist.duplicate()
 					pts.reverse()
 					_trail(2, pts, Pal.red(0.55, 2.0))
-	var widths := [3.5, 3.0, 1.6, 8.0]
+	var widths := [3.5, 3.5, 1.6, 9.0]
 	for g in [3, 0, 1, 2]:
 		if _ts[g].size() > 0:
 			draw_multiline_colors(_ts[g], _tc[g], widths[g])
@@ -1113,7 +1115,7 @@ func _trail(g: int, pts: PackedVector2Array, c: Color) -> void:
 		var a := pts[i - 1]
 		var b := pts[i]
 		var l := a.distance_to(b)
-		var parts := clampi(int(l / 40.0), 1, 4)
+		var parts := clampi(int(l / 14.0), 1, 12)
 		for k in parts:
 			var p0 := a.lerp(b, float(k) / parts)
 			var p1 := a.lerp(b, float(k + 1) / parts)
@@ -1281,7 +1283,7 @@ func _draw_glow() -> void:
 		if b.state == RETURN:
 			# (thinning as they reach you: the light comes into you white, not as a red fog)
 			var near := clampf(b.pos.distance_to(game.player.pos) / 140.0, 0.25, 1.0)
-			glow.draw_texture_rect(glow_tex, Rect2(b.pos - Vector2(22, 22), Vector2(44, 44)), false, Pal.red(0.55 * share * near, 1.6))
+			glow.draw_texture_rect(glow_tex, Rect2(b.pos - Vector2(30, 30), Vector2(60, 60)), false, Pal.red(0.55 * share * near, 1.6))
 		elif b.state == EMBED and b.light > 0.0:
 			var p := b.pos - b.dir * 9.0
 			var r := 18.0 + 4.0 * sin(game.real_time * 6.0 + b.seed)

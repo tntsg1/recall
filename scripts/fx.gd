@@ -258,11 +258,11 @@ func _draw() -> void:
 		if ot < 0.16:
 			# the power failing: the outline jumps, thin, three places at once
 			for j in 3:
-				var jo := Vector2(sin(j * 2.1 + ot * 90.0), cos(j * 1.7 + ot * 70.0)) * 5.0
+				var jo := Vector2.from_angle(TAU * j / 3.0 + ot * 40.0) * 7.0
 				var shifted := PackedVector2Array()
 				for q in pts:
 					shifted.append(q + jo)
-				draw_polyline(shifted, Color(oc.r, oc.g, oc.b, 0.4 * stut), 1.5)
+				draw_polyline(shifted, Color(oc.r, oc.g, oc.b, 0.45 * stut), 1.6)
 		else:
 			# then a dim afterglow that fades
 			var lvl := lerpf(0.5, 0.0, (ot - 0.16) / (float(o[2]) - 0.16))

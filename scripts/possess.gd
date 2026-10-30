@@ -1423,7 +1423,10 @@ func _draw() -> void:
 		var run := PackedVector2Array([a, a + Vector2(d.x * 0.5, 0.0), a + Vector2(d.x * 0.5, d.y), b]) if absf(d.x) >= absf(d.y) else PackedVector2Array([a, a + Vector2(0.0, d.y * 0.5), a + Vector2(d.x, d.y * 0.5), b])
 		Fx.tube(self, run, cyan(0.95 * sk, 2.4), 2.5, 14.0, 0.14)
 		# where you were: your body's outline going out as the mind leaves it
-		draw_arc(a, Player.R + 9.0, 0.0, TAU, 28, cyan(0.9 * sk, 2.2), 2.5)
+		var husk := PackedVector2Array()
+		for j in 29:
+			husk.append(a + Vector2.from_angle(TAU * j / 28.0) * (Player.R + 9.0))
+		Fx.tube(self, husk, cyan(0.9 * sk, 2.2), 4.0, 12.0, 0.14)
 		draw_arc(a, Player.R + 9.0 + 12.0 * (1.0 - sk), 0.0, TAU, 28, cyan(0.35 * sk, 1.8), 1.0)
 		# and the light that carried you, a bright bead running ahead to the shell
 		var bead := clampf(float(sg[2]) / 0.18, 0.0, 1.0)

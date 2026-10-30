@@ -405,7 +405,7 @@ func _die(e: E, dir: Vector2) -> void:
 			game.bullets.drop(b)
 		game.sfx.play("mend", 1.3, -6.0)
 	var tr := Transform2D(e.rot, e.pos)
-	var col := Pal.foe(1.0, 1.6).lerp(Pal.red(1.0, 2.6), e.red)
+	var col := Pal.foe(0.85, 1.2).lerp(Pal.red(1.0, 2.6), e.red)
 	var pts := _poly(e)
 	# its tubes go out where it stood, as the pieces fly
 	var ghost := PackedVector2Array()
@@ -428,7 +428,7 @@ func _die(e: E, dir: Vector2) -> void:
 	game.fx.ring(e.pos, e.r * 0.6, e.r * 4.0, 0.45, col, 2.0)
 	game.fx.ring(e.pos, e.r * 0.3, e.r * 2.2, 0.3, Pal.foe(0.6), 1.0)
 	# (a short flash: the tube's outline going out has to read through it)
-	game.fx.flash(e.pos, e.r * 2.2, 0.16, Color(col.r, col.g, col.b, 0.22))
+	game.fx.flash(e.pos, e.r * 2.0, 0.12, Color(col.r, col.g, col.b, 0.08))
 	game.fx.sparks(e.pos, dir, 10 + e.sides * 2, col, 700.0, 0.4, 1.3)
 	game.on_target_die(e.pos, e.kind)
 
