@@ -24,6 +24,8 @@ var worker_t := -1.0         # the worker by the door, from the chapter's start
 var t := 0.0
 var font: Font
 var mem_layer: Node2D
+var refl_layer: Node2D
+var refl_dim := 0.0        # the hall's light level, kept for the reflections' own layer
 var mem_shown := false
 var tick := 0.0
 var focus_last := 0.0
@@ -42,6 +44,13 @@ func _ready() -> void:
 	mem_layer.z_as_relative = false
 	mem_layer.draw.connect(_draw_memory)
 	add_child(mem_layer)
+	# the hall's mirror reflections follow you, so they redraw every frame on
+	# their own layer while the rest of the props keep their ten a second
+	refl_layer = Node2D.new()
+	refl_layer.z_index = 2
+	refl_layer.z_as_relative = false
+	refl_layer.draw.connect(func(): _draw_reflections(refl_dim))
+	add_child(refl_layer)
 
 
 func start_chapter(ch: int) -> void:
@@ -111,6 +120,8 @@ func step(dt: float) -> void:
 			break
 	focus_last = game.focus
 	# the hall's mirrors carry a slow light: the room redraws twenty times a second
+	# (every frame, so a reflection never lingers once the hall is left)
+	refl_layer.queue_redraw()
 	if story == 2:
 		mirror_tick -= dt
 		if mirror_tick <= 0.0:
@@ -196,7 +207,7 @@ func _draw() -> void:
 		else:
 			_draw_seal(Vector2(330, 880), dim)
 			_draw_pillars(dim)
-		_draw_reflections(dim)
+		refl_dim = dim
 		var queue_at = game.rooms.spot("queue", Vector2(1240, 1010))
 		if queue_at != null:
 			draw_set_transform(queue_at - Vector2(1240, 1010), 0.0, Vector2.ONE)
@@ -1615,16 +1626,16 @@ func _draw_reflections(dim: float) -> void:
 		var a := lerpf(0.14, 0.6, clampf(1.0 - dist / 300.0, 0.0, 1.0)) * dim
 		# you, as the glass would rather have you: your outline, a little ring of
 		# light about it, and a smile you are not wearing
-		draw_circle(mirrored, 26.0, Color(1, 1, 1, a * 0.08))
-		draw_arc(mirrored, 26.0, 0.0, TAU, 32, Pal.ink(a), 2.0, false)
-		draw_arc(mirrored, 34.0, 0.0, TAU, 40, Pal.ink(a * 0.4), 1.0, false)
-		draw_circle(mirrored + Vector2(-9, -7), 2.6, Pal.ink(a))
-		draw_circle(mirrored + Vector2(9, -7), 2.6, Pal.ink(a))
+		refl_layer.draw_circle(mirrored, 26.0, Color(1, 1, 1, a * 0.08))
+		refl_layer.draw_arc(mirrored, 26.0, 0.0, TAU, 32, Pal.ink(a), 2.0, false)
+		refl_layer.draw_arc(mirrored, 34.0, 0.0, TAU, 40, Pal.ink(a * 0.4), 1.0, false)
+		refl_layer.draw_circle(mirrored + Vector2(-9, -7), 2.6, Pal.ink(a))
+		refl_layer.draw_circle(mirrored + Vector2(9, -7), 2.6, Pal.ink(a))
 		var smile := PackedVector2Array()
 		for j in 9:
 			var u := lerpf(-1.0, 1.0, j / 8.0)
 			smile.append(mirrored + Vector2(u * 13.0, 5.0 + 6.0 * (1.0 - u * u)))
-		draw_polyline(smile, Pal.ink(a), 2.0, false)
+		refl_layer.draw_polyline(smile, Pal.ink(a), 2.0, false)
 
 
 # A row of ID gates against the top wall: posts, arms, a scanner light each.

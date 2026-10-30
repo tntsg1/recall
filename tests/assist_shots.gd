@@ -7,7 +7,8 @@ func _initialize() -> void:
 	call_deferred("run")
 
 func shot(path: String) -> void:
-	for i in 8:
+	# (long enough for the panel's rows to finish coming in)
+	for i in 45:
 		await process_frame
 	await RenderingServer.frame_post_draw
 	Cap.save(root, path)

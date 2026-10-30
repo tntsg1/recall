@@ -126,7 +126,9 @@ func run() -> void:
 	title._set_change(1)
 	check(is_instance_valid(title.assist_panel), "title settings opens assist panel")
 	title.assist_panel.close()
-	await process_frame
+	# (it fades out first)
+	for k in 30:
+		await process_frame
 	check(not is_instance_valid(title.assist_panel), "back closes panel")
 	while ResourceLoader.load_threaded_get_status("res://scenes/main.tscn") == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
 		await process_frame
