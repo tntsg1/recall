@@ -80,7 +80,7 @@ var dash_prev := false
 # test driver: {move: Vector2, aim: Vector2 (world), fire: bool, focus: bool, dash: bool}
 var bot = null
 var hits_taken := 0
-var lv := {"bounce": 0, "split": 0, "orbit": 0, "magnet": 0, "blast": 0, "charge": 0, "shadow": 0, "chain": 0, "possess": 0}
+var lv := {"bounce": 0, "split": 0, "orbit": 0, "magnet": 0, "blast": 0, "charge": 0, "shadow": 0, "chain": 0, "possess": 0, "walk": 0}
 var picking := false
 var offers: Array = []
 var pick_cd := 0.0
@@ -1147,7 +1147,8 @@ func _update_focus(dt: float) -> void:
 			hud.dry()
 			sfx.play("empty", 0.8, -8.0)
 	if focusing:
-		focus_time += dt
+		if not lightwalk.holds_focus():
+			focus_time += dt
 		if has("leech_ward"):
 			for b in bullets.list:
 				if b.state == Bullets.CAPTURED and not b.child:

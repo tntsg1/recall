@@ -7,12 +7,24 @@ extends Node2D
 # round's end and you take the round back with you; run it to where it was
 # fired from and the round stays where it is. A line can be run once; the
 # dodge's cooldown is spent either way.
+# The Lightrun school (game.lv.walk): 1 a run leaves its line burning; 2 for a
+# moment after a run another lit line can be struck, twice over, cooldown free,
+# and running does not use up the recall hold; 3 a run takes back the rounds it
+# passes, each adding to that run's cut.
 
 const SPEED := 3600.0        # px/s along the line
 const REACH := 240.0         # how far ahead of you a dodge can strike a line
 const CATCH := 34.0          # how near the dodge must pass to it
 const CUT := 16.0            # how near a body on the line must stand to be cut
 const OFF_WALL := 22.0       # where you come out, short of the round's wall
+const BURN_LIFE := 1.5       # a light scar, in sim seconds
+const BURN_TICK := 0.2
+const BURN_R := 16.0
+const CHAIN_WINDOW := 0.7    # real seconds to strike the next line
+const CHAIN_MAX := 2         # further runs after the first
+const CHAIN_REACH := 420.0
+const LOAD_R := 130.0
+const LOAD_GAIN := 0.25
 
 var game
 var on := false
@@ -43,13 +55,28 @@ var tip_done := false
 var aim_b = null              # while you hold recall: the line a dodge now would take
 var aim_s := 0.0
 var aim_dir := 1.0
+var burns: Array = []         # light scars: {pts, life, tick}
+var burn = null               # the one being laid by the run under way
+var chain_t := 0.0            # >0: the next line can be struck, free
+var chain_n := 0              # further runs taken in this chain
+var chain_owed := 0.0         # the cooldown that falls due if the chain ends here
+var loaded := 0               # rounds taken back on this run
+
+
+func level() -> int:
+	return int(game.lv.get("walk", 0))
+
+
+# Running (and the moment after) does not use up the recall hold at level 2.
+func holds_focus() -> bool:
+	return level() >= 2 and (on or chain_t > 0.0)
 
 
 # The line a dodge toward `move` would strike: [round, where along it, its way there] or [].
 func _find(move: Vector2) -> Array:
 	var p: Vector2 = game.player.pos
 	var d: Vector2 = move.normalized() if move.length() > 0.1 else game.player.aim
-	var q := p + d * REACH
+	var q := p + d * (CHAIN_REACH if chain_t > 0.0 else REACH)
 	var best = null
 	var best_k := INF
 	var best_s := 0.0
@@ -81,6 +108,12 @@ func try_start(move: Vector2) -> bool:
 	var found := _find(move)
 	if found.is_empty():
 		return false
+	if chain_t > 0.0:
+		chain_n += 1
+		chain_t = 0.0
+	else:
+		chain_n = 0
+	loaded = 0
 	b = found[0]
 	s = found[1]
 	dir = found[2]
@@ -90,6 +123,9 @@ func try_start(move: Vector2) -> bool:
 	flare = 1.0
 	at_in = b.sample(s)
 	b.walked = true
+	if level() >= 1:
+		burn = {"pts": PackedVector2Array([at_in]), "life": BURN_LIFE, "tick": 0.0}
+		burns.append(burn)
 	var pl = game.player
 	pl.dash_cd = Player.DASH_CD * (0.6 if game.has("lightstep") else 1.0)
 	pl.dash_t = 0.0
@@ -107,6 +143,12 @@ func try_start(move: Vector2) -> bool:
 # Run on along the line (the player's own step has run; this places you).
 func step(sdt: float) -> void:
 	flare = maxf(0.0, flare - sdt / 0.25)
+	_step_burns(sdt * game.slow)
+	if chain_t > 0.0:
+		chain_t -= sdt
+		if chain_t <= 0.0 or not game.focusing:
+			chain_t = 0.0
+			game.player.dash_cd = maxf(game.player.dash_cd, chain_owed)
 	aim_b = null
 	if not on and available() and game.focusing and game.player.dash_cd <= 0.0 and not game.possess.busy():
 		var found := _find(game._in_move())
@@ -135,8 +177,12 @@ func step(sdt: float) -> void:
 	pl.vel = Vector2.ZERO
 	pl.streak.append([now, 0.0])
 	pl.light = 0.6
+	if burn != null:
+		burn.pts.append(now)
+	if level() >= 3:
+		_take_rounds(from, now)
 	# what stands on the line is cut as you pass
-	var dmg: float = Bullets.RET_DMG * 0.5 * game.gun_dmg()
+	var dmg: float = Bullets.RET_DMG * 0.5 * game.gun_dmg() * (1.0 + LOAD_GAIN * loaded)
 	var going: Vector2 = (now - from).normalized() if now.distance_to(from) > 0.01 else Vector2.RIGHT
 	for e in game.enemies.list:
 		if e.state != Enemies.ALIVE or cut.has(e.id):
@@ -172,15 +218,89 @@ func _arrive(going: Vector2) -> void:
 	game.fx.ring(pl.pos, 6.0, 40.0, 0.22, Pal.you(0.9, 2.2), 1.6)
 	game.sfx.play("home", 1.8, -8.0)
 	b = null
+	burn = null
+	if level() >= 2 and chain_n < CHAIN_MAX and game.focusing:
+		# refraction: the dodge comes straight back, for a moment
+		chain_t = CHAIN_WINDOW
+		chain_owed = pl.dash_cd
+		pl.dash_cd = 0.0
+		game.fx.ring(pl.pos, 10.0, 70.0, 0.3, Pal.you(0.7, 2.4), 2.0)
+		game.sfx.play("lit", 1.3 + chain_n * 0.2, -6.0)
+
+
+# Full Load: rounds near the run go home with you.
+func _take_rounds(from: Vector2, now: Vector2) -> void:
+	for rb in game.bullets.list:
+		if rb == b or rb.state != Bullets.EMBED or rb.foe or rb.child or rb.filed or rb.dark_by != 0:
+			continue
+		if Geometry2D.get_closest_point_to_segment(rb.pos, from, now).distance_to(rb.pos) > LOAD_R:
+			continue
+		if rb.settled:
+			rb.settled = false
+			game.bullets.faint_dirty = true
+		game.bullets.send_home(rb)
+		loaded += 1
+		game.fx.flash(rb.pos, 22.0, 0.16, Pal.you(0.8, 2.2))
+		game.sfx.play("lit", 1.0 + minf(loaded, 12.0) * 0.08, -10.0)
+
+
+# Light scars burn for a moment: everything touching one is hurt on each tick.
+func _step_burns(dt: float) -> void:
+	var i := 0
+	while i < burns.size():
+		var br: Dictionary = burns[i]
+		if is_same(br, burn):
+			i += 1
+			continue
+		br.life -= dt
+		br.tick -= dt
+		if br.tick <= 0.0:
+			br.tick += BURN_TICK
+			_burn_tick(br.pts)
+		if br.life <= 0.0:
+			burns.remove_at(i)
+		else:
+			i += 1
+	if not burns.is_empty():
+		queue_redraw()
+
+
+func _burn_tick(pts: PackedVector2Array) -> void:
+	var dmg: float = Bullets.RET_DMG * 0.25 * game.gun_dmg()
+	for e in game.enemies.list:
+		if e.state != Enemies.ALIVE:
+			continue
+		for k in pts.size() - 1:
+			if Geometry2D.get_closest_point_to_segment(e.pos, pts[k], pts[k + 1]).distance_to(e.pos) < e.r + BURN_R:
+				game.enemies.burn_hit(e, (pts[k + 1] - pts[k]).normalized(), dmg)
+				break
+	var boss = game.boss
+	if boss == null or not boss.alive():
+		return
+	for k in pts.size() - 1:
+		var bh: Dictionary = boss.hit_test(pts[k], pts[k + 1])
+		if bh and bh.get("core", false):
+			boss.damage(dmg * bh.get("mult", 1.0), false, bh.point, (pts[k + 1] - pts[k]).normalized(), bh.get("frame", -1))
+			break
 
 
 # A run cut short (a new room, the wave over, you hurt).
 func stop() -> void:
 	on = false
 	b = null
+	burn = null
+	burns.clear()
+	chain_t = 0.0
 
 
 func _draw() -> void:
+	for br in burns:
+		var fade: float = clampf(br.life / 0.5, 0.0, 1.0)
+		var flick := 0.8 + 0.2 * sin(game.real_time * 37.0 + br.pts.size())
+		Fx.tube(self, br.pts, Pal.red(0.8 * fade * flick, 2.6), 3.0, 16.0, 0.16)
+	if chain_t > 0.0:
+		var ck := chain_t / CHAIN_WINDOW
+		draw_arc(game.player.pos, 26.0, -PI * 0.5, -PI * 0.5 + TAU * ck, 32, Pal.you(0.9, 2.4), 2.0)
 	if tip_t >= 0.0:
 		var ta := clampf(tip_t / 0.25, 0.0, 1.0) * clampf((3.2 - tip_t) / 0.4, 0.0, 1.0)
 		var font := Fonts.get_font("SemiBold")

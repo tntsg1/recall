@@ -6,7 +6,7 @@ class_name Cards
 const SCHOOL_SLOTS := 4
 const RELIC_SLOTS := 5
 
-const SCHOOLS := ["bounce", "split", "orbit", "magnet", "blast", "charge", "shadow", "chain", "possess"]
+const SCHOOLS := ["bounce", "split", "orbit", "magnet", "blast", "charge", "shadow", "chain", "possess", "walk"]
 # what has to happen before some of the pool appears (Meta unlock keys)
 const SCHOOL_LOCK := {"charge": "boss_3", "shadow": "boss_4", "chain": "win"}
 const LEGEND_LOCK := "boss_1"
@@ -148,6 +148,9 @@ static func _school(game) -> Dictionary:
 	for k in SCHOOLS:
 		var l: int = game.lv.get(k, 0)
 		if l >= 3 or not Meta.unlocked(SCHOOL_LOCK.get(k, "")):
+			continue
+		# no use before light-speed travel itself is yours
+		if k == "walk" and not game.lightwalk.available():
 			continue
 		pool.append(k)
 	if pool.is_empty():

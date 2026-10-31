@@ -670,7 +670,7 @@ var cards_t := -1.0
 var chosen := -1
 var chosen_t := 0.0
 var chosen_card := {}
-var school_pop := {"bounce": 0.0, "split": 0.0, "orbit": 0.0, "magnet": 0.0, "blast": 0.0, "charge": 0.0, "shadow": 0.0, "chain": 0.0, "possess": 0.0}
+var school_pop := {"bounce": 0.0, "split": 0.0, "orbit": 0.0, "magnet": 0.0, "blast": 0.0, "charge": 0.0, "shadow": 0.0, "chain": 0.0, "possess": 0.0, "walk": 0.0}
 var relic_pop := {}
 var hover := -1
 var hover_k := [0.0, 0.0, 0.0]
@@ -966,6 +966,16 @@ func _icon(key: String, c: Vector2, r: float, t: float, col: Color, w: float = 2
 						var m := (q0 + q1) * 0.5
 						view.draw_rect(Rect2((m / 2.0).floor() * 2.0 - Vector2(w, w), Vector2(w, w) * 2.0), Possess.cyan(1.0, 2.2))
 			view.draw_rect(Rect2(((c - Vector2(r * 0.1, 0)) / 2.0).floor() * 2.0 - Vector2(w, w), Vector2(w, w) * 2.0), Possess.cyan(1.0, 2.4))
+		"walk":
+			# a bent line, and a streak of light running it end to end
+			var wp := PackedVector2Array([c + Vector2(-r, r * 0.6), c + Vector2(-r * 0.1, -r * 0.5), c + Vector2(r, r * 0.2)])
+			view.draw_polyline(wp, col, w * 0.6, false)
+			var wf := fmod(t * 1.1, 1.0) * 2.0
+			var wseg := mini(int(wf), 1)
+			var wq := wp[wseg].lerp(wp[wseg + 1], wf - wseg)
+			var wb := wp[wseg].lerp(wp[wseg + 1], maxf(0.0, wf - wseg - 0.45))
+			view.draw_line(wb, wq, Pal.you(1.0, 2.6), w * 1.3)
+			view.draw_circle(wq, w * 1.5, Pal.you(1.0, 3.0))
 		"bounce":
 			var pts := PackedVector2Array([c + Vector2(-r, -r * 0.7), c + Vector2(-r * 0.3, r * 0.7), c + Vector2(r * 0.35, -r * 0.7), c + Vector2(r, r * 0.7)])
 			view.draw_polyline(pts, col, w, false)

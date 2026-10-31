@@ -371,6 +371,17 @@ func blast_hit(e: E, dir: Vector2, dmg: float) -> void:
 		_die(e, dir)
 
 
+# A light scar's burn: hurts in place, no shove.
+func burn_hit(e: E, dir: Vector2, dmg: float) -> void:
+	if e.kind == PHASE and phased(e):
+		return
+	e.hp -= dmg
+	e.flash = 1.0
+	game.fx.number(e.pos, dmg, true)
+	if e.hp <= 0.0:
+		_die(e, dir)
+
+
 # Aftershock damage: no recall bonus and no chain of its own.
 func aftershock_hit(e: E, dir: Vector2) -> void:
 	e.hp -= 25.0
