@@ -35,6 +35,7 @@ class E:
 	var pos := Vector2.ZERO
 	var vel := Vector2.ZERO
 	var knock := Vector2.ZERO
+	var dazed := 0.0            # left reeling for you to seize: it does nothing
 	var hp := 1.0
 	var maxhp := 1.0
 	var r := 14.0
@@ -261,7 +262,11 @@ func sweep(a: Vector2, b: Vector2, bullet, ret: bool) -> void:
 					for o in list:
 						if o != e and o.state == ALIVE and o.pos.distance_to(q) < 34.0 + o.r:
 							blast_hit(o, (o.pos - q).normalized(), 15.0)
-			_hit(e, dmg, d, q, ret)
+			# (the one a recall would finish is left reeling, for you to seize)
+			if ret and game.possess.spare(e, dmg):
+				dmg = maxf(0.0, e.hp - 1.0)
+			if dmg > 0.0:
+				_hit(e, dmg, d, q, ret)
 			if ret and game.lv.magnet >= 3 and e.state == ALIVE:
 				# magnet lv3: a returning round drags what it pierces
 				e.knock += d * 420.0
@@ -489,7 +494,10 @@ func step(dt: float) -> void:
 					game.fx.ring(e.pos, e.r, e.r * 2.0, 0.35, Pal.foe(0.7, 1.3), 1.5)
 					game.fx.flash(e.pos, e.r * 2.5, 0.2, Pal.foe(0.5, 1.2))
 			ALIVE:
-				match e.kind:
+				if e.dazed > 0.0:
+					e.dazed -= dt
+					e.vel = Vector2.ZERO
+				match -1 if e.dazed > 0.0 else e.kind:
 					PRISM:
 						if e.anchor != null and e.anchor.alive():
 							# circling the warden

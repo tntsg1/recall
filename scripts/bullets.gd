@@ -16,6 +16,7 @@ const OUT_DMG := 10.0
 const RET_DMG := 20.0
 const LIGHT_SPEED := 2600.0   # px per real second the "light up" ripple spreads
 const CHILD_DMG := 6.0
+const SPLIT_FALL := 0.8    # each generation of split rounds hits this much as hard
 const ORBIT_DMG := 10.0
 const ORBIT_SPIN := 7.5
 
@@ -73,6 +74,7 @@ class B:
 	var plate := -1             # the hull plate it is embedded in (it rides, and yanks it when recalled)
 	var stasis := -1            # the stasis field holding it in mid-air
 	var walked := false         # its line has been run at light speed (once only)
+	var split_k := 1.0          # what generations of splitting have left of its damage
 	var filed := false          # the warden stamped it: recalled, it flies into the warden's keeping
 
 	func total() -> float:
@@ -245,7 +247,7 @@ func fling(b: B, dir: Vector2) -> void:
 	b.path = PackedVector2Array([b.pos, b.pos])
 	b.cum = PackedFloat32Array([0.0, 0.0])
 	b.hit.clear()
-	b.dmg = game.out_dmg() if not b.child else CHILD_DMG
+	b.dmg = game.out_dmg() if not b.child else CHILD_DMG * b.split_k
 	b.bounces = 0
 	b.bends = 0
 	b.refracted = false
@@ -405,6 +407,7 @@ func split(b: B, at: Vector2, dir: Vector2, s_at: float) -> void:
 		var c := B.new()
 		c.child = true
 		c.gen = b.gen + 1
+		c.split_k = b.split_k * SPLIT_FALL
 		c.pos = at
 		c.dir = dir.rotated(spread + randf_range(-0.05, 0.05))
 		c.path = base.duplicate()
@@ -417,7 +420,7 @@ func split(b: B, at: Vector2, dir: Vector2, s_at: float) -> void:
 			c.cum.append(acc)
 		c.seed = randf() * 100.0
 		c.hit = b.hit.duplicate()
-		c.dmg = CHILD_DMG
+		c.dmg = CHILD_DMG * c.split_k
 		c.bounces = game.lv.bounce if game.lv.bounce >= 3 else 0
 		list.append(c)
 	# a crowded screen keeps the split mark small
@@ -471,7 +474,7 @@ func recall(from: Vector2) -> int:
 		b.light = 1.0
 		b.hit.clear()
 		b.via_done = false
-		b.dmg = RET_DMG * (0.6 if b.child and not b.foe else 1.0)
+		b.dmg = RET_DMG * (0.6 if b.child and not b.foe else 1.0) * b.split_k
 		b.home_zero = b.foe and game.boss.alive()
 		b.zero_pass = false
 		b.first_bonus = game.has("zero_point")

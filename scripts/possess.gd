@@ -16,6 +16,8 @@ const COOLDOWN := 8.0
 const RANGE := 680.0
 const FLOW_TIME := 0.16
 const SHELL_HITS := 3
+const DAZE_TIME := 1.4          # how long a spared enemy reels
+const SPARE_GAP := 6.0          # seconds before another can be spared
 const PX := 2.0                 # one effect pixel = two world units
 const KINDS := [Enemies.CHASER, Enemies.LEECH, Enemies.GUARD, Enemies.CHARGER, Enemies.PRISM, Enemies.PULSE, Enemies.ECHO]
 const NAMES := {Enemies.CHASER: "chaser", Enemies.LEECH: "leech", Enemies.GUARD: "guard", Enemies.CHARGER: "charger",
@@ -74,6 +76,7 @@ var flow_t := 0.0
 var flow_from := Vector2.ZERO
 var marks := {}                 # enemy id -> [E, time left]
 var hinted := false
+var spare_cd := 0.0
 var endless := false            # the training yard: no time limit, no cooldown
 var grow := 0.0
 var hits_left := SHELL_HITS
@@ -188,6 +191,28 @@ func mark(e) -> void:
 		if not hinted and game.bot == null:
 			hinted = true
 			game.hud.flash_text(Txt.t("possess_hint"))
+
+
+# A recall that would finish a seizable enemy leaves it on 1 HP and reeling,
+# so a clean sweep still gives you something to seize: one at a time, only
+# when E is ready and nothing else is marked. True while it is being spared.
+func spare(e, dmg: float) -> bool:
+	if e.dazed > 0.0:
+		return true
+	if e.hp - dmg > 0.0 or state != IDLE or cooldown > 0.0 or spare_cd > 0.0 or game.tutorial != null:
+		return false
+	if not KINDS.has(e.kind) or not marks.has(e.id) or e.pos.distance_to(game.player.pos) >= RANGE:
+		return false
+	var other = target()
+	if other != null and other != e:
+		return false
+	spare_cd = SPARE_GAP
+	e.dazed = DAZE_TIME
+	e.vel = Vector2.ZERO
+	game.fx.ring(e.pos, e.r, e.r + 40.0, 0.4, cyan(1.0, 2.4), 2.5)
+	game.fx.flash(e.pos, e.r * 2.5, 0.2, cyan(0.6, 2.2))
+	game.sfx.play("p_ready", 1.0, -6.0)
+	return true
 
 
 func target():
@@ -399,6 +424,7 @@ func shell_hit(dir: Vector2) -> bool:
 
 func step(sdt: float, dt: float) -> void:
 	t += dt
+	spare_cd = maxf(0.0, spare_cd - sdt)
 	for id in marks.keys():
 		var m: Array = marks[id]
 		m[1] -= sdt

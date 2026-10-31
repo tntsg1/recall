@@ -465,7 +465,7 @@ ROUNDS UNDER A RED STAMP GET CONFISCATED · DASH THROUGH THE BEAM\nLAST PHASE: R
 	"up_bounce_1": ["子弹命中墙面后可反弹 1 次，再嵌入墙体。回收时会沿原有弹道反向飞行，包括反弹路径。", "Rounds bounce off a wall once before embedding. Recalls fly back along the full path, bounce included."],
 	"up_bounce_2": ["子弹最多可连续反弹 2 次，回收时沿完整弹道反向飞行。", "Rounds bounce up to 2 times; recalls retrace the whole path."],
 	"up_bounce_3": ["子弹最多可连续反弹 3 次。若已获得分裂能力，每次反弹都会额外触发分裂。", "Rounds bounce up to 3 times. With Split, every bounce also splits."],
-	"up_split_1": ["子弹命中敌人时分裂出 2 颗小型子弹，最多连续分裂 2 代。所有分裂弹均可回收，并沿各自弹道返回最初的发射点。", "Rounds that hit an enemy split into 2 small rounds, up to 2 generations. Every split round can be recalled and flies back along its own path to where it was first fired."],
+	"up_split_1": ["子弹命中敌人时分裂出 2 颗小型子弹，最多连续分裂 2 代，每分裂一代伤害 ×0.8。所有分裂弹均可回收，并沿各自弹道返回最初的发射点。", "Rounds that hit an enemy split into 2 small rounds, up to 2 generations, each generation hitting ×0.8. Every split round can be recalled and flies back along its own path to where it began."],
 	"up_split_2": ["分裂效果同样适用于返程子弹。回收过程中命中敌人，也会触发分裂。", "Splitting also applies to returning rounds: hits during a recall split too."],
 	"up_split_3": ["每次分裂产生的子弹增加至 3 颗。若已解锁「行星轨道」，分裂弹回收后也会加入环绕轨道。", "Each split now makes 3 rounds. With Orbit unlocked, recalled split rounds join the ring too."],
 	"up_orbit_1": ["每次回收的前 6 颗子弹会环绕自身飞行 2 秒，对接触的敌人造成切割伤害。", "The first 6 rounds of each recall circle you for 2 s, cutting enemies they touch."],
