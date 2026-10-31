@@ -25,6 +25,7 @@ const CHAIN_MAX := 2         # further runs after the first
 const CHAIN_REACH := 420.0
 const LOAD_R := 130.0
 const LOAD_GAIN := 0.25
+const LOAD_MAX := 6          # rounds that count toward the bonus
 
 var game
 var on := false
@@ -61,6 +62,7 @@ var chain_t := 0.0            # >0: the next line can be struck, free
 var chain_n := 0              # further runs taken in this chain
 var chain_owed := 0.0         # the cooldown that falls due if the chain ends here
 var loaded := 0               # rounds taken back on this run
+var run_hit := 0.0            # hurt dealt on this run: shown once, as you come out
 
 
 func level() -> int:
@@ -114,6 +116,7 @@ func try_start(move: Vector2) -> bool:
 	else:
 		chain_n = 0
 	loaded = 0
+	run_hit = 0.0
 	b = found[0]
 	s = found[1]
 	dir = found[2]
@@ -157,9 +160,12 @@ func step(sdt: float) -> void:
 			aim_s = found[1]
 			aim_dir = found[2]
 			# the first time it can be done: a short word by you, once a run
-			if not tip_done and game.tutorial == null:
+			if not tip_done and game.tutorial == null and not game.boss.alive():
 				tip_done = true
 				tip_t = 0.0
+	# it would only sit over the cards or a boss's attacks
+	if game.hud.cards_t >= 0.0 or game.boss.alive():
+		tip_t = -1.0
 	if tip_t >= 0.0:
 		tip_t += sdt if not game.focusing else sdt * 3.0
 		if tip_t > 3.2:
@@ -182,14 +188,15 @@ func step(sdt: float) -> void:
 	if level() >= 3:
 		_take_rounds(from, now)
 	# what stands on the line is cut as you pass
-	var dmg: float = Bullets.RET_DMG * 0.5 * game.gun_dmg() * (1.0 + LOAD_GAIN * loaded)
+	var dmg: float = Bullets.RET_DMG * 0.5 * game.gun_dmg() * (1.0 + LOAD_GAIN * mini(loaded, LOAD_MAX))
 	var going: Vector2 = (now - from).normalized() if now.distance_to(from) > 0.01 else Vector2.RIGHT
 	for e in game.enemies.list:
 		if e.state != Enemies.ALIVE or cut.has(e.id):
 			continue
 		if Geometry2D.get_closest_point_to_segment(e.pos, from, now).distance_to(e.pos) < e.r + CUT:
 			cut[e.id] = true
-			game.enemies.blast_hit(e, going, dmg)
+			game.enemies.blast_hit(e, going, dmg, false)
+			run_hit += dmg
 			# cut through: a white slash across it, and it is thrown off the line
 			e.knock += going.orthogonal() * (240.0 if going.orthogonal().dot(e.pos - now) >= 0.0 else -240.0)
 			game.fx.sparks(e.pos, going, 8, Pal.you(1.0, 2.2), 520.0, 0.22, 0.6)
@@ -217,6 +224,8 @@ func _arrive(going: Vector2) -> void:
 		game.bullets.send_home(b)
 	game.fx.ring(pl.pos, 6.0, 40.0, 0.22, Pal.you(0.9, 2.2), 1.6)
 	game.sfx.play("home", 1.8, -8.0)
+	if run_hit > 0.0:
+		game.fx.number(pl.pos + Vector2(0, -26), run_hit, true)
 	b = null
 	burn = null
 	if level() >= 2 and chain_n < CHAIN_MAX and game.focusing:
@@ -266,7 +275,7 @@ func _step_burns(dt: float) -> void:
 
 
 func _burn_tick(pts: PackedVector2Array) -> void:
-	var dmg: float = Bullets.RET_DMG * 0.25 * game.gun_dmg()
+	var dmg: float = Bullets.RET_DMG * 0.2 * game.gun_dmg()
 	for e in game.enemies.list:
 		if e.state != Enemies.ALIVE:
 			continue

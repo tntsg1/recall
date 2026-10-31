@@ -91,7 +91,7 @@ func _run() -> void:
 		await frames(1)
 	await shot("4_burning")
 	game.lv.walk = 1
-	game.hud.show_cards([{"type": "school", "id": "walk", "level": 1, "full": false}, {"type": "school", "id": "walk", "level": 0, "full": false}, {"type": "school", "id": "walk", "level": 2, "full": false}])
+	game.hud.show_cards([{"type": "school", "id": "walk", "level": 1, "full": false}, {"type": "school", "id": "bounce", "level": 0, "full": false}, {"type": "relic", "id": "lightstep", "rarity": 0, "full": false}])
 	await frames(70)
 	await shot("5_cards")
 	quit()

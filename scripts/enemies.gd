@@ -360,13 +360,14 @@ func _chain(from: E, dmg: float) -> void:
 
 
 # Blast school / Echo / Singularity damage: plain, no chain of its own.
-func blast_hit(e: E, dir: Vector2, dmg: float) -> void:
+func blast_hit(e: E, dir: Vector2, dmg: float, show_number: bool = true) -> void:
 	if e.kind == PHASE and phased(e):
 		return
 	e.hp -= dmg
 	e.flash = 1.0
 	e.knock += dir * 220.0
-	game.fx.number(e.pos, dmg, true)
+	if show_number:
+		game.fx.number(e.pos, dmg, true)
 	if e.hp <= 0.0:
 		_die(e, dir)
 
@@ -377,7 +378,7 @@ func burn_hit(e: E, dir: Vector2, dmg: float) -> void:
 		return
 	e.hp -= dmg
 	e.flash = 1.0
-	game.fx.number(e.pos, dmg, true)
+	game.fx.sparks(e.pos, dir, 2, Pal.red(0.9, 2.2), 180.0, 0.14, 0.8)
 	if e.hp <= 0.0:
 		_die(e, dir)
 

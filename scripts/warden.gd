@@ -61,6 +61,7 @@ var skill_t := 0.0
 var skill_cd := 4.0
 var rot := 0
 var glint := 0                # rounds thrown back since its last volley
+var volley_split := false     # every other volley leaves its middle open
 var shots: Array = []         # its glass: {p, v, kind (0 shard, 1 bolt), pass, life}
 var stamps: Array = []        # {c, off, t, at}
 var beam_a0 := 0.0
@@ -256,6 +257,8 @@ func _phase_break() -> void:
 	game.cam.add_trauma(0.6)
 	game.cam.punch(0.04)
 	game.hud.boss_phase()
+	if phase == 2:
+		game.hud.radio(Txt.t("radio_warden_mirror"))
 	if phase == 1:
 		for k in 2:
 			var e = game.enemies.spawn(Enemies.PRISM, pos + Vector2.from_angle(PI * k) * 170.0, 0.2 * k)
@@ -357,6 +360,7 @@ func _begin_skill(pl: Vector2) -> void:
 	skill_t = 0.0
 	match skill:
 		"volley":
+			volley_split = not volley_split
 			game.sfx.play("windup", 1.3, -6.0)
 		"stamp":
 			# one on you, two either side; they follow you with a lag, then slam
@@ -421,8 +425,7 @@ func _volley(pl: Vector2) -> void:
 	glint = 0
 	var aim := (pl - pos).angle()
 	var spread := 0.8 + 0.035 * n
-	for k in n:
-		var a := aim + lerpf(-spread, spread, (k + 0.5) / n) * 0.5
+	for a in _fan(n, aim):
 		var d := Vector2.from_angle(a)
 		shots.append({"p": pos + d * (SHIELD_R + 6.0), "v": d * SHARD_SPEED[phase] * randf_range(0.92, 1.08), "kind": 0, "pass": -1, "life": 6.0, "spin": randf() * TAU})
 	# what it filed goes out with the glass: yours again once it lands
@@ -433,6 +436,19 @@ func _volley(pl: Vector2) -> void:
 	game.sfx.play("armor", 1.6, -4.0)
 	game.cam.add_trauma(0.12)
 	game.fx.flash(pos + Vector2.from_angle(aim) * SHIELD_R, 60.0, 0.2, Pal.foe(0.8, 2.0))
+
+
+# The volley's angles: a full fan at you, or (every other time) two wings
+# with the middle open, which punishes running sideways out of the first kind.
+func _fan(n: int, aim: float) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	var spread := 0.8 + 0.035 * n
+	for k in n:
+		var off := lerpf(-spread, spread, (k + 0.5) / n) * 0.5
+		if volley_split:
+			off += 0.3 if off >= 0.0 else -0.3
+		out.append(aim + off)
+	return out
 
 
 func _step_stamps(dt: float, pl: Vector2) -> void:
@@ -578,7 +594,8 @@ func _step_reflections(dt: float) -> void:
 			var mi: int = c[3]
 			if refl_cut.get(mi, 0.0) <= 0.0:
 				shots.append({"p": c[1], "v": (c[2] as Vector2) * BOLT_SPEED, "kind": 1, "pass": game.arena.mirror_from + mi, "life": 3.0, "spin": 0.0})
-				game.sfx.play("shot", 0.7, -12.0)
+				game.fx.flash(c[1], 30.0, 0.14, Pal.red(0.8, 2.4))
+				game.sfx.play("shot", 0.7, -8.0)
 			copies.remove_at(j)
 		else:
 			j += 1
@@ -692,13 +709,13 @@ func _draw_skills(dim: float) -> void:
 		var aim: float = (game.player.pos - pos).angle()
 		var spread := 0.8 + 0.035 * n
 		var segs := PackedVector2Array()
-		for j in n:
-			var a: float = aim + lerpf(-spread, spread, (j + 0.5) / n) * 0.5
+		for a in _fan(n, aim):
 			var d := Vector2.from_angle(a)
 			segs.append(pos + d * (SHIELD_R + 10.0))
 			segs.append(pos + d * (SHIELD_R + 10.0 + 150.0 * Pal.ease_out(k)))
 		draw_multiline(segs, Pal.foe((0.15 + 0.35 * k) * dim, 1.4), 1.0)
-		draw_arc(pos, SHIELD_R + 4.0, aim - spread * 0.5, aim + spread * 0.5, 24, Pal.foe(k * dim, 2.0 + k), 3.0, false)
+		var wing := spread * 0.5 + (0.3 if volley_split else 0.0)
+		draw_arc(pos, SHIELD_R + 4.0, aim - wing, aim + wing, 24, Pal.foe(k * dim, 2.0 + k), 3.0, false)
 	# spotlight: the warned half, then the beam
 	if skill == "beam":
 		var d := Vector2.from_angle(beam_a)
@@ -763,7 +780,15 @@ func _draw_skills(dim: float) -> void:
 		if b.filed and b.state == Bullets.EMBED:
 			var q: Vector2 = b.pos - b.dir * 6.0
 			draw_rect(Rect2(q - Vector2(7, 7), Vector2(14, 14)), Pal.red(0.85 * dim, 2.2), false, 2.0)
-	# your reflections, turned against you
+	# your reflections: their eyes turn first, in the phase before they do
+	if phase == 1:
+		for m: Rect2 in game.arena.mirrors:
+			var r1 := _reflect(m, game.player.pos, Vector2.RIGHT)
+			if r1.is_empty():
+				continue
+			var ea := (0.45 + 0.35 * sin(t * 5.0)) * dim
+			draw_circle(r1.p + Vector2(-9, -7), 3.0, Pal.red(ea, 2.0))
+			draw_circle(r1.p + Vector2(9, -7), 3.0, Pal.red(ea, 2.0))
 	if phase >= 2:
 		var ms: Array = game.arena.mirrors
 		for i in ms.size():
@@ -799,5 +824,7 @@ func _draw_skills(dim: float) -> void:
 			draw_polyline(PackedVector2Array([pts[0], pts[1], pts[2], pts[3], pts[0]]), Pal.foe(dim, 2.6), 1.5)
 			draw_line(p2 - v * 8.0, p2 + v * 14.0, Pal.foe(dim, 3.2), 1.5)
 		else:
-			draw_line(p2 - v * 24.0, p2, Pal.red(0.35 * dim, 1.6), 5.0)
-			draw_line(p2 - v * 20.0, p2, Pal.red(dim, 2.6), 2.0)
+			draw_circle(p2, 16.0, Pal.red(0.14 * dim, 1.6))
+			draw_line(p2 - v * 70.0, p2, Pal.red(0.22 * dim, 1.6), 9.0)
+			draw_line(p2 - v * 52.0, p2, Pal.red(0.55 * dim, 2.0), 5.0)
+			draw_line(p2 - v * 30.0, p2 + v * 4.0, Pal.red(dim, 3.2), 3.0)
