@@ -130,7 +130,7 @@ func try_start(move: Vector2) -> bool:
 		burn = {"pts": PackedVector2Array([at_in]), "life": BURN_LIFE, "tick": 0.0}
 		burns.append(burn)
 	var pl = game.player
-	pl.dash_cd = Player.DASH_CD * (0.6 if game.has("lightstep") else 1.0)
+	pl.dash_cd = Player.DASH_CD * (1.0 - game.sv("lightstep") / 100.0 if game.has("lightstep") else 1.0)
 	pl.dash_t = 0.0
 	pl.invuln = maxf(pl.invuln, absf(to - s) / SPEED + 0.2)
 	pl.light = 0.6

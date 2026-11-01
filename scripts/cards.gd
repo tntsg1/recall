@@ -9,7 +9,11 @@ const RELIC_SLOTS := 5
 const SCHOOLS := ["bounce", "split", "orbit", "magnet", "blast", "charge", "shadow", "chain", "possess", "walk"]
 # what has to happen before some of the pool appears (Meta unlock keys)
 const SCHOOL_LOCK := {"charge": "boss_3", "shadow": "boss_4", "chain": "win"}
-const LEGEND_LOCK := "boss_1"
+const LEGEND_LOCK := "boss_2"
+# The same relic again raises its rank: what picks are for once the case is full.
+const MAX_STAR := 3
+const UP_CHANCE := 0.6       # of relic draws, once all five slots are taken
+const STEAL_FROM := 4        # the story chapter where rounds first get stolen
 
 # id: [rarity 0 common / 1 rare / 2 legendary, name zh, name en, desc zh, desc en]
 const RELICS := {
@@ -66,13 +70,66 @@ const RELICS := {
 	"zero_point": [1, "零点", "ZERO POINT", "回收时每颗子弹第一次命中伤害 ×2", "Each recalled round's first hit deals ×2"],
 	"sniper": [1, "狙击", "SNIPER", "去程子弹每飞 100 像素伤害 +4%", "Outbound rounds deal +4% per 100 px flown"],
 	"fortress": [1, "堡垒", "FORTRESS", "每碎一格裂痕，伤害 +8%", "Each missing crack adds +8% damage"],
-	"overkill": [2, "余波", "OVERKILL", "击杀溢出的伤害一半跳到最近的敌人", "Half of any overkill jumps to the nearest enemy"],
+	"overkill": [2, "余波", "OVERKILL", "击杀溢出伤害的 50% 跳到最近的敌人", "50% of any overkill jumps to the nearest enemy"],
 	"encore": [2, "安可", "ENCORE", "每波第一次回收会再来一遍影子回收（60% 伤害）", "Each wave's first recall plays twice (a shadow pass at 60%)"],
 	"keen_edge": [0, "锋刃", "KEEN EDGE", "返程伤害 +15%", "Returning damage +15%"],
 	"deep_focus": [0, "深定", "DEEP FOCUS", "按住 Q 时时间更慢，并多撑 0.3 秒", "Holding Q slows time further and lasts 0.3 s longer"],
 	"lucky": [1, "幸运", "LUCKY", "每章多 1 次刷新", "One more reroll each chapter"],
 	"glass_cannon": [1, "玻璃炮", "GLASS CANNON", "所有伤害 +40%，裂痕上限 -1", "All damage +40%, one fewer crack"],
 	"apex": [2, "顶点", "APEX", "有 3 个流派达到 3 级时，所有伤害 ×1.5", "With three schools at Lv3, all damage ×1.5"],
+}
+
+# id: [how the number reads in its description, rank 1, rank 2, rank 3]. Rank 2
+# is about ×1.25 of the bonus and rank 3 ×1.5, more where a bonus sits on top of
+# the base (+50% to +75% is only a sixth more damage), so a rank can be felt.
+# A relic not listed is a switch, on or off, and has no ranks.
+const STARS := {
+	"whet": ["+%s%%", 50.0, 70.0, 90.0],
+	"quick": ["+%s%%", 25.0, 31.0, 37.0],
+	"deepmag": ["+%s", 6.0, 9.0, 12.0],
+	"longfuse": ["%s", 20.0, 22.0, 24.0],
+	"lightstep": ["-%s%%", 40.0, 50.0, 60.0],
+	"aftershock": ["%s", 25.0, 31.0, 37.0],
+	"chain": ["+%s%%", 6.0, 7.5, 9.0],
+	"critical": ["×%s", 2.0, 2.5, 3.0],
+	"crossfire": ["%s", 60.0, 75.0, 90.0],
+	"stillheart": ["%s", 2.0, 2.5, 3.0],
+	"reaper": ["+%s%%", 12.0, 15.0, 18.0],
+	"zeroblade": ["×%s", 1.08, 1.11, 1.14],
+	"edge": ["+%s%%", 25.0, 31.0, 37.0],
+	"steady": ["+%s%%", 40.0, 50.0, 60.0],
+	"spare_round": ["%s", 3.0, 5.0, 7.0],
+	"focus_lens": ["+%s%%", 40.0, 60.0, 80.0],
+	"hunter": ["+%s%%", 50.0, 75.0, 100.0],
+	"eclipse": ["×%s", 2.0, 2.5, 3.0],
+	"magnetic_tip": ["%s%%", 30.0, 37.0, 45.0],
+	"quick_recall": ["%s%%", 30.0, 37.0, 45.0],
+	"lean": ["%s%%", 12.0, 15.0, 18.0],
+	"first_blood": ["×%s", 3.0, 4.0, 5.0],
+	"echo": ["%s", 6.0, 7.5, 9.0],
+	"overflow": ["+%s%%", 40.0, 60.0, 80.0],
+	"singularity": ["%s", 50.0, 62.0, 75.0],
+	"downbeat": ["+%s%%", 30.0, 45.0, 60.0],
+	"reserve": ["+%s", 3.0, 5.0, 7.0],
+	"swift_feet": ["%s%%", 40.0, 50.0, 60.0],
+	"heavy": ["+%s%%", 25.0, 40.0, 55.0],
+	"beat_heart": ["%s", 8.0, 10.0, 12.0],
+	"afterburn": ["%s", 2.0, 2.5, 3.0],
+	"vampire": ["%s", 40.0, 32.0, 27.0],
+	"grit": ["+%s%%", 20.0, 25.0, 30.0],
+	"crescendo": ["+%s%%", 25.0, 31.0, 37.0],
+	"long_barrel": ["%s%%", 30.0, 37.0, 45.0],
+	"wide_ring": ["+%s%%", 50.0, 62.0, 75.0],
+	"spark": ["%s", 6.0, 7.5, 9.0],
+	"zero_point": ["×%s", 2.0, 2.5, 3.0],
+	"sniper": ["+%s%%", 4.0, 5.0, 6.0],
+	"fortress": ["+%s%%", 8.0, 10.0, 12.0],
+	"overkill": ["%s%%", 50.0, 62.0, 75.0],
+	"encore": ["%s%%", 60.0, 75.0, 90.0],
+	"keen_edge": ["+%s%%", 15.0, 25.0, 35.0],
+	"deep_focus": ["%s", 0.3, 0.4, 0.5],
+	"glass_cannon": ["+%s%%", 40.0, 50.0, 60.0],
+	"apex": ["×%s", 1.5, 1.6, 1.75],
 }
 
 # id: [name zh, name en, desc zh, desc en]
@@ -101,8 +158,37 @@ static func relic_name(id: String) -> String:
 	return RELICS[id][1] if Txt.zh else RELICS[id][2]
 
 
-static func relic_desc(id: String) -> String:
-	return RELICS[id][3] if Txt.zh else RELICS[id][4]
+# The description at a rank: the one number that rises is swapped in place,
+# or, on the card that raises it, shown going from the old to the new.
+static func relic_desc(id: String, star := 1, rising := false) -> String:
+	var d: String = RELICS[id][3] if Txt.zh else RELICS[id][4]
+	if star <= 1 or not STARS.has(id):
+		return d
+	var s: Array = STARS[id]
+	var from: String = s[0] % num(s[1])
+	var at := d.rfind(from)
+	if at < 0:
+		return d
+	var now: String = s[0] % num(s[star])
+	if rising:
+		now = (s[0] % num(s[star - 1])) + " → " + now
+	return d.substr(0, at) + now + d.substr(at + from.length())
+
+
+# What the next rank would read; "" at the top rank.
+static func next_value(id: String, star: int) -> String:
+	if star >= MAX_STAR:
+		return ""
+	return STARS[id][0] % num(STARS[id][star + 1])
+
+
+static func num(v: float) -> String:
+	return str(int(v)) if is_equal_approx(v, roundf(v)) else String.num(v, 2)
+
+
+# A relic's number at a rank.
+static func sv(id: String, star: int) -> float:
+	return STARS[id][star]
 
 
 static func item_name(id: String) -> String:
@@ -127,7 +213,7 @@ static func offer(game) -> Array:
 			elif r < 0.85:
 				c = _relic(game, chapter)
 			else:
-				c = {"type": "item", "id": ITEMS.keys()[randi() % ITEMS.size()]}
+				c = _item(game)
 			if c.is_empty():
 				continue
 			var key: String = c.type + ":" + c.id
@@ -160,6 +246,15 @@ static func _school(game) -> Dictionary:
 
 
 static func _relic(game, chapter: int) -> Dictionary:
+	# the case is full: most draws now raise something you hold
+	if game.relics.size() >= RELIC_SLOTS and randf() < UP_CHANCE and not game.armed.get("card_luck", false):
+		var ups: Array = []
+		for id in game.relics:
+			if STARS.has(id) and game.star(id) < MAX_STAR and _useful(game, id):
+				ups.append(id)
+		if not ups.is_empty():
+			var u: String = ups[randi() % ups.size()]
+			return {"type": "relic", "id": u, "star": game.star(u) + 1}
 	var w: Array = RARITY_WEIGHT[chapter]
 	var roll: float = randf() * (w[0] + w[1] + w[2])
 	var rarity := 0 if roll < w[0] else (1 if roll < w[0] + w[1] else 2)
@@ -170,12 +265,48 @@ static func _relic(game, chapter: int) -> Dictionary:
 		rarity = 1
 	var pool: Array = []
 	for id in RELICS:
-		if RELICS[id][0] == rarity and not game.relics.has(id):
+		if RELICS[id][0] == rarity and not game.relics.has(id) and _useful(game, id):
 			pool.append(id)
 	if pool.is_empty():
 		for id in RELICS:
-			if not game.relics.has(id):
+			if not game.relics.has(id) and _useful(game, id):
 				pool.append(id)
 	if pool.is_empty():
 		return {}
 	return {"type": "relic", "id": pool[randi() % pool.size()]}
+
+
+# No card is offered that could do nothing for you here.
+static func _useful(game, id: String) -> bool:
+	match id:
+		"wide_ring":
+			return game.lv.get("orbit", 0) > 0
+		"leech_ward":
+			return Chapters.story(game.chapter) >= STEAL_FROM
+	return true
+
+
+static func _item(game) -> Dictionary:
+	var pool: Array = []
+	for id in ITEMS:
+		if _item_useful(game, id):
+			pool.append(id)
+	if pool.is_empty():
+		return {}
+	return {"type": "item", "id": pool[randi() % pool.size()]}
+
+
+static func _item_useful(game, id: String) -> bool:
+	match id:
+		"patch", "mend_all":
+			return game.cracks < game.max_cracks
+		"recall_order":
+			return game.bullets.count_state(Bullets.CAPTURED) > 0
+		"rewind":
+			return game.bullets.count_state(Bullets.EMBED) > 0
+		"card_luck":
+			return Meta.unlocked(LEGEND_LOCK)
+		"firststrike", "stasis", "slowfield":
+			# the boss is next: these would only reach its small fry
+			return game.wave_ctl.index + 1 != Waves.BOSS
+	return true

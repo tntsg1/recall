@@ -288,7 +288,9 @@ func pick_done() -> void:
 		# the harder way's reward: another pick straight after
 		game.rooms.bonus -= 1
 		pick_state = 0
+		game.extra_pick = true
 		return
+	game.extra_pick = false
 	pick_state = 2
 	pick_done_t = t
 

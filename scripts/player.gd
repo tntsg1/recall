@@ -62,7 +62,7 @@ func step(dt: float, real_dt: float, move: Vector2, aim_at: Vector2) -> void:
 		if dash_t <= 0.0:
 			vel = dash_dir * SPEED
 	else:
-		var target: Vector2 = move.limit_length(1.0) * SPEED * (1.12 if game.has("lean") else 1.0) * (1.25 if game.wave_haste else 1.0) * game.stasis.slow_at(pos)
+		var target: Vector2 = move.limit_length(1.0) * SPEED * (1.0 + game.sv("lean") / 100.0 if game.has("lean") else 1.0) * (1.25 if game.wave_haste else 1.0) * game.stasis.slow_at(pos)
 		vel = Pal.damp2(vel, target, 16.0 if move != Vector2.ZERO else 12.0, dt)
 	pos += vel * dt
 	pos = game.arena.push_circle(pos, R)
@@ -96,8 +96,8 @@ func try_dash(move: Vector2) -> bool:
 	if dash_cd > 0.0 or dash_t > 0.0:
 		return false
 	dash_dir = move.normalized() if move.length() > 0.1 else aim
-	dash_t = DASH_TIME * (1.4 if game.has("swift_feet") else 1.0)
-	dash_cd = DASH_CD * (0.6 if game.has("lightstep") else 1.0)
+	dash_t = DASH_TIME * (1.0 + game.sv("swift_feet") / 100.0 if game.has("swift_feet") else 1.0)
+	dash_cd = DASH_CD * (1.0 - game.sv("lightstep") / 100.0 if game.has("lightstep") else 1.0)
 	ghost_cd = 0.0
 	return true
 

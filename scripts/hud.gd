@@ -496,6 +496,11 @@ func _draw_timer(vp: Vector2) -> void:
 	var wc := Txt.t("cap_wave")
 	view.draw_string(font_s, Vector2(cx - 158.0 - font_s.get_string_size(wc, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x, y + 3.0), wc, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.4 * appear))
 	view.draw_string(font_s, Vector2(cx + 160.0, y + 3.0), Txt.t("cap_grade"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.4 * appear))
+	view.draw_string(font_s, Vector2(cx + 216.0, y + 3.0), "S", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.4 * appear))
+	var paid: bool = game.real_time < game.s_paid_until
+	for j in Game.S_PICK:
+		var lit: bool = paid or j < game.s_count % Game.S_PICK
+		view.draw_circle(Vector2(cx + 234.0 + j * 11.0, y - 2.0), 3.0, Pal.ink((0.8 if lit else 0.15) * appear, 2.0 if paid else 1.0))
 	view.draw_line(Vector2(cx - 120.0, y - 2.0), Vector2(cx - 70.0, y - 2.0), Pal.ink(0.18 * appear), 1.0)
 	view.draw_line(Vector2(cx + 70.0, y - 2.0), Vector2(cx + 120.0, y - 2.0), Pal.ink(0.18 * appear), 1.0)
 	# the grade still within reach, flipping over as each threshold passes
@@ -678,6 +683,7 @@ var reroll_k := 0.0
 var rep_card := {}
 var rep_t := -1.0
 var rep_hover := -2
+var rep_armed := -1          # a number key has picked this slot; pressing it again confirms
 var cracks_shown := 5
 var crack_anim := []          # per crack: >0 breaking, <0 mending
 var flashes: Array = []       # [text, world_pos or null, t]
@@ -716,6 +722,7 @@ func pick(i: int, c: Dictionary) -> void:
 func show_replace(c: Dictionary) -> void:
 	rep_card = c
 	rep_t = 0.0
+	rep_armed = -1
 
 
 func replace_done() -> void:
@@ -892,7 +899,7 @@ func replace_at(p: Vector2) -> int:
 	for j in n:
 		if Rect2(_rep_center(j, n, vp) - Vector2(80, 90), Vector2(160, 180)).has_point(p):
 			return j
-	if Rect2(vp.x / 2.0 - 120.0, vp.y * 0.5 + 150.0, 240.0, 40.0).has_point(p):
+	if Rect2(vp.x / 2.0 - 120.0, vp.y * 0.5 + 182.0, 240.0, 40.0).has_point(p):
 		return -1
 	return -2
 
@@ -933,6 +940,8 @@ func _step_cards(dt: float) -> void:
 	if rep_t >= 0.0:
 		rep_t += dt
 		rep_hover = replace_at(reticle)
+		if rep_armed >= 0:
+			rep_hover = rep_armed
 	if cards_t < 0.0:
 		return
 	cards_t += dt
@@ -1120,9 +1129,9 @@ func _card_face(c: Dictionary, r: Rect2, a: float, hov: float, idx: int) -> void
 			desc = Txt.t("up_%s_%d" % [c.id, c.level + 1])
 		"relic":
 			rarity = Cards.RELICS[c.id][0]
-			kind = Txt.t("card_relic") + " · " + Txt.t(["rar_0", "rar_1", "rar_2"][rarity])
+			kind = Txt.t("card_relic") + " · " + (Txt.t("card_star") % c.star if c.has("star") else Txt.t(["rar_0", "rar_1", "rar_2"][rarity]))
 			title = Cards.relic_name(c.id)
-			desc = Cards.relic_desc(c.id)
+			desc = Cards.relic_desc(c.id, c.get("star", 1), c.has("star"))
 		_:
 			kind = Txt.t("card_item")
 			title = Cards.item_name(c.id)
@@ -1133,7 +1142,8 @@ func _card_face(c: Dictionary, r: Rect2, a: float, hov: float, idx: int) -> void
 	match c.type:
 		"school":
 			_icon(c.id, Vector2(0, -80), 40.0, game.real_time + idx, ic, 3.0)
-			for j in 3:
+			# a full hand: its level comes from what it replaces, so none shows here
+			for j in 0 if c.get("full", false) else 3:
 				var on: bool = j < c.level
 				var pc := Pal.ink(0.8 * a) if on else Pal.ink(0.15 * a)
 				if j == c.level:
@@ -1141,6 +1151,12 @@ func _card_face(c: Dictionary, r: Rect2, a: float, hov: float, idx: int) -> void
 				view.draw_rect(Rect2(Vector2(-40 + j * 30, 42), Vector2(20, 4)), pc)
 		"relic":
 			_glyph(c.id, Vector2(0, -80), 40.0, ic, 2.5)
+			if c.has("star"):
+				for j in Cards.MAX_STAR:
+					var pc := Pal.ink(0.8 * a) if j < c.star - 1 else Pal.ink(0.15 * a)
+					if j == c.star - 1:
+						pc = Pal.red(a * (0.6 + 0.4 * sin(game.real_time * 6.0)), 2.2)
+					view.draw_rect(Rect2(Vector2(-40 + j * 30, 42), Vector2(20, 4)), pc)
 		_:
 			_item_glyph(Vector2(0, -80), 38.0, ic, 2.5)
 	_text_c(font_xl, title, Vector2(0, 22), 28, Pal.ink(a))
@@ -1148,8 +1164,8 @@ func _card_face(c: Dictionary, r: Rect2, a: float, hov: float, idx: int) -> void
 	for ln in _wrap(desc, 17, CARD.x - 56.0):
 		_text_c(font_s, ln, Vector2(0, y), 17, Pal.ink(0.82 * a))
 		y += 25.0
-	if c.get("full", false) or (c.type == "relic" and game.relics.size() >= Cards.RELIC_SLOTS):
-		_text_c(font_s, Txt.t("card_full"), Vector2(0, CARD.y / 2.0 - 50.0), 13, Pal.ink(0.5 * a))
+	if c.get("full", false) or (c.type == "relic" and not c.has("star") and game.relics.size() >= Cards.RELIC_SLOTS):
+		_text_c(font_s, Txt.t("card_full_school" if c.type == "school" else "card_full"), Vector2(0, r.position.y + 56.0), 13, Pal.ink(0.5 * a))
 	_text_c(font_b, str(idx + 1), Vector2(0, CARD.y / 2.0 - 22.0), 18, Pal.ink((0.35 + 0.4 * hov) * a))
 
 
@@ -1211,7 +1227,14 @@ func _tip_lines(key: String) -> Array:
 	var id := key.split(":")[1]
 	if key.begins_with("relic:"):
 		var rar: int = Cards.RELICS[id][0]
-		return [Cards.relic_name(id), Txt.t("card_relic") + " · " + Txt.t(["rar_0", "rar_1", "rar_2"][rar]), Cards.relic_desc(id), rar]
+		var kind: String = Txt.t("card_relic") + " · " + Txt.t(["rar_0", "rar_1", "rar_2"][rar])
+		if game.star(id) > 1:
+			kind += " · " + Txt.t("relic_rank") % game.star(id)
+		var said := Cards.relic_desc(id, game.star(id))
+		if Cards.STARS.has(id):
+			var nxt := Cards.next_value(id, game.star(id))
+			said += ("；" if Txt.zh else "; ") + (Txt.t("relic_max") if nxt == "" else Txt.t("relic_next") % nxt)
+		return [Cards.relic_name(id), kind, said, rar]
 	var lvl: int = game.lv.get(id, 0)
 	var parts: PackedStringArray = []
 	for n in range(1, maxi(1, lvl) + 1):
@@ -1314,6 +1337,11 @@ func _draw_slots(vp: Vector2) -> void:
 			var rar: int = Cards.RELICS[id][0]
 			view.draw_rect(rr.grow(pop2 * 4.0), Pal.ink(0.5 + 0.3 * rar * 0.5, 1.0 + pop2), false, 1.0 + rar * 0.6)
 			_glyph(id, rp, 11.0 * (1.0 + 0.3 * pop2), Pal.ink(0.85, 1.0 + 0.8 * pop2), 1.3)
+			if game.star(id) > 1:
+				var top: bool = game.star(id) >= Cards.MAX_STAR
+				for j in Cards.MAX_STAR:
+					var bar := Pal.red(0.9, 1.8) if top else Pal.ink(0.8 if j < game.star(id) else 0.15)
+					view.draw_rect(Rect2(rp + Vector2(-15 + j * 11, 19), Vector2(8, 3)), bar)
 		else:
 			view.draw_rect(rr, Pal.ink(0.07), false, 1.0)
 	# armed items wait beside the ammo
@@ -1514,6 +1542,8 @@ func _draw_cards(vp: Vector2) -> void:
 		view.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# reroll
 	if chosen < 0:
+		if game.extra_pick:
+			_text_c(font_b, Txt.t("extra_pick"), Vector2(vp.x / 2.0, _card_center(0, vp).y - CARD.y / 2.0 - 34.0), 22, Pal.ink(dim, 1.3))
 		var rr := _reroll_rect(vp)
 		var ra := Pal.ease_out((t - 0.4) / 0.3) * (1.0 if game.rerolls > 0 else 0.35)
 		view.draw_rect(rr, Pal.ink((0.25 + 0.5 * reroll_k) * ra), false, 1.0)
@@ -1566,7 +1596,14 @@ func _draw_replace(vp: Vector2) -> void:
 	view.draw_rect(Rect2(Vector2.ZERO, vp), Color(0, 0, 0, 0.6 * a))
 	var is_school: bool = rep_card.type == "school"
 	var new_name: String = Txt.t("sch_" + rep_card.id) if is_school else Cards.relic_name(rep_card.id)
-	_text_c(font_xl, Txt.t("replace_q") % new_name, Vector2(vp.x / 2.0, vp.y * 0.5 - 140.0), 30, Pal.ink(a))
+	_text_c(font_xl, Txt.t("replace_q") % new_name, Vector2(vp.x / 2.0, vp.y * 0.5 - 176.0), 30, Pal.ink(a))
+	var new_desc: String = Txt.t("up_%s_1" % rep_card.id) if is_school else Cards.relic_desc(rep_card.id)
+	var dy := vp.y * 0.5 - 142.0
+	for ln in _wrap(new_desc, 15, 1100.0):
+		_text_c(font_s, ln, Vector2(vp.x / 2.0, dy), 15, Pal.ink(0.75 * a))
+		dy += 22.0
+	if is_school:
+		_text_c(font_s, Txt.t("replace_inherit"), Vector2(vp.x / 2.0, dy), 15, Pal.ink(0.6 * a))
 	var held := _held_schools()
 	var n := _rep_count()
 	for j in n:
@@ -1585,12 +1622,25 @@ func _draw_replace(vp: Vector2) -> void:
 			title = Cards.relic_name(game.relics[j])
 		_frame(r, rar, a, hov)
 		if is_school:
+			_text_c(font_s, "→ %s  Lv%d" % [Txt.t("sch_" + rep_card.id), game.lv[held[j]]], r.get_center() + Vector2(0, 58), 14, Pal.ink((0.95 if game.lv[held[j]] >= 3 else 0.8) * a, 1.2))
+		elif game.star(game.relics[j]) > 1:
+			_text_c(font_s, Txt.t("relic_lose") % game.star(game.relics[j]), r.get_center() + Vector2(0, 58), 14, Pal.red(0.95 * a, 1.6))
+		if is_school:
 			_icon(held[j], r.get_center() + Vector2(0, -24), 26.0 * k, game.real_time, Pal.ink(a), 2.0)
 		else:
 			_glyph(game.relics[j], r.get_center() + Vector2(0, -24), 26.0 * k, Pal.ink(a), 2.0)
 		_text_c(font_s, title, r.get_center() + Vector2(0, 38), 15, Pal.ink(a))
-		_text_c(font_b, str(j + 1), r.get_center() + Vector2(0, 70), 15, Pal.ink(0.5 * a))
-	var keep := Rect2(vp.x / 2.0 - 120.0, vp.y * 0.5 + 150.0, 240.0, 40.0)
+		_text_c(font_b, str(j + 1), r.get_center() + Vector2(0, 80), 15, Pal.ink(0.5 * a))
+	if rep_hover >= 0 and rep_hover < n:
+		var gone: String = "school:" + held[rep_hover] if is_school else "relic:" + game.relics[rep_hover]
+		var hx: float = clampf(_rep_center(rep_hover, n, vp).x, 280.0, vp.x - 280.0)
+		var hy := vp.y * 0.5 + 136.0
+		for ln in _wrap(_tip_lines(gone)[2], 15, 520.0).slice(0, 2):
+			_text_c(font_s, ln, Vector2(hx, hy), 15, Pal.ink(0.8 * a))
+			hy += 21.0
+		if rep_armed == rep_hover:
+			_text_c(font_s, Txt.t("replace_again"), Vector2(hx, hy), 15, Pal.red(0.95 * a, 1.6))
+	var keep := Rect2(vp.x / 2.0 - 120.0, vp.y * 0.5 + 182.0, 240.0, 40.0)
 	view.draw_rect(keep, Pal.ink((0.25 + (0.5 if rep_hover == -1 else 0.0)) * a), false, 1.0)
 	_text_c(font_s, "0  " + Txt.t("replace_keep"), keep.get_center() + Vector2(0, 6), 15, Pal.ink(0.7 * a))
 
@@ -1680,9 +1730,16 @@ func _wrap_lines(txt: String, size: int, width: float) -> Array:
 		var cur := ""
 		for ch in para:
 			var test := cur + ch
-			if font_s.get_string_size(test, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width and cur != "":
+			# (closing punctuation hangs on the line rather than starting one)
+			if font_s.get_string_size(test, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width and cur != "" and not "，。；：、）》”！？".contains(ch):
 				var sp := cur.rfind(" ")
-				if ch != " " and sp > cur.length() / 2:
+				# a number stays with the word after it
+				var bare := cur.strip_edges(false, true)
+				var num_at := bare.rfind(" ")
+				if num_at > cur.length() / 2 and bare.substr(num_at + 1).is_valid_float():
+					out.append(bare.substr(0, num_at))
+					cur = cur.substr(num_at + 1) + ch
+				elif ch != " " and sp > cur.length() / 2 and cur.unicode_at(mini(sp + 1, cur.length() - 1)) < 0x2E80:
 					out.append(cur.substr(0, sp))
 					cur = cur.substr(sp + 1) + ch
 				else:

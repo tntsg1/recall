@@ -233,12 +233,12 @@ func sweep(a: Vector2, b: Vector2, bullet, ret: bool) -> void:
 			var d: Vector2 = (b - a).normalized() if b.distance_squared_to(a) > 0.01 else bullet.dir
 			var dmg: float = bullet.dmg * (game.ret_mult() if ret else game.out_mult())
 			if game.has("hunter") and e.hp >= e.maxhp:
-				dmg *= 1.5
+				dmg *= 1.0 + game.sv("hunter") / 100.0
 			if ret and bullet.first_bonus:
 				bullet.first_bonus = false
-				dmg *= 2.0
+				dmg *= game.sv("zero_point")
 			if not ret and game.has("sniper"):
-				dmg *= 1.0 + 0.04 * bullet.total() / 100.0
+				dmg *= 1.0 + game.sv("sniper") / 100.0 * bullet.total() / 100.0
 			if e.kind == PULSE:
 				# its shell is open just after each beat
 				dmg *= 1.5 if game.sfx.beat_frac() < 0.35 else 0.25
@@ -247,10 +247,10 @@ func sweep(a: Vector2, b: Vector2, bullet, ret: bool) -> void:
 			if ret:
 				dmg *= game.possess.lane_bonus(q)
 			if ret and game.has("afterburn"):
-				e.burn = 2.0
+				e.burn = game.sv("afterburn")
 			if game.first_blood_ready:
 				game.first_blood_ready = false
-				dmg *= 3.0
+				dmg *= game.sv("first_blood")
 				game.hud.flash_text(Cards.relic_name("first_blood"), e.pos)
 			if ret:
 				if game.pass_first == null:
@@ -283,7 +283,7 @@ func sweep(a: Vector2, b: Vector2, bullet, ret: bool) -> void:
 					game.fx.ring(e.pos, 6.0, 70.0, 0.3, Pal.red(1.0, 2.6), 2.5)
 					game.sfx.play("cross", 1.0, -2.0)
 					game.hud.flash_text(Txt.t("crossfire"), e.pos)
-					_hit(e, 60.0, d, e.pos, true)
+					_hit(e, game.sv("crossfire"), d, e.pos, true)
 			if bullet.state != Bullets.ORBIT:
 				game.bullets.on_enemy_hit(bullet, q, d, ret)
 
@@ -330,7 +330,7 @@ func _hit(e: E, dmg: float, dir: Vector2, at: Vector2, ret: bool) -> void:
 					best = o
 			if best != null:
 				game.fx.spark(e.pos, (best.pos - e.pos).normalized() * 900.0, 0.15, Pal.red(1.0, 2.6), 2.0, 20.0)
-				blast_hit(best, (best.pos - e.pos).normalized(), excess * 0.5)
+				blast_hit(best, (best.pos - e.pos).normalized(), excess * game.sv("overkill") / 100.0)
 		if ret and game.pass_active:
 			game.on_pass_kill(e.pos)
 
@@ -390,10 +390,11 @@ func burn_hit(e: E, dir: Vector2, dmg: float) -> void:
 
 # Aftershock damage: no recall bonus and no chain of its own.
 func aftershock_hit(e: E, dir: Vector2) -> void:
-	e.hp -= 25.0
+	var dmg: float = game.sv("aftershock")
+	e.hp -= dmg
 	e.flash = 1.0
 	e.knock += dir * 260.0
-	game.fx.number(e.pos, 25.0, true)
+	game.fx.number(e.pos, dmg, true)
 	if e.hp <= 0.0:
 		_die(e, dir)
 
@@ -541,7 +542,7 @@ func step(dt: float) -> void:
 					_magnet(e, dt)
 				var spd: float = game.enemy_speed() * game.stasis.slow_at(e.pos)
 				if game.has("magnetic_tip") and _near_round(e.pos, 120.0):
-					spd *= 0.7
+					spd *= 1.0 - game.sv("magnetic_tip") / 100.0
 				var intended: Vector2 = e.pos + (e.vel * spd + e.knock) * dt
 				e.knock *= exp(-7.0 * dt)
 				e.pos = game.arena.push_circle(intended, e.r)

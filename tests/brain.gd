@@ -188,8 +188,8 @@ func think(game) -> void:
 				bot.dash = true
 	if game.scan_rings.active():
 		var nb: int = game.scan_rings.last_beat + 1
-		for ri in 4:
-			var rc: Vector2 = ScanRings.SPOTS[ri]
+		for ri in game.scan_rings.spots.size():
+			var rc: Vector2 = game.scan_rings.spots[ri]
 			var rd: float = rc.distance_to(p)
 			if rd < ScanRings.R + 30.0 and (game.scan_rings.lit[ri] or game.scan_rings.lit_on(ri, nb)):
 				move += (p - rc) / maxf(rd, 1.0) * 2.0

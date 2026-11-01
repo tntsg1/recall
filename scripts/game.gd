@@ -90,6 +90,12 @@ var victory_slow := 0.0
 var chapter := 0
 var cracks := CRACKS
 var relics: Array[String] = []
+var stars := {}               # relics above rank 1: id -> rank
+const S_PICK := 3             # S ranks that bring one more pick
+var s_count := 0
+var s_paid_until := 0.0       # the S dots stay lit till then
+var extra_pick := false       # the pick on screen is a bonus one
+const REPLACE_HOLD := 0.4     # the replace page takes no input this soon
 var rerolls := 1
 var undying_used := false
 var armed := {"overload": false, "firststrike": false, "stasis": false, "ward": false, "longhold": false, "slowfield": false, "tempo": false, "haste": false, "calm_mind": false, "card_luck": false}
@@ -523,14 +529,14 @@ func _apply_loadout() -> void:
 func gun_dmg() -> float:
 	var m := Loadout.dmg_mult()
 	if has("glass_cannon"):
-		m *= 1.4
+		m *= 1.0 + sv("glass_cannon") / 100.0
 	if has("apex"):
 		var n := 0
 		for k in lv:
 			if lv[k] >= 3:
 				n += 1
 		if n >= 3:
-			m *= 1.5
+			m *= sv("apex")
 	return m
 
 
@@ -548,21 +554,30 @@ func has(id: String) -> bool:
 	return relics.has(id)
 
 
+func star(id: String) -> int:
+	return int(stars.get(id, 1))
+
+
+# A relic's number at the rank you hold it.
+func sv(id: String) -> float:
+	return Cards.sv(id, star(id))
+
+
 func fire_interval() -> float:
-	var k := 0.8 if has("quick") else 1.0
+	var k := 1.0 / (1.0 + sv("quick") / 100.0) if has("quick") else 1.0
 	if has("heavy"):
 		k *= 1.1
 	if wave_tempo:
 		k *= 0.6
 	if has("steady") and player.vel.length() < 30.0:
-		k *= 0.7
+		k /= 1.0 + sv("steady") / 100.0
 	return FIRE_INTERVAL * k * Loadout.fire_mult()
 
 
 func focus_max() -> float:
 	if wave_longhold:
 		return 3.0
-	return (2.0 if has("stillheart") else FOCUS_MAX) + (0.3 if has("deep_focus") else 0.0)
+	return (sv("stillheart") if has("stillheart") else FOCUS_MAX) + (sv("deep_focus") if has("deep_focus") else 0.0)
 
 
 func slow_min() -> float:
@@ -570,42 +585,40 @@ func slow_min() -> float:
 
 
 func embed_life() -> float:
-	return 20.0 if has("longfuse") else Bullets.LIFE
+	return sv("longfuse") if has("longfuse") else Bullets.LIFE
 
 
 func out_dmg() -> float:
-	return Bullets.OUT_DMG * (1.5 if has("whet") else 1.0) * gun_dmg()
+	return Bullets.OUT_DMG * (1.0 + sv("whet") / 100.0 if has("whet") else 1.0) * gun_dmg()
 
 
 # Multiplier on every returning hit of the current recall.
 func ret_mult() -> float:
 	var m := 1.0
 	if has("chain"):
-		m *= 1.0 + 0.06 * pass_hits
+		m *= 1.0 + sv("chain") / 100.0 * pass_hits
 	if has("zeroblade"):
-		m *= minf(4.0, pow(1.08, pass_hits))
+		m *= minf(4.0, pow(sv("zeroblade"), pass_hits))
 	if has("reaper"):
-		m *= 1.0 + 0.12 * pass_kills
+		m *= 1.0 + sv("reaper") / 100.0 * pass_kills
 	if pass_overload:
 		m *= 3.0
 	if pass_focus:
-		m *= 1.4
+		m *= 1.0 + sv("focus_lens") / 100.0
 	if pass_big:
-		m *= 2.0
+		m *= sv("eclipse")
 	if pass_beat:
-		m *= 1.3
+		m *= 1.0 + sv("downbeat") / 100.0
 	if has("crescendo"):
-		m *= 1.0 + 0.25 * crescendo
+		m *= 1.0 + minf(1.0, sv("crescendo") / 100.0 * crescendo)
 	if grit_t > 0.0:
-		m *= 1.2
+		m *= 1.0 + sv("grit") / 100.0
 	if has("fortress"):
-		m *= 1.0 + 0.08 * (max_cracks - cracks)
+		m *= 1.0 + sv("fortress") / 100.0 * (max_cracks - cracks)
 	if wave_calm:
 		m *= 1.2
-	if has("fortress"):
-		m *= 1.0 + 0.08 * (max_cracks - cracks)
 	if has("keen_edge"):
-		m *= 1.15
+		m *= 1.0 + sv("keen_edge") / 100.0
 	return m * gun_dmg()
 
 
@@ -619,11 +632,11 @@ func enemy_speed() -> float:
 func out_mult() -> float:
 	var m := 1.0
 	if has("heavy"):
-		m *= 1.25
+		m *= 1.0 + sv("heavy") / 100.0
 	if grit_t > 0.0:
-		m *= 1.2
+		m *= 1.0 + sv("grit") / 100.0
 	if has("overflow") and ammo >= mag - 1:
-		m *= 1.4
+		m *= 1.0 + sv("overflow") / 100.0
 	return m
 
 
@@ -941,10 +954,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event is InputEventKey and event.pressed and not event.echo:
 			var kc: int = event.physical_keycode
 			if kc >= KEY_1 and kc <= KEY_5:
-				replace_slot(kc - KEY_1)
-			elif kc == KEY_0 or kc == KEY_X:
+				replace_key(kc - KEY_1)
+			elif (kc == KEY_0 or kc == KEY_X) and hud.rep_t >= REPLACE_HOLD:
 				replace_slot(-1)
-		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and hud.rep_t >= REPLACE_HOLD:
 			var j: int = hud.replace_at(hud.reticle)
 			if j != -2:
 				replace_slot(j)
@@ -1192,7 +1205,7 @@ func _release() -> void:
 	last_release = real_time
 	pass_big = has("eclipse") and n >= 12
 	if pass_big:
-		hud.flash_text(Cards.relic_name("eclipse") + "  ×2")
+		hud.flash_text(Cards.relic_name("eclipse") + "  ×" + Cards.num(sv("eclipse")))
 	pass_active = true
 	pass_hits = 0
 	pass_kills = 0
@@ -1269,7 +1282,7 @@ func _update_fire(sdt: float, dt: float) -> void:
 		bullets.twin(at, dir.rotated(randf_range(-0.09, 0.09)))
 	if ammo == 0 and has("spare_round") and not spare_used:
 		spare_used = true
-		bullets.quick_home(3)
+		bullets.quick_home(int(sv("spare_round")))
 	player.kick()
 	player.pop_tick(ammo, false)
 	hud.fired()
@@ -1310,14 +1323,14 @@ func _update_pass() -> void:
 		pass_focus = false
 		pass_big = false
 		if has("echo") and pass_first != null and pass_first.state == Enemies.ALIVE and pass_hits > 0:
-			enemies.blast_hit(pass_first, Vector2.UP, 6.0 * pass_hits)
+			enemies.blast_hit(pass_first, Vector2.UP, sv("echo") * pass_hits)
 			fx.ring(pass_first.pos, 6.0, 60.0, 0.4, Pal.red(0.9, 2.4), 2.0)
 		if has("singularity") and pass_hits >= 20:
 			hud.flash_text(Cards.relic_name("singularity"))
 			fx.ring(player.pos, 20.0, 1600.0, 1.0, Pal.red(0.9, 2.4), 4.0)
 			for e in enemies.list:
 				if e.state == Enemies.ALIVE:
-					enemies.blast_hit(e, Vector2.UP, 50.0)
+					enemies.blast_hit(e, Vector2.UP, sv("singularity"))
 		pass_first = null
 		if pass_hits > 0:
 			hud.combo_end()
@@ -1368,7 +1381,7 @@ func on_embed(b, normal: Vector2) -> void:
 	if has("spark") and not b.foe:
 		for e in enemies.list:
 			if e.state == Enemies.ALIVE and e.pos.distance_to(p) < 30.0 + e.r:
-				enemies.blast_hit(e, (e.pos - p).normalized(), 6.0)
+				enemies.blast_hit(e, (e.pos - p).normalized(), sv("spark"))
 	if bullets.list.size() > 250:
 		# a storm of split rounds: one quiet mark each
 		fx.flash(p, 14.0, 0.1, Pal.ink(0.4, 1.3))
@@ -1389,7 +1402,7 @@ func on_target_hit(ret: bool) -> void:
 		pass_hits += 1
 		if has("vampire"):
 			pierce_bank += 1
-			if pierce_bank >= 40:
+			if pierce_bank >= int(sv("vampire")):
 				pierce_bank = 0
 				if cracks < max_cracks:
 					cracks += 1
@@ -1561,7 +1574,7 @@ func _beat_events() -> void:
 				fx.ring(b.pos, 4.0, 50.0, 0.3, Pal.red(0.8, 2.2), 1.5)
 				for e in enemies.list:
 					if e.state == Enemies.ALIVE and e.pos.distance_to(b.pos) < 50.0 + e.r:
-						enemies.blast_hit(e, (e.pos - b.pos).normalized(), 8.0)
+						enemies.blast_hit(e, (e.pos - b.pos).normalized(), sv("beat_heart"))
 
 
 func on_pass_kill(at: Vector2) -> void:
@@ -1627,10 +1640,13 @@ func choose(i: int) -> void:
 			lv[c.id] += 1
 			_check_schools()
 		"relic":
-			if relics.size() >= Cards.RELIC_SLOTS:
+			if c.has("star"):
+				_star_up(c.id)
+			elif relics.size() >= Cards.RELIC_SLOTS:
 				_ask_replace(c)
 				return
-			_gain_relic(c.id)
+			else:
+				_gain_relic(c.id)
 		"item":
 			_use_item(c.id)
 	wave_ctl.pick_done()
@@ -1652,6 +1668,24 @@ func _ask_replace(c: Dictionary) -> void:
 	hud.show_replace(c)
 
 
+# A number key on the replace page. The page ignores the first moment, so a
+# key still going down from the pick can't land here, and anything hard won
+# takes a second press: the first only shows what it would cost.
+func replace_key(j: int) -> void:
+	if hud.rep_t < REPLACE_HOLD:
+		return
+	var dear := false
+	if replacing.type == "school":
+		var held: Array = hud._held_schools()
+		dear = j < held.size() and lv[held[j]] >= 3
+	else:
+		dear = j < relics.size() and star(relics[j]) >= 2
+	if dear and hud.rep_armed != j:
+		hud.rep_armed = j
+		return
+	replace_slot(j)
+
+
 # j = slot to give up, -1 = keep what you have and drop the new card
 func replace_slot(j: int) -> void:
 	if replacing.is_empty():
@@ -1665,8 +1699,11 @@ func replace_slot(j: int) -> void:
 					held.append(k)
 			if j >= held.size():
 				return
+			# the new school takes up where the old one stood
+			var keep: int = lv[held[j]]
 			lv[held[j]] = 0
-			lv[c.id] = 1
+			lv[c.id] = keep
+			_check_schools()
 		else:
 			if j >= relics.size():
 				return
@@ -1704,18 +1741,31 @@ func _gain_relic(id: String) -> void:
 		hud.ammo_in()
 
 
+# The same relic again: it rises a rank.
+func _star_up(id: String) -> void:
+	var was := sv(id)
+	stars[id] = star(id) + 1
+	if id == "deepmag" or id == "reserve":
+		var more := int(sv(id) - was)
+		mag += more
+		ammo += more
+		hud.ammo_in()
+	sfx.play("relic", 1.2, -3.0)
+
+
 func _lose_relic(id: String) -> void:
 	if id == "glass_cannon":
 		max_cracks += 1
 	if id == "reserve":
-		mag -= 3
+		mag -= int(sv(id))
 		ammo = mini(ammo, mag)
 	if id == "thick":
 		max_cracks -= 1
 		cracks = mini(cracks, max_cracks)
 	if id == "deepmag":
-		mag -= 6
+		mag -= int(sv(id))
 		ammo = mini(ammo, mag)
+	stars.erase(id)
 
 
 func _use_item(id: String) -> void:
@@ -1789,7 +1839,7 @@ func run_snapshot() -> Dictionary:
 		"plan": wave_ctl.plan.duplicate(true), "phoenix_used": phoenix_used,
 		"undying_used": undying_used, "waves_cleared": waves_cleared,
 		"v": 3, "chapter": chapter, "story": Chapters.story(chapter), "wave": wave_ctl.index, "gun": Loadout.gun, "stake": Loadout.stake,
-		"cracks": cracks, "max_cracks": max_cracks, "relics": relics.duplicate(), "lv": lv.duplicate(),
+		"cracks": cracks, "max_cracks": max_cracks, "relics": relics.duplicate(), "stars": stars.duplicate(), "s_count": s_count, "lv": lv.duplicate(),
 		"armed": armed.duplicate(), "rerolls": rerolls, "run_time": run_time, "kills": kills,
 		"hits_taken": hits_taken, "chapter_hits": chapter_hits, "max_combo": max_combo, "crosses": crosses,
 		"crit_recalls": crit_recalls, "steals": steals, "run_ach": run_ach.duplicate(),
@@ -1817,6 +1867,12 @@ func _resume(snap: Dictionary) -> void:
 	for id in snap.get("relics", []):
 		if Cards.RELICS.has(id):
 			_gain_relic(id)
+	var saved_stars: Dictionary = snap.get("stars", {})
+	for id in saved_stars:
+		if relics.has(id):
+			for n in int(saved_stars[id]) - 1:
+				_star_up(id)
+	s_count = int(snap.get("s_count", 0))
 	var slv: Dictionary = snap.get("lv", {})
 	for k in slv:
 		lv[k] = int(slv[k])
@@ -1935,6 +1991,16 @@ func on_wave_clear(index: int, time: float, grade: String) -> void:
 	waves_cleared += 1
 	if rooms.active and rooms.risky_now and index < Waves.BOSS:
 		rooms.bonus += 1
+	if grade == "S" and tutorial == null:
+		s_count += 1
+		# under the wave's stamp
+		var under := Vector2(960.0, 520.0)
+		if s_count % S_PICK == 0:
+			rooms.bonus += 1
+			s_paid_until = real_time + 2.0
+			hud.flash_text(Txt.t("s_bonus"), under)
+		else:
+			hud.flash_text(Txt.t("s_count") % [s_count % S_PICK, S_PICK, S_PICK - s_count % S_PICK], under)
 	if has("second_wind") and waves_cleared % 3 == 0 and cracks < max_cracks:
 		cracks += 1
 		hud.crack_mend(cracks)

@@ -492,12 +492,12 @@ func recall(from: Vector2) -> int:
 			b.dmg *= 1.0 + 0.1 * minf(b.life, 10.0 if cl == 1 else 20.0)
 		b.piercer = cl >= 3 and b.life >= 8.0
 		if game.has("edge"):
-			b.dmg *= pow(1.25, b.bends)
+			b.dmg *= pow(1.0 + game.sv("edge") / 100.0, b.bends)
 		b.orbited = false
 		# Critical Hold: a round about to go out comes back twice as hard
 		b.crit = game.has("critical") and life_max - b.life <= 3.0
 		if b.crit:
-			b.dmg *= 2.0
+			b.dmg *= game.sv("critical")
 			game.fx.flash(b.pos, 30.0, 0.25, Pal.you(0.8, 2.2))
 			game.sfx.play("crit", randf_range(0.95, 1.1), -6.0)
 	_shadows(c, gap)
@@ -527,7 +527,7 @@ func _shadows(c: Array[B], gap: float) -> void:
 		s.t = 0.0
 		s.delay = b.delay + 0.3
 		s.light = 1.0
-		s.dmg = b.dmg * (0.6 if encore else 0.5)
+		s.dmg = b.dmg * (game.sv("encore") / 100.0 if encore else 0.5)
 		s.seed = randf() * 100.0
 		list.append(s)
 
@@ -651,7 +651,7 @@ func _fly(b: B, dt: float) -> void:
 	if not b.foe and game.vents.active():
 		game.vents.pull_round(b, dt)
 	var a := b.pos
-	var to := a + b.dir * SPEED * (1.3 if game.has("long_barrel") and not b.foe else 1.0) * (2.0 if Loadout.gun == "rail" and not b.foe else 1.0) * dt
+	var to: Vector2 = a + b.dir * SPEED * (1.0 + game.sv("long_barrel") / 100.0 if game.has("long_barrel") and not b.foe else 1.0) * (2.0 if Loadout.gun == "rail" and not b.foe else 1.0) * dt
 	if b.foe:
 		var hw: Dictionary = game.arena.raycast(a, to)
 		if hw:
@@ -748,7 +748,7 @@ func _fly(b: B, dt: float) -> void:
 			b.bounces -= 1
 			b.bends += 1
 			if game.has("edge"):
-				b.dmg *= 1.25
+				b.dmg *= 1.0 + game.sv("edge") / 100.0
 			b.set_head(h.point)
 			b.dir = b.dir.bounce(h.normal)
 			b.pos = h.point + h.normal * 0.5
@@ -824,7 +824,7 @@ func _bend(b: B, at: Vector2, new_dir: Vector2, nudge: Vector2 = Vector2.ZERO) -
 	if b.bends >= 8:
 		game.ach("mirror8")
 	if game.has("edge"):
-		b.dmg *= 1.25
+		b.dmg *= 1.0 + game.sv("edge") / 100.0
 	b.set_head(at)
 	b.dir = new_dir.normalized()
 	b.pos = at + (nudge * 0.5 if nudge != Vector2.ZERO else b.dir * 0.5)
@@ -835,7 +835,7 @@ func _bend(b: B, at: Vector2, new_dir: Vector2, nudge: Vector2 = Vector2.ZERO) -
 
 func _return(b: B, dt: float) -> void:
 	var s0 := b.s
-	var s1 := maxf(0.0, s0 - RETURN_SPEED * (1.3 if game.has("quick_recall") else 1.0) * dt)
+	var s1 := maxf(0.0, s0 - RETURN_SPEED * (1.0 + game.sv("quick_recall") / 100.0 if game.has("quick_recall") else 1.0) * dt)
 	var pts := b.sub(s0, s1)
 	if b.zero_pass:
 		for k0 in pts.size() - 1:
@@ -972,7 +972,7 @@ func _orbit(b: B, dt: float) -> void:
 	if b.hit_clear <= 0.0:
 		b.hit_clear = 0.25
 		b.hit.clear()
-	b.dmg = ORBIT_DMG * (1.5 if game.has("wide_ring") else 1.0)
+	b.dmg = ORBIT_DMG * (1.0 + game.sv("wide_ring") / 100.0 if game.has("wide_ring") else 1.0)
 	game.enemies.sweep(prev, p, b, false)
 	b.orbit_left -= dt
 	if b.orbit_left <= 0.0:
