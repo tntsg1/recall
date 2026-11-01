@@ -10,11 +10,12 @@ signal closed
 var game
 var old_mouse := Input.MOUSE_MODE_HIDDEN
 
-const ROWS := ["enable", "damage", "retries", "back"]
+const ROWS := ["enable", "damage", "taken", "retries", "back"]
 const ROW_W := 720.0
 const ROW_H := 58.0
 const DAMAGE := [0, 20, 40, 60, 80]
-const RETRIES := [0, 1, 3, 5]
+const TAKEN := [100, 80, 60, 40, 20]
+const RETRIES := [0, 1, 3, 5, Settings.RETRY_ALL]
 
 var view: Control
 var font_s: Font
@@ -59,11 +60,11 @@ func _vp() -> Vector2:
 
 func _row_rect(i: int) -> Rect2:
 	var vp := _vp()
-	var top := vp.y * 0.5 - 150.0
+	var top := vp.y * 0.5 - 206.0
 	return Rect2(vp.x / 2.0 - ROW_W / 2.0, top + i * ROW_H, ROW_W, ROW_H - 10.0)
 
 
-# A row the cursor may rest on: the two values only while assist is on.
+# A row the cursor may rest on: the values only while assist is on.
 func _usable(i: int) -> bool:
 	return ROWS[i] in ["enable", "back"] or Settings.assist
 
@@ -122,7 +123,7 @@ func _gui(event: InputEvent) -> void:
 		if i < 0 or not _usable(i):
 			return
 		sel = i
-		if ROWS[i] in ["damage", "retries"]:
+		if ROWS[i] in ["damage", "taken", "retries"]:
 			# the left third steps down, the rest steps up
 			var r := _row_rect(i)
 			_change(i, -1 if event.position.x < r.position.x + r.size.x * 0.33 else 1)
@@ -154,7 +155,7 @@ func _activate(i: int) -> void:
 		"enable":
 			Settings.assist = not Settings.assist
 			Settings.save()
-		"damage", "retries":
+		"damage", "taken", "retries":
 			_change(i, 1)
 		"back":
 			close()
@@ -166,12 +167,15 @@ func _change(i: int, d: int) -> void:
 		if (d > 0) != Settings.assist:
 			_activate(i)
 		return
-	if not (key in ["damage", "retries"]) or not Settings.assist:
+	if not (key in ["damage", "taken", "retries"]) or not Settings.assist:
 		return
 	val_old = _value(i)
 	if key == "damage":
 		var at := DAMAGE.find(int(Settings.damage_reduction))
 		Settings.damage_reduction = DAMAGE[clampi(maxi(at, 0) + d, 0, DAMAGE.size() - 1)]
+	elif key == "taken":
+		var at := TAKEN.find(int(Settings.damage_taken))
+		Settings.damage_taken = TAKEN[clampi(maxi(at, 0) + d, 0, TAKEN.size() - 1)]
 	else:
 		var at := RETRIES.find(Settings.retry_limit)
 		Settings.retry_limit = RETRIES[clampi(maxi(at, 0) + d, 0, RETRIES.size() - 1)]
@@ -186,9 +190,11 @@ func _change(i: int, d: int) -> void:
 func _value(i: int) -> String:
 	match ROWS[i]:
 		"damage":
-			return "%d%%" % int(Settings.damage_reduction)
+			return "%d%%" % (100 - int(Settings.damage_reduction))
+		"taken":
+			return "%d%%" % int(Settings.damage_taken)
 		"retries":
-			return str(Settings.retry_limit)
+			return Txt.t("a_unlimited") if Settings.retry_limit == Settings.RETRY_ALL else str(Settings.retry_limit)
 	return ""
 
 
@@ -233,6 +239,8 @@ func _draw_view() -> void:
 				_draw_toggle(i, ki)
 			"damage":
 				_row(i, Txt.t("a_damage_label"), _value(i), ki, not Settings.assist)
+			"taken":
+				_row(i, Txt.t("a_taken_label"), _value(i), ki, not Settings.assist)
 			"retries":
 				_row(i, Txt.t("a_retries_label"), _value(i), ki, not Settings.assist)
 			"back":
@@ -240,8 +248,11 @@ func _draw_view() -> void:
 	# below the rows: how many retries are left, then what the two settings do
 	var kn := _k(ROWS.size() + 1)
 	var y := _row_rect(ROWS.size() - 1).end.y + 44.0
-	var status := Txt.t("a_remaining") % maxi(0, Settings.retry_limit - game.assist_retries_used) if game != null else Txt.t("a_new_run")
-	_text_c(font_b, status, Vector2(vp.x / 2.0, y), 15, Pal.ink(0.62 * kn.x) if Settings.assist else Pal.ink(0.38 * kn.x))
+	var status := Txt.t("a_remaining") % Settings.retries_left(game.assist_retries_used) if game != null else Txt.t("a_new_run")
+	var lit: Color = Pal.ink(0.62 * kn.x) if Settings.assist else Pal.ink(0.38 * kn.x)
+	_text_c(font_b, Txt.t("a_total") % roundi(Settings.damage_share() * 100.0), Vector2(vp.x / 2.0, y), 15, lit)
+	y += 26.0
+	_text_c(font_b, status, Vector2(vp.x / 2.0, y), 15, lit)
 	y += 40.0
 	for key in ["a_checkpoint", "a_fraction"]:
 		for line in Txt.wrap(font_s, Txt.t(key), 15, ROW_W - 40.0):

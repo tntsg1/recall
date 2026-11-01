@@ -35,6 +35,14 @@ func run() -> void:
 	title._set_change(1)
 	await shot("res://proofs/assist-en-on.png")
 	title.assist_panel.close()
+	await process_frame
+	Txt.zh = true
+	Settings.damage_reduction = 80
+	Settings.damage_taken = 20
+	Settings.retry_limit = Settings.RETRY_ALL
+	title._set_change(1)
+	await shot("res://proofs/assist-zh-max.png")
+	title.assist_panel.close()
 	title.queue_free()
 	await process_frame
 	Txt.zh = true

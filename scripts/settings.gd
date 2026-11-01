@@ -33,6 +33,8 @@ static var loaded := false
 static var assist := false
 static var damage_reduction := 20
 static var retry_limit := 3
+static var damage_taken := 100   # percent of a hit that reaches you, after damage_reduction
+const RETRY_ALL := 999           # retry_limit's "as many as it takes"
 
 
 static func load_all() -> void:
@@ -52,7 +54,8 @@ static func load_all() -> void:
 	keys = cf.get_value("input", "keys", {})
 	assist = bool(cf.get_value("assist", "enabled", false))
 	damage_reduction = clampi(int(cf.get_value("assist", "damage_reduction", 20)), 0, 80)
-	retry_limit = clampi(int(cf.get_value("assist", "retries", 3)), 0, 5)
+	retry_limit = clampi(int(cf.get_value("assist", "retries", 3)), 0, RETRY_ALL)
+	damage_taken = clampi(int(cf.get_value("assist", "damage_taken", 100)), 20, 100)
 
 
 static func save() -> void:
@@ -68,7 +71,21 @@ static func save() -> void:
 	cf.set_value("assist", "enabled", assist)
 	cf.set_value("assist", "damage_reduction", damage_reduction)
 	cf.set_value("assist", "retries", retry_limit)
+	cf.set_value("assist", "damage_taken", damage_taken)
 	cf.save(_path())
+
+
+# The share of a hit that lands: the two assist settings multiply.
+static func damage_share() -> float:
+	return (1.0 - damage_reduction / 100.0) * damage_taken / 100.0
+
+
+static func can_retry(used: int) -> bool:
+	return retry_limit == RETRY_ALL or used < retry_limit
+
+
+static func retries_left(used: int) -> String:
+	return Txt.t("a_unlimited") if retry_limit == RETRY_ALL else str(maxi(0, retry_limit - used))
 
 
 # Volumes, window mode, language and rebinds take effect here.

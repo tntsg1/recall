@@ -1472,7 +1472,7 @@ func on_player_hit(dir: Vector2, _e) -> bool:
 	var hurt := 2 if rooms.active and rooms.risky_now and wave_ctl.index < Waves.BOSS else 1
 	var damage := hurt
 	if Settings.assist:
-		assist_damage += hurt * (1.0 - Settings.damage_reduction / 100.0)
+		assist_damage += hurt * Settings.damage_share()
 		damage = int(floor(assist_damage + 0.00001))
 		assist_damage = maxf(0.0, assist_damage - damage)
 	cracks -= damage
@@ -1515,7 +1515,7 @@ func on_player_hit(dir: Vector2, _e) -> bool:
 
 
 func _game_over() -> void:
-	if Settings.assist and assist_retries_used < Settings.retry_limit and not assist_checkpoint.is_empty():
+	if Settings.assist and Settings.can_retry(assist_retries_used) and not assist_checkpoint.is_empty():
 		assist_retries_used += 1
 		var snap := assist_checkpoint.duplicate(true)
 		snap.assist_retries_used = assist_retries_used
@@ -1800,7 +1800,7 @@ func on_wave_start() -> void:
 	if assist_restored:
 		assist_restored = false
 		player.invuln = 2.0
-		hud.flash_text(Txt.t("a_restored") % maxi(0, Settings.retry_limit - assist_retries_used))
+		hud.flash_text(Txt.t("a_restored") % Settings.retries_left(assist_retries_used))
 	wave_half = armed.firststrike
 	armed.firststrike = false
 	wave_longhold = armed.longhold

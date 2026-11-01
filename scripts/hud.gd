@@ -1426,7 +1426,7 @@ func _pop(t: float) -> float:
 func _draw_cracks(vp: Vector2) -> void:
 	_ensure_cracks()
 	if Settings.assist:
-		_text_c(font_s, Txt.t("a_hud") % [Settings.damage_reduction, maxi(0, Settings.retry_limit - game.assist_retries_used)], Vector2(vp.x / 2.0, vp.y - 100.0), 14, Pal.ink(0.65))
+		_text_c(font_s, Txt.t("a_hud") % [roundi(Settings.damage_share() * 100.0), Settings.retries_left(game.assist_retries_used)], Vector2(vp.x / 2.0, vp.y - 100.0), 14, Pal.ink(0.65))
 	for mr in mend_rings:
 		if mr[1] < 0.0:
 			continue

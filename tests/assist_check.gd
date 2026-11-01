@@ -41,6 +41,19 @@ func run() -> void:
 	for i in 5:
 		hit()
 	check(game.cracks == 4, "80 percent reduction: five hits cost one crack")
+	Settings.damage_taken = 20
+	game.assist_damage = 0.0
+	game.cracks = 5
+	for i in 24:
+		hit()
+	check(game.cracks == 5, "20 percent of 20 percent: 24 hits cost nothing")
+	hit()
+	check(game.cracks == 4, "20 percent of 20 percent: the 25th hit costs one crack")
+	Settings.damage_taken = 100
+	Settings.retry_limit = Settings.RETRY_ALL
+	check(Settings.can_retry(5000), "unlimited retries never run out")
+	Settings.retry_limit = 1
+	check(not Settings.can_retry(1), "a limited allowance still runs out")
 	Settings.damage_reduction = 0
 	Settings.retry_limit = 1
 	game.cracks = 3
@@ -75,17 +88,20 @@ func run() -> void:
 	hit()
 	check(game.lost, "allowance exhausted: fatal hit ends the run")
 	Settings.damage_reduction = 40
-	Settings.retry_limit = 5
+	Settings.retry_limit = Settings.RETRY_ALL
+	Settings.damage_taken = 40
 	Settings.save()
 	Settings.assist = false
 	Settings.damage_reduction = 0
 	Settings.retry_limit = 0
+	Settings.damage_taken = 100
 	Settings.loaded = false
 	Settings.load_all()
-	check(Settings.assist and Settings.damage_reduction == 40 and Settings.retry_limit == 5, "assist settings survive config reload")
+	check(Settings.assist and Settings.damage_reduction == 40 and Settings.retry_limit == Settings.RETRY_ALL and Settings.damage_taken == 40, "assist settings survive config reload")
 	game.queue_free()
 	await process_frame
 	Settings.damage_reduction = 0
+	Settings.damage_taken = 100
 	Settings.retry_limit = 3
 	for chapter in 5:
 		game = load("res://scenes/main.tscn").instantiate()
