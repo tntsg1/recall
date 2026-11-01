@@ -122,7 +122,7 @@ func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
 			kinds.append(H)
 			left -= COST[H] * 2
 		_:
-			var specials := randi_range(2, 4) + chapter
+			var specials := int((randi_range(2, 4) + chapter) * Loadout.specials())
 			var mix: Array = [G, H]
 			if pool == 1:
 				mix = [G, H, P, P]
@@ -173,14 +173,19 @@ func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
 	var last := 0.0
 	for g in groups:
 		last = maxf(last, g[0])
-	var s := roundf(3.0 + 0.26 * budget + 0.45 * last)
-	if elite:
-		var ek: int = G
+	# (a stake's elite is worth about eight of budget in the time it takes)
+	var s := roundf(3.0 + 0.26 * (budget + 8 * Loadout.elites()) + 0.45 * last)
+	var elites := Loadout.elites() + (1 if elite else 0)
+	if elites > 0:
+		var ek: Array = []
 		for g in groups:
 			if g[1] != C:
-				ek = g[1]
-				break
-		groups.append([1.2, ek, 1, SIDES[randi() % 4], true])
+				ek.append(g[1])
+		# (a wave of chasers: the first chapters' get a chaser, not a shield yet)
+		if ek.is_empty():
+			ek.append(G if chapter >= 2 else C)
+		for k in elites:
+			groups.append([1.2 + k * 1.6, ek[randi() % ek.size()], 1, SIDES[randi() % 4], true])
 	return {"groups": groups, "par": [s, roundf(s * 1.5)]}
 
 

@@ -169,7 +169,7 @@ func _draw() -> void:
 			var sk: float = 1.0 - float(streak[j][1]) / 0.35
 			# (the tail's first 40% thins and fades to nothing)
 			var tail := clampf(float(j) / maxf(sn * 0.4, 1.0), 0.0, 1.0)
-			Fx.tube(self, PackedVector2Array([streak[j][0] - pos, streak[j + 1][0] - pos]), Pal.you(0.9 * sk * tail, 2.4), 1.0 + 4.0 * sk * tail, 13.0, 0.09)
+			Fx.tube(self, PackedVector2Array([streak[j][0] - pos, streak[j + 1][0] - pos]), Loadout.trail_color(Loadout.trail, 0.9 * sk * tail, 2.4, float(j) / maxf(sn, 1.0)), 1.0 + 4.0 * sk * tail, 13.0, 0.09)
 	# lit from inside while dodging, or as light comes home
 	var glow_k := maxf(light, clampf(dash_t / DASH_TIME, 0.0, 1.0) * 0.8)
 	if glow_k > 0.0:

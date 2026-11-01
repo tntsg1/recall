@@ -107,6 +107,7 @@ var steals := 0
 var rerolled := false
 var chapter_hits := 0
 var run_ach: Array = []
+var run_opened := -1         # the stake this run finished for the first time
 var wave_haste := false
 var wave_calm := false
 var encore_ready := false
@@ -1964,11 +1965,7 @@ func on_chapter_clear() -> void:
 	var badge: String = Chapters.BOSS_ACH.get(Chapters.boss(chapter), "")
 	if badge != "":
 		ach(badge)
-	if Loadout.at_least(7):
-		rerolls = maxi(rerolls, 0 if Loadout.at_least(2) else 1) + (1 if has("lucky") else 0)
-		undying_used = false
-		return
-	cracks = mini(max_cracks, cracks + 2)
+	cracks = mini(max_cracks, cracks + Loadout.mend())
 	hud.crack_mend(cracks)
 	sfx.play("mend", 0.9, -2.0)
 	rerolls = maxi(rerolls, 0 if Loadout.at_least(2) else 1) + (1 if has("lucky") else 0)
@@ -2049,7 +2046,13 @@ func on_boss_dead(at: Vector2) -> void:
 func on_run_done(results: Array) -> void:
 	hud.final(results)
 	sfx.play("title", 0.8, -2.0)
+	if bot == null and Loadout.stake > int(Meta.load_data().stake_won):
+		run_opened = Loadout.stake
 	Meta.record_run(self, true)
+	# a colour just earned goes on straight away; the title's row changes it back
+	if run_opened >= 0:
+		Loadout.trail = run_opened + 1
+		Meta.choose_trail(Loadout.trail)
 	if bot == null:
 		Meta.clear_run()
 	ach("win")

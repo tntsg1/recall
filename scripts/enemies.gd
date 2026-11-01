@@ -102,7 +102,7 @@ func spawn(kind: int, pos: Vector2, delay: float = 0.0) -> E:
 	e.pos = pos
 	e.hp = s.hp
 	e.maxhp = s.hp
-	e.hp *= Loadout.enemy_hp()
+	e.hp *= Loadout.enemy_hp() * Loadout.chapter_hp(game.chapter)
 	e.maxhp = e.hp
 	if game.wave_half:
 		e.hp *= 0.5

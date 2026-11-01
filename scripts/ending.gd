@@ -19,6 +19,8 @@ const CARD_TIME := 3.6
 const CARD_KEYS := ["end_1", "face", "end_3", "door", "end_5"]
 const SCENE_LINE := {"face": "end_2", "door": "end_4"}
 const SCENE_TIME := 5.2
+const RED_CARD := "end_6"     # finishing on the top stake earns one more card
+const LINE_W := 1500.0
 const STORIES := 11
 
 var game
@@ -32,6 +34,7 @@ var card_t := 0.0
 var fire_prev := true
 var lit := 0.0
 var home_n := 0
+var keys: Array = CARD_KEYS
 
 
 func _init() -> void:
@@ -48,6 +51,7 @@ func finished() -> bool:
 
 
 func start(at: Vector2) -> void:
+	keys = CARD_KEYS + [RED_CARD] if Loadout.at_least(7) else CARD_KEYS
 	state = QUIET
 	t = 0.0
 	core = Vector2(960, 540)     # the seal at the hall's centre, where every order came from
@@ -143,17 +147,32 @@ func step(dt: float) -> void:
 			if card_t >= hold or (click and card_t > 0.8):
 				card += 1
 				card_t = 0.0
-				if card > CARD_KEYS.size():
+				if card > keys.size():
 					state = DONE
 	queue_redraw()
 
 
 func _hold() -> float:
-	if card >= CARD_KEYS.size():
+	if card >= keys.size():
 		return CARD_TIME * 1.8
-	if CARD_KEYS[card] == "face":
+	if keys[card] == "face":
 		return SCENE_TIME + 1.6
-	return SCENE_TIME if SCENE_LINE.has(CARD_KEYS[card]) else CARD_TIME
+	return SCENE_TIME if SCENE_LINE.has(keys[card]) else CARD_TIME
+
+
+# A long line split at its words so it stays on the screen.
+func _lines(txt: String, f: Font, fs: int) -> Array:
+	var out: Array = []
+	var cur := ""
+	for w in txt.split(" "):
+		var next: String = w if cur == "" else cur + " " + w
+		if cur != "" and f.get_string_size(next, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > LINE_W:
+			out.append(cur)
+			cur = w
+		else:
+			cur = next
+	out.append(cur)
+	return out
 
 
 # ---------------------------------------------------------------- drawing
@@ -222,25 +241,31 @@ func _draw() -> void:
 	var a := clampf(card_t / 0.6, 0.0, 1.0)
 	var hold := _hold()
 	a *= 1.0 - clampf((card_t - (hold - 0.6)) / 0.6, 0.0, 1.0)
-	if card < CARD_KEYS.size() and SCENE_LINE.has(CARD_KEYS[card]):
-		if CARD_KEYS[card] == "face":
+	if card < keys.size() and SCENE_LINE.has(keys[card]):
+		if keys[card] == "face":
 			_draw_face(a)
 		else:
 			_draw_door(a)
-		var st := Txt.t(SCENE_LINE[CARD_KEYS[card]])
-		var sw := light_f.get_string_size(st, HORIZONTAL_ALIGNMENT_LEFT, -1, 28).x
 		# the face's line only once the face is gone
-		var after := 4.3 if CARD_KEYS[card] == "face" else 0.8
+		var after := 4.3 if keys[card] == "face" else 0.8
 		var sa := a * clampf((card_t - after) / 0.6, 0.0, 1.0)
-		draw_string(light_f, Vector2(960.0 - sw * 0.5, 840.0), st, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Pal.ink(0.92 * sa, 1.2))
-	elif card < CARD_KEYS.size():
-		var txt := Txt.t(CARD_KEYS[card])
+		var sl := _lines(Txt.t(SCENE_LINE[keys[card]]), light_f, 28)
+		for j in sl.size():
+			var sw := light_f.get_string_size(sl[j], HORIZONTAL_ALIGNMENT_LEFT, -1, 28).x
+			draw_string(light_f, Vector2(960.0 - sw * 0.5, 840.0 + j * 42.0), sl[j], HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Pal.ink(0.92 * sa, 1.2))
+	elif card < keys.size():
 		var fs := 30
-		var w := light_f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string(light_f, Vector2(960.0 - w * 0.5, 548.0), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.92 * a, 1.2))
+		var ls := _lines(Txt.t(keys[card]), light_f, fs)
+		var w := 0.0
+		var y := 548.0 - (ls.size() - 1) * 23.0
+		for j in ls.size():
+			var lw := light_f.get_string_size(ls[j], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			w = maxf(w, lw)
+			draw_string(light_f, Vector2(960.0 - lw * 0.5, y + j * 46.0), ls[j], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.92 * a, 1.2))
 		# a thin rule that draws itself under it
 		var rl := w * Pal.ease_out(clampf(card_t / 1.4, 0.0, 1.0))
-		draw_line(Vector2(960.0 - rl * 0.5, 576.0), Vector2(960.0 + rl * 0.5, 576.0), Pal.ink(0.3 * a), 1.0)
+		var ry := y + (ls.size() - 1) * 46.0 + 28.0
+		draw_line(Vector2(960.0 - rl * 0.5, ry), Vector2(960.0 + rl * 0.5, ry), Pal.ink(0.3 * a), 1.0)
 	else:
 		var title := Txt.t("end_title")
 		var tw := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 92).x

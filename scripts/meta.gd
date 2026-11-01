@@ -203,6 +203,25 @@ static func stake_open(i: int) -> bool:
 
 
 # Returns true the first time.
+static func stake_done(i: int) -> bool:
+	return int(load_data().stake_won) >= i
+
+
+static func trail_open(i: int) -> bool:
+	return i == 0 or test_mode or dev_unlock or int(load_data().stake_won) >= i - 1
+
+
+# The trail the player chose, if they still hold it.
+static func saved_trail() -> int:
+	var i := clampi(int(load_data().get("trail", 0)), 0, Loadout.TRAILS.size() - 1)
+	return i if trail_open(i) else 0
+
+
+static func choose_trail(i: int) -> void:
+	load_data().trail = i
+	save()
+
+
 static func achieve(id: String) -> bool:
 	if training_active:
 		return false

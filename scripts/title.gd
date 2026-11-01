@@ -19,7 +19,7 @@ const LETTERS := {
 	" ": [],
 }
 const UNIT := 22.0
-const MENU := ["start", "trial", "tutorial", "gun", "stake", "achievements", "archive", "settings", "quit"]
+const MENU := ["start", "trial", "tutorial", "gun", "stake", "trail", "achievements", "archive", "settings", "quit"]
 const SETTINGS := ["master", "music", "sfx", "shake", "soft", "fullscreen", "lang", "keys", "assist", "back"]
 const ROW_H := 58.0
 const ROW_W := 520.0
@@ -38,6 +38,7 @@ var sel := {"menu": 0, "settings": 0, "keys": 0}
 var waiting_key := ""
 var guns: Array = []
 var gun_i := 0
+var trail_i := 0
 var hover := -1
 var font_l: Font
 var font_s: Font
@@ -83,6 +84,8 @@ func _ready() -> void:
 	font_xl = Fonts.get_font("Medium")
 	guns = Loadout.GUNS.keys()
 	gun_i = maxi(0, guns.find(Loadout.gun))
+	Loadout.trail = Meta.saved_trail()
+	trail_i = Loadout.trail
 	sfx = Sfx.new()
 	add_child(sfx)
 	sfx.start_chapter(0)
@@ -196,7 +199,9 @@ func _row_top() -> float:
 	return _vp().y * (_menu_top() if page == "menu" else 0.40)
 
 func _menu_top() -> float:
-	return 0.46 if _menu().size() >= 8 else 0.52
+	if _menu().size() >= 11:
+		return 0.415
+	return 0.44 if _menu().size() >= 8 else 0.52
 
 
 func _row_rect(i: int, pg: String = "") -> Rect2:
@@ -204,7 +209,7 @@ func _row_rect(i: int, pg: String = "") -> Rect2:
 	var on := pg if pg != "" else page
 	var top := vp.y * (_menu_top() if on == "menu" else 0.40)
 	# a long menu (Continue on top) packs its rows a little closer
-	var step := 52.0 if on == "menu" and _menu().size() >= 10 else ROW_H
+	var step := 50.0 if on == "menu" and _menu().size() >= 10 else ROW_H
 	return Rect2(vp.x / 2.0 - ROW_W / 2.0, top + i * step, ROW_W, step - 10.0)
 
 
@@ -419,7 +424,7 @@ func _press(i: int) -> void:
 func _side(d: int) -> void:
 	if page == "menu":
 		var key: String = _menu()[sel.menu]
-		if key == "gun" or key == "stake":
+		if key in ["gun", "stake", "trail"]:
 			_change_value(key, d)
 	elif page == "settings":
 		_set_change(d)
@@ -461,7 +466,7 @@ func _accept(d: int) -> void:
 					Meta.training_requested = 2
 					start_t = 0.0
 					sfx.play("release", 1.0, -2.0)
-				"gun", "stake":
+				"gun", "stake", "trail":
 					_change_value(_menu()[sel.menu], 1)
 				"achievements":
 					_go("achievements")
@@ -485,6 +490,12 @@ func _change_value(key: String, d: int) -> void:
 	val_row = key
 	if key == "gun":
 		gun_i = posmod(gun_i + d, guns.size())
+	elif key == "trail":
+		trail_i = posmod(trail_i + d, Loadout.TRAILS.size())
+		# a locked one can be looked at; the run keeps the last one you hold
+		if Meta.trail_open(trail_i):
+			Loadout.trail = trail_i
+			Meta.choose_trail(trail_i)
 	else:
 		Loadout.stake = posmod(Loadout.stake + d, Loadout.STAKES.size())
 	_tick(1.1 + 0.05 * d)
@@ -494,7 +505,14 @@ func _value_text(key: String) -> String:
 	if key == "gun":
 		var gid: String = guns[gun_i]
 		return Loadout.gun_name(gid) + ("" if Meta.gun_open(gid) else "  ·  " + Txt.t("t_locked"))
-	return "%d · %s" % [Loadout.stake + 1, Loadout.stake_name(Loadout.stake)] + ("" if Meta.stake_open(Loadout.stake) else "  ·  " + Txt.t("t_locked"))
+	if key == "trail":
+		return Loadout.trail_name(trail_i) + ("" if Meta.trail_open(trail_i) else "  ·  " + Txt.t("t_locked"))
+	var mark := ""
+	if not Meta.stake_open(Loadout.stake):
+		mark = "  ·  " + Txt.t("t_locked")
+	elif Meta.stake_done(Loadout.stake):
+		mark = "  ·  " + Txt.t("t_stake_done")
+	return "%d · %s" % [Loadout.stake + 1, Loadout.stake_name(Loadout.stake)] + mark
 
 
 func _set_vol(k: String, v: float) -> void:
@@ -813,6 +831,9 @@ func _draw_menu(vp: Vector2) -> void:
 				_row(i, "menu", Txt.t("t_gun"), _value_text("gun"), a, dx, not gun_ok, "gun")
 			"stake":
 				_row(i, "menu", Txt.t("t_stake"), _value_text("stake"), a, dx, not stake_ok, "stake")
+			"trail":
+				_row(i, "menu", Txt.t("t_trail"), _value_text("trail"), a, dx, not Meta.trail_open(trail_i), "trail")
+				_trail_sample(i, a, dx)
 			_:
 				_row(i, "menu", Txt.t("t_" + key), "", a, dx)
 	var pa := _page_k("menu", 0).x * menu_in
@@ -821,15 +842,27 @@ func _draw_menu(vp: Vector2) -> void:
 	if mk == "gun":
 		info = Loadout.gun_desc(gid) if gun_ok else Txt.t("t_unlock") + " · " + _unlock_text(Loadout.GUNS[gid][4])
 	elif mk == "stake":
-		var lines: Array = []
-		for k in range(1, Loadout.stake + 1):
-			lines.append(Loadout.stake_desc(k))
-		info = ("  ·  ".join(lines) if not lines.is_empty() else Loadout.stake_desc(0)) if stake_ok else Txt.t("t_stake_lock")
+		# a locked stake still shows what it would ask of you
+		info = Loadout.stake_rules(Loadout.stake)
+	elif mk == "trail":
+		info = Txt.t("t_trail_info") if Meta.trail_open(trail_i) else Txt.t("t_trail_lock") % Loadout.stake_name(trail_i - 1)
 	if info != "":
 		_text_c(font_s, info, Vector2(vp.x / 2.0, _row_rect(_menu().size(), "menu").position.y + 24), 16, Pal.ink(0.6 * pa))
 	var d := Meta.load_data()
 	var rec := Txt.t("t_records") % [int(d.runs), int(d.wins), int(round(count_roll.shown)), Ach.LIST.size()]
+	if mk == "stake" and not stake_ok:
+		rec = Txt.t("t_stake_lock")
 	_text_c(font_s, rec, Vector2(vp.x / 2.0, vp.y - 40.0), 15, Pal.ink(0.45 * pa))
+
+
+# The colour itself, a short streak beside the row's label, dim while locked.
+func _trail_sample(i: int, a: float, dx: float) -> void:
+	var r := _row_rect(i, "menu")
+	var y := r.position.y + r.size.y * 0.5 + 2.0
+	var a0 := a * (1.0 if Meta.trail_open(trail_i) else 0.3)
+	for k in 8:
+		var pts := PackedVector2Array([Vector2(r.position.x + 92.0 + dx + k * 12.0, y), Vector2(r.position.x + 104.0 + dx + k * 12.0, y)])
+		Fx.tube(self, pts, Loadout.trail_color(trail_i, a0 * (k + 1) / 8.0, 1.6, k / 8.0), 1.0 + k * 0.3, 10.0, 0.14)
 
 
 func _unlock_text(key: String) -> String:

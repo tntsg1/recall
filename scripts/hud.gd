@@ -617,7 +617,10 @@ func _draw_final(vp: Vector2) -> void:
 	var a := Pal.ease_out(t / 0.6)
 	view.draw_rect(Rect2(Vector2.ZERO, vp), Color(0, 0, 0, 0.93 * a))
 	var cx := vp.x / 2.0
-	var y := vp.y * 0.26
+	# twelve chapters need the page closer packed
+	var long_list: bool = final_rows.size() > 8
+	var row_h := 36.0 if long_list else 46.0
+	var y := vp.y * (0.1 if long_list else 0.26)
 	_text_stagger(font_xl, Txt.t("done"), Vector2(cx, y), 44, Pal.ink(1.0, 1.1), t - 0.1, -1.0, 0.06)
 	view.draw_line(Vector2(cx - 220.0 * a, y + 26.0), Vector2(cx + 220.0 * a, y + 26.0), Pal.ink(0.4 * a), 1.0)
 	var total := 0.0
@@ -627,9 +630,11 @@ func _draw_final(vp: Vector2) -> void:
 		var rt := clampf((t - 0.4 - i * 0.12) / 0.3, 0.0, 1.0)
 		if rt <= 0.0:
 			continue
-		var ry := y + 80.0 + i * 46.0
+		var ry := y + 80.0 + i * row_h
 		var ra := Pal.ease_out(rt)
 		var dx := (1.0 - ra) * 30.0
+		if i == 0:
+			view.draw_string(font_s, Vector2(cx + 150.0, y + 56.0), Txt.t("r_grades"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.4 * ra))
 		view.draw_string(font_s, Vector2(cx - 260.0 - dx, ry), row[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.6 * ra))
 		var roll := Pal.ease_out(clampf((t - 0.45 - i * 0.12) / 0.7, 0.0, 1.0))
 		view.draw_string(font_l, Vector2(cx - 10.0 - dx, ry), "%.1f s" % (row[1] * roll), HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Pal.ink(0.9 * ra))
@@ -640,7 +645,7 @@ func _draw_final(vp: Vector2) -> void:
 	var n := final_rows.size()
 	var bt := clampf((t - 0.5 - n * 0.12) / 0.4, 0.0, 1.0)
 	if bt > 0.0:
-		var by := y + 80.0 + n * 46.0 + 24.0
+		var by := y + 80.0 + n * row_h + 24.0
 		view.draw_line(Vector2(cx - 220.0, by - 22.0), Vector2(cx + 220.0, by - 22.0), Pal.ink(0.25 * bt), 1.0)
 		view.draw_string(font_s, Vector2(cx - 200.0, by + 8.0), Txt.t("total"), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.ink(0.6 * bt))
 		view.draw_string(font_l, Vector2(cx - 10.0, by + 8.0), "%.1f s" % (total * Pal.ease_out(bt)), HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Pal.ink(bt))
@@ -657,11 +662,21 @@ func _run_stats(cx: float, y: float, a: float) -> void:
 	var k := Pal.ease_out(a)
 	var line := "%s %d   ·   %s %d   ·   %s %d" % [Txt.t("r_combo"), int(round(game.max_combo * k)), Txt.t("r_cross"), int(round(game.crosses * k)), Txt.t("r_crit"), int(round(game.crit_recalls * k))]
 	_text_c(font_s, line, Vector2(cx, y), 16, Pal.ink(0.65 * a))
-	if not game.run_ach.is_empty():
-		var names: Array = []
-		for id in game.run_ach:
-			names.append(Ach.name_of(id))
+	var names: Array = []
+	if game.run_opened >= 0:
+		if game.run_opened + 1 < Loadout.STAKES.size():
+			names.append(Txt.t("r_stake") % Loadout.stake_name(game.run_opened + 1))
+		names.append(Txt.t("r_trail") % Loadout.trail_name(game.run_opened + 1))
+	for id in game.run_ach:
+		names.append(Ach.name_of(id))
+	if not names.is_empty():
 		_text_c(font_s, Txt.t("r_new") + "  " + "  ·  ".join(names.slice(0, 6)), Vector2(cx, y + 30.0), 15, Pal.ink(0.85 * a, 1.2))
+	# the colour just earned, drawn once across the page
+	if game.run_opened >= 0:
+		for j in 20:
+			var x0 := cx - 200.0 + j * 20.0 * a
+			var fade := sin(PI * (j + 0.5) / 20.0)
+			Fx.tube(view, PackedVector2Array([Vector2(x0, y + 8.0), Vector2(x0 + 20.0 * a, y + 8.0)]), Loadout.trail_color(game.run_opened + 1, 0.8 * a * fade, 1.8, j / 20.0), 1.6, 12.0, 0.14)
 
 
 # ---------------------------------------------------------------- cards and slots

@@ -31,6 +31,13 @@ static func red(a: float = 1.0, k: float = 1.0) -> Color:
 	return Color(RED.r * k, RED.g * (1.0 + (k - 1.0) * 0.08), RED.b * (1.0 + (k - 1.0) * 0.05), a)
 
 
+# Any other light, with the same web correction as ink.
+static func tint(c: Color, a: float = 1.0, k: float = 1.0) -> Color:
+	if ldr:
+		a = pow(clampf(a, 0.0, 1.0), LDR_ALPHA)
+	return Color(c.r * k, c.g * k, c.b * k, a)
+
+
 # Roles, all drawn in the same white ink: enemies and bosses, you, the walls.
 static func foe(a: float = 1.0, k: float = 1.0) -> Color:
 	return ink(a, k)
