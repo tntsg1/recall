@@ -24,7 +24,6 @@ const BAR_W := 36.0
 const BAR_WARN := 1.0
 const BAR_LIFE := [5.5, 5.0, 4.6]
 const BAR_LEN := [900.0, 980.0, 1060.0]
-const BARS_N := [2, 3, 3]
 const IDLE_TIME := [1.6, 1.3, 1.1]
 const OPEN_TIME := [4.6, 4.2, 3.8]
 const KEEP := Rect2(610, 120, 700, 440)    # the cabinet and its drawers: no bar crosses it

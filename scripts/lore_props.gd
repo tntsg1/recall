@@ -7,7 +7,6 @@ extends Node2D
 
 const REVEAL_R := 110.0      # a returning round this close wakes a remnant
 const HOLD := 2.6
-const REMNANT_OFF := {"plate": 80.0, "screen": 120.0, "scrawl": 130.0, "notice": 110.0}
 
 var game
 var story := 1

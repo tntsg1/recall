@@ -174,14 +174,6 @@ func count_state(st: int) -> int:
 	return n
 
 
-func in_flight_home() -> int:
-	var n := 0
-	for b in list:
-		if b.state != HOME:
-			n += 1
-	return n
-
-
 # Twin: a free split round beside every shot.
 func twin(origin: Vector2, dir: Vector2) -> void:
 	if list.size() >= CHILD_MAX:

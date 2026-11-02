@@ -41,8 +41,6 @@ var possess: Possess
 var lightwalk: Lightwalk
 var lightwalk_taught := false
 var possess_prev := false
-var trial := false            # 训练场: dummies, number keys to any shell, nothing ends, nothing saved
-var trial_cd := 0.0
 var hud: Hud
 var sfx: Sfx
 var floor_rect: ColorRect
@@ -146,10 +144,6 @@ var dev_speed := 2
 
 func _ready() -> void:
 	Meta.test_mode = bot != null
-	if Meta.possess_trial:
-		Meta.possess_trial = false
-		trial = true
-		Meta.test_mode = true
 	if Meta.training_requested > 0:
 		tutorial = TutorialGate.new()
 		tutorial.configure(self, Meta.training_requested)
@@ -742,109 +736,6 @@ func _in_focus() -> bool:
 	return Input.is_action_pressed("recall") or Input.is_action_pressed("recall_mouse")
 
 
-# 训练场 (the title's training yard): no real fight. A field of target dummies that
-# never die for long, and the number keys put you straight into any shell:
-# 1 chaser · 2 leech · 3 guard · 4 charger · 5 prism · 6 pulse · 7 echo. No time
-# limit, no cooldown, nothing can hurt you; E steps out, R resets the dummies,
-# T makes them walk and fight back. Shooting and Q still work for the combos.
-const YARD_KEYS := [Enemies.CHASER, Enemies.LEECH, Enemies.GUARD, Enemies.CHARGER, Enemies.PRISM, Enemies.PULSE, Enemies.ECHO]
-var yard_slots: Array = []      # [kind, home position, enemy or null, respawn timer]
-var yard_live := false
-var yard_timed := false         # Y: shells run their real time (to see the Lv2 chain and the final blast)
-
-
-func _yard_layout() -> void:
-	yard_slots.clear()
-	var c := Arena.ROOM.get_center()
-	# an arc of chasers, two guards in front of the right wall to ram into it, two chargers
-	for k in 7:
-		yard_slots.append([Enemies.CHASER, c + Vector2.from_angle(-PI * 0.75 + k * PI * 0.25) * 300.0 + Vector2(120, 0), null, 0.0])
-	yard_slots.append([Enemies.GUARD, Vector2(Arena.ROOM.end.x - 200.0, c.y - 90.0), null, 0.0])
-	yard_slots.append([Enemies.GUARD, Vector2(Arena.ROOM.end.x - 200.0, c.y + 90.0), null, 0.0])
-	yard_slots.append([Enemies.CHARGER, c + Vector2(-80, -330), null, 0.0])
-	yard_slots.append([Enemies.CHARGER, c + Vector2(-80, 330), null, 0.0])
-
-
-func _trial_step(sdt: float) -> void:
-	dev_god = true
-	dev_ammo = true
-	possess.endless = not yard_timed
-	possess.cooldown = 0.0
-	if wave_ctl.phase != Waves.FIGHT:
-		return
-	wave_ctl.queue.clear()
-	if yard_slots.is_empty():
-		_yard_layout()
-		for e in enemies.list:
-			if e.state != Enemies.HOST:
-				e.state = Enemies.DEAD
-	for sl in yard_slots:
-		var e = sl[2]
-		if e != null and e.state == Enemies.DEAD:
-			sl[2] = null
-			sl[3] = 1.2
-		if sl[2] == null:
-			sl[3] -= sdt
-			if sl[3] <= 0.0:
-				var ne = enemies.spawn(sl[0], sl[1])
-				sl[2] = ne
-		elif not yard_live and e.state == Enemies.ALIVE:
-			# a dummy: it stays on its spot and does not come for you
-			e.vel = Vector2.ZERO
-			e.mode = Enemies.APPROACH
-			e.cool = 99.0
-			e.pos = e.pos.lerp(sl[1], 1.0 - exp(-2.0 * sdt))
-
-
-func yard_key(k: int) -> void:
-	if k == KEY_L:
-		# the 夺壳 school, 0 → 3
-		lv.possess = (int(lv.get("possess", 0)) + 1) % 4
-		hud.school_pop["possess"] = 1.0
-		hud.flash_text(Txt.t("yard_lv_now") % lv.possess)
-		sfx.play("pick", 1.0 + lv.possess * 0.1, -6.0)
-		return
-	if k == KEY_Y:
-		yard_timed = not yard_timed
-		possess.endless = not yard_timed
-		if yard_timed and possess.hosting():
-			possess.t_left = possess.duration()
-		hud.flash_text(Txt.t("yard_timed_on" if yard_timed else "yard_timed_off"))
-		sfx.play("tick", 1.0, -6.0)
-		return
-	if k == KEY_M:
-		for sl in yard_slots:
-			if sl[2] != null and sl[2].state == Enemies.ALIVE:
-				possess.mark(sl[2])
-		sfx.play("lit", 1.0, -6.0)
-		return
-	if k == KEY_R:
-		for sl in yard_slots:
-			if sl[2] != null and sl[2].state != Enemies.HOST:
-				sl[2].state = Enemies.DEAD
-			sl[3] = 0.0
-		sfx.play("reroll", 1.0, -6.0)
-		return
-	if k == KEY_T:
-		yard_live = not yard_live
-		for sl in yard_slots:
-			if sl[2] != null and sl[2].state == Enemies.ALIVE:
-				sl[2].speed = Enemies.SPEC[sl[0]].speed if yard_live else sl[2].speed
-		hud.flash_text(Txt.t("yard_live_on" if yard_live else "yard_live_off"))
-		sfx.play("tick", 1.0, -6.0)
-		return
-	var i := k - KEY_1
-	if i < 0 or i >= YARD_KEYS.size():
-		return
-	# straight into that shell, wherever you stand
-	if possess.hosting():
-		possess.end(false, true)
-	var e = enemies.spawn(YARD_KEYS[i], player.pos + player.aim * 4.0)
-	e.state = Enemies.ALIVE
-	e.t = 0.0
-	possess.seize_now(e)
-
-
 func _in_possess() -> bool:
 	if tutorial != null and tutorial.stage != TutorialGate.POSSESS:
 		return false
@@ -904,12 +795,6 @@ func _ask_dev_code() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(assist_panel):
 		return
-	if trial and not paused and event is InputEventKey and event.pressed and not event.echo:
-		var kc: int = event.physical_keycode
-		if (kc >= KEY_1 and kc <= KEY_7) or kc in [KEY_R, KEY_T, KEY_L, KEY_Y, KEY_M]:
-			yard_key(kc)
-			get_viewport().set_input_as_handled()
-			return
 	if tutorial != null and not paused and tutorial.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
@@ -1126,8 +1011,6 @@ func _run_frame(dt: float) -> void:
 		tutorial.step(dt)
 	else:
 		wave_ctl.step(sdt)
-		if trial:
-			_trial_step(sdt)
 	if prof_on:
 		_lap("waves")
 	fx.step(sdt, dt)

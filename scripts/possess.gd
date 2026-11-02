@@ -77,7 +77,6 @@ var flow_from := Vector2.ZERO
 var marks := {}                 # enemy id -> [E, time left]
 var hinted := false
 var spare_cd := 0.0
-var endless := false            # the training yard: no time limit, no cooldown
 var grow := 0.0
 var hits_left := SHELL_HITS
 var iframes := 0.0
@@ -254,7 +253,7 @@ func press() -> void:
 	game.player.visible = false
 
 
-# The training yard's number keys: straight in, no mark and no flight.
+# Straight into a shell, no mark and no flight (tests and the finale's stills).
 func seize_now(e) -> void:
 	shell = e
 	game.player.visible = false
@@ -268,7 +267,7 @@ func _begin_host() -> void:
 		return
 	state = HOST
 	shell.state = Enemies.HOST
-	if game.lore != null and not endless:
+	if game.lore != null:
 		game.lore.on_seize(shell)
 	shell.knock = Vector2.ZERO
 	shell.vel = Vector2.ZERO
@@ -478,8 +477,6 @@ func host_step(sdt: float, dt: float, move: Vector2, aim_at: Vector2, fire_held:
 	if shell.state != Enemies.HOST:
 		_restore(shell.pos)
 		return
-	if endless:
-		t_left = duration()
 	t_left -= sdt
 	iframes = maxf(0.0, iframes - sdt)
 	recover = maxf(0.0, recover - sdt)
@@ -1051,18 +1048,6 @@ func _blink_land(at: Vector2, radius: float, dmg: float, slam: bool) -> void:
 	game.cam.add_trauma(0.4 if slam else 0.18)
 	if slam:
 		_finisher(at, radius)
-
-
-func _ring_hit(radius: float, dmg: float, heavy: bool) -> void:
-	var at: Vector2 = shell.pos
-	for e in game.enemies.list:
-		if e.state == Enemies.ALIVE and e.pos.distance_to(at) < radius + e.r:
-			var d: Vector2 = (e.pos - at).normalized()
-			_deal(e, dmg, d, heavy)
-			e.knock += d * (420.0 if heavy else 160.0)
-	bursts.append([at, radius, 0.0])
-	if heavy:
-		game.cam.add_trauma(0.15)
 
 
 # ---------------------------------------------------------------- echo

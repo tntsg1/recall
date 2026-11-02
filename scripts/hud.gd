@@ -333,7 +333,7 @@ func _step_host(dt: float) -> void:
 	var inside: bool = pz.busy() and pz.shell != null
 	host_k = move_toward(host_k, 1.0 if inside else 0.0, dt / 0.32)
 	if inside:
-		host_name = Txt.t("yard_k%d" % pz.shell.kind)
+		host_name = Txt.t("shell_k%d" % pz.shell.kind)
 		if pz.hits_left < host_hits_last:
 			for j in range(pz.hits_left, mini(host_hits_last, 3)):
 				host_break[j] = 1.0
@@ -406,8 +406,6 @@ func _draw_view() -> void:
 		if combo_stamp > 0.0:
 			var e := 1.0 - combo_stamp
 			view.draw_arc(cp, lerpf(40.0, 150.0, Pal.ease_out(e)), 0.0, TAU, 64, Possess.cyan(combo_stamp * 0.8, 2.0) if combo_seize else Pal.red(combo_stamp * 0.8, 2.0), 2.0, false)
-	if game.trial:
-		_draw_yard(vp)
 	if game.tutorial == null:
 		_draw_timer(vp)
 		_draw_title(vp)
@@ -1408,7 +1406,7 @@ func _draw_seize_key(c: Vector2, a: float) -> void:
 	if a <= 0.01:
 		return
 	var pz = game.possess
-	var cooling: bool = pz.cooldown > 0.0 and not pz.endless
+	var cooling: bool = pz.cooldown > 0.0
 	var ready: bool = e_ready_last
 	if pz.busy():
 		# in use: the key holds its place, a steady cyan outline with a full line
@@ -2154,37 +2152,3 @@ func _draw_pause(vp: Vector2) -> void:
 		view.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	_text_c(font_s, Txt.t("pause_keys"), Vector2(vp.x / 2.0, vp.y * 0.44 + 350.0), 14, Pal.ink(0.4 * a))
 	_draw_build(vp, a)
-
-
-# 训练场: which key makes you what, and what the current shell's three moves are.
-func _draw_yard(vp: Vector2) -> void:
-	var x := 40.0
-	var y := 150.0
-	view.draw_string(font_b, Vector2(x, y), Txt.t("yard_title"), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Possess.cyan(0.95, 1.6))
-	y += 34.0
-	var cur := -1
-	if game.possess.hosting():
-		cur = game.possess.shell.kind
-	for i in Game.YARD_KEYS.size():
-		var k: int = Game.YARD_KEYS[i]
-		var on := k == cur
-		var line := "%d   %s" % [i + 1, Txt.t("yard_k%d" % k)]
-		view.draw_string(font_s, Vector2(x, y), line, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Possess.cyan(1.0, 2.0) if on else Pal.ink(0.6))
-		y += 24.0
-		if on:
-			for row in Txt.t("yard_m%d" % k).split("\n"):
-				view.draw_string(font_s, Vector2(x + 26.0, y), row, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Possess.cyan(0.75, 1.3))
-				y += 21.0
-	y += 12.0
-	# the 夺壳 school level and what it adds, and whether shells run their real time
-	var sl: int = game.lv.get("possess", 0)
-	view.draw_string(font_s, Vector2(x, y), Txt.t("yard_lv") % sl, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Possess.cyan(1.0, 2.0) if sl > 0 else Pal.ink(0.6))
-	y += 22.0
-	for n in range(1, sl + 1):
-		view.draw_string(font_s, Vector2(x + 26.0, y), Txt.t("up_possess_%d" % n), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Possess.cyan(0.75, 1.3))
-		y += 20.0
-	view.draw_string(font_s, Vector2(x, y), Txt.t("yard_y_on" if game.yard_timed else "yard_y_off"), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Possess.cyan(1.0, 2.0) if game.yard_timed else Pal.ink(0.6))
-	y += 30.0
-	for key in ["yard_e", "yard_r", "yard_t", "yard_m", "yard_esc"]:
-		view.draw_string(font_s, Vector2(x, y), Txt.t(key), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.45))
-		y += 20.0

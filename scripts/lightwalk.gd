@@ -43,7 +43,7 @@ func _init() -> void:
 	z_as_relative = false
 
 
-# From chapter 2 on (the training yard and tests may force it).
+# From chapter 2 on (tests may force it).
 var force := false
 
 

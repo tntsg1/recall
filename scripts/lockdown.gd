@@ -585,10 +585,6 @@ func _arc_end() -> Vector2:
 	return h.point if h else end
 
 
-func socket_lit(k: int) -> bool:
-	return phase == 2 and core_open >= 1.0
-
-
 func _in_socket(p: Vector2, k: int) -> bool:
 	var c: Vector2 = SOCKETS[k][0]
 	var n: Vector2 = SOCKETS[k][1]
@@ -827,16 +823,6 @@ func _draw_beam(k: int, dim: float) -> void:
 	draw_polygon(pts, cols)
 	if lock_k > 0.0:
 		draw_line(lp, lp + Vector2.from_angle(lamp_a[k]) * 120.0, Pal.red(lock_k * dim, 2.2), 2.0)
-
-
-func _draw_stripes(k: float, dim: float) -> void:
-	# hazard stripes along the top wall: the street is sealed
-	var y := 74.0
-	var x := 700.0
-	while x < 1220.0:
-		var a := k * (0.5 + 0.3 * sin(t * 3.0 + x * 0.02))
-		draw_line(Vector2(x, y), Vector2(x + 16.0, y + 14.0), Pal.red(a * 0.6 * dim, 1.6), 3.0)
-		x += 30.0
 
 
 func _draw_sockets(dim: float) -> void:

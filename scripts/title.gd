@@ -19,7 +19,7 @@ const LETTERS := {
 	" ": [],
 }
 const UNIT := 22.0
-const MENU := ["start", "trial", "tutorial", "gun", "stake", "trail", "achievements", "archive", "settings", "quit"]
+const MENU := ["start", "tutorial", "gun", "stake", "trail", "achievements", "archive", "settings", "quit"]
 const SETTINGS := ["master", "music", "sfx", "shake", "soft", "fullscreen", "lang", "keys", "assist", "back"]
 const ROW_H := 58.0
 const ROW_W := 520.0
@@ -71,7 +71,6 @@ var dot_tex: Texture2D
 
 func _ready() -> void:
 	Meta.test_mode = false
-	Meta.possess_trial = false
 	if not OS.has_feature("web"):
 		get_window().title = "霓虹行者 NEON RAID"
 	Settings.load_all()
@@ -195,12 +194,7 @@ func _rows() -> Array:
 	return []
 
 
-func _row_top() -> float:
-	return _vp().y * (_menu_top() if page == "menu" else 0.40)
-
 func _menu_top() -> float:
-	if _menu().size() >= 11:
-		return 0.415
 	return 0.44 if _menu().size() >= 8 else 0.52
 
 
@@ -452,13 +446,6 @@ func _accept(d: int) -> void:
 					Loadout.gun = guns[gun_i]
 					Meta.training_requested = 1 if Meta.needs_tutorial() else 0
 					Meta.clear_run()
-					start_t = 0.0
-					sfx.play("release", 1.0, -2.0)
-				"trial":
-					# 夺壳试玩: an endless room of chasers and leeches, nothing saved
-					Meta.resume = null
-					Meta.training_requested = 0
-					Meta.possess_trial = true
 					start_t = 0.0
 					sfx.play("release", 1.0, -2.0)
 				"tutorial":

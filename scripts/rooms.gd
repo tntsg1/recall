@@ -43,7 +43,7 @@ func _ready() -> void:
 
 func setup(ch: int) -> void:
 	var story := Chapters.story(ch)
-	active = RoomGen.on(story) and game.tutorial == null and not game.trial
+	active = RoomGen.on(story) and game.tutorial == null
 	lay = {}
 	room_index = -1
 	bonus = 0
