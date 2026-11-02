@@ -20,6 +20,8 @@ const LETTERS := {
 }
 const UNIT := 22.0
 const MENU := ["start", "tutorial", "gun", "stake", "trail", "achievements", "archive", "settings", "quit"]
+# the demo has no achievements; its place goes to the full game's store page
+const DEMO_MENU := ["start", "tutorial", "gun", "stake", "trail", "wishlist", "archive", "settings", "quit"]
 const SETTINGS := ["master", "music", "sfx", "shake", "soft", "fullscreen", "lang", "keys", "assist", "back"]
 const ROW_H := 58.0
 const ROW_W := 520.0
@@ -180,7 +182,8 @@ func _vp() -> Vector2:
 
 # "Continue" leads the menu while a run is waiting (it may arrive from the cloud).
 func _menu() -> Array:
-	return (["continue"] + MENU) if Meta.run_saved() != null else MENU
+	var m: Array = MENU if not Demo.on() else DEMO_MENU
+	return (["continue"] + m) if Meta.run_saved() != null else m
 
 
 func _rows() -> Array:
@@ -457,6 +460,9 @@ func _accept(d: int) -> void:
 					_change_value(_menu()[sel.menu], 1)
 				"achievements":
 					_go("achievements")
+				"wishlist":
+					Demo.open_store()
+					sfx.play("release", 1.0, -4.0)
 				"archive":
 					_go("archive")
 				"settings":
@@ -742,6 +748,8 @@ func _draw_word(vp: Vector2) -> void:
 	var era := clampf((t - 3.0) / 0.8, 0.0, 1.0)
 	if era > 0.0:
 		_text_c(font_s, Txt.t("t_era"), Vector2(vp.x / 2.0, 432), 17, Pal.ink(0.62 * era * whole))
+		if Demo.on():
+			_text_c(font_b, Txt.t("t_demo"), Vector2(vp.x / 2.0 + sw / 2.0 + 44.0, 395), 15, Pal.red(0.9 * era * whole, 1.8))
 
 
 # The highlight: a soft band that springs between rows, a red underline that
@@ -837,6 +845,8 @@ func _draw_menu(vp: Vector2) -> void:
 		_text_c(font_s, info, Vector2(vp.x / 2.0, _row_rect(_menu().size(), "menu").position.y + 24), 16, Pal.ink(0.6 * pa))
 	var d := Meta.load_data()
 	var rec := Txt.t("t_records") % [int(d.runs), int(d.wins), int(round(count_roll.shown)), Ach.LIST.size()]
+	if Demo.on():
+		rec = Txt.t("t_records_demo") % [int(d.runs), int(d.wins)]
 	if mk == "stake" and not stake_ok:
 		rec = Txt.t("t_stake_lock")
 	_text_c(font_s, rec, Vector2(vp.x / 2.0, vp.y - 40.0), 15, Pal.ink(0.45 * pa))

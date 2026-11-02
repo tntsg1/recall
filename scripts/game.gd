@@ -537,7 +537,7 @@ func gun_dmg() -> float:
 
 # Achievements: saved, mirrored to Steam, and shown once.
 func ach(id: String) -> void:
-	if bot != null or tutorial != null:
+	if bot != null or tutorial != null or Demo.on():
 		return
 	if Meta.achieve(id):
 		run_ach.append(id)
@@ -836,6 +836,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_tree().quit()
 	elif (lost or wave_ctl.phase == Waves.DONE) and event is InputEventKey and event.pressed and event.physical_keycode == KEY_M:
 		_pause_choice("title")
+	elif Demo.on() and wave_ctl.phase == Waves.DONE and not lost and _wishlist_pressed(event):
+		Demo.open_store()
 	elif not replacing.is_empty() and not paused:
 		if event is InputEventKey and event.pressed and not event.echo:
 			var kc: int = event.physical_keycode
@@ -864,6 +866,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("restart") and (wave_ctl.phase == Waves.DONE or lost):
 		_pause_choice("restart")
 
+
+
+# The demo's end page: W, the pad's Y, or a click on the wishlist line.
+func _wishlist_pressed(event: InputEvent) -> bool:
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_W:
+		return true
+	if event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_Y:
+		return true
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		return hud.wishlist_hit(hud.reticle)
+	return false
 
 
 # The run's glow. The title builds the same one at no strength, so the glow

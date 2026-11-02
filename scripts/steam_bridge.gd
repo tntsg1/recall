@@ -7,6 +7,7 @@ class_name SteamBridge
 # (recall_meta.json + .bak under the user folder); nothing here touches files.
 
 const APP_ID := 4953700
+const DEMO_APP_ID := 0          # the demo's own app (0 until Steamworks makes it: no Steam in the demo)
 
 static var _ready := false
 static var _steam = null
@@ -20,14 +21,17 @@ static func init() -> void:
 		return
 	if "--no-steam" in OS.get_cmdline_user_args() or not Engine.has_singleton("Steam"):
 		return
+	if Demo.on() and DEMO_APP_ID == 0:
+		return
 	var s = Engine.get_singleton("Steam")
 	# (callbacks embedded: GodotSteam runs them each frame itself)
-	var res: Dictionary = s.steamInitEx(APP_ID, true)
+	var res: Dictionary = s.steamInitEx(DEMO_APP_ID if Demo.on() else APP_ID, true)
 	if int(res.get("status", -1)) != 0:
 		print("Steam not available: ", res.get("verbal", ""))
 		return
 	_steam = s
-	_sync_all()
+	if not Demo.on():
+		_sync_all()
 
 
 static func available() -> bool:
@@ -48,6 +52,14 @@ static func _sync_all() -> void:
 			changed = true
 	if changed:
 		_steam.storeStats()
+
+
+# The full game's store page in the overlay; false when there is no Steam to show it.
+static func open_store() -> bool:
+	if not available():
+		return false
+	_steam.activateGameOverlayToStore(APP_ID, 0)
+	return true
 
 
 static func unlock(id: String) -> void:

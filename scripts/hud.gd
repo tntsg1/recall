@@ -34,6 +34,7 @@ var shown_grade := "S"
 var grade_flip := 0.0
 var final_t := -1.0
 var final_rows: Array = []
+var wish_at := Vector2.INF   # the demo end page's wishlist line (its baseline centre)
 var font_xl: Font
 var boss_hp_shown := 1.0
 var boss_hp_chip := 1.0
@@ -218,6 +219,15 @@ func penalty(from_screen: Vector2) -> void:
 func final(rows: Array) -> void:
 	final_rows = rows
 	final_t = 0.0
+	wish_at = Vector2.INF
+
+
+# The demo's end page: is `p` on the wishlist line?
+func wishlist_hit(p: Vector2) -> bool:
+	if wish_at == Vector2.INF or final_t < 0.0:
+		return false
+	var w := font_b.get_string_size(Txt.t("demo_wish"), HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+	return absf(p.x - wish_at.x) <= w / 2.0 + 16.0 and p.y > wish_at.y - 30.0 and p.y < wish_at.y + 14.0
 
 
 func boss_phase() -> void:
@@ -619,7 +629,7 @@ func _draw_final(vp: Vector2) -> void:
 	var long_list: bool = final_rows.size() > 8
 	var row_h := 36.0 if long_list else 46.0
 	var y := vp.y * (0.1 if long_list else 0.26)
-	_text_stagger(font_xl, Txt.t("done"), Vector2(cx, y), 44, Pal.ink(1.0, 1.1), t - 0.1, -1.0, 0.06)
+	_text_stagger(font_xl, Txt.t("demo_done" if Demo.on() else "done"), Vector2(cx, y), 44, Pal.ink(1.0, 1.1), t - 0.1, -1.0, 0.06)
 	view.draw_line(Vector2(cx - 220.0 * a, y + 26.0), Vector2(cx + 220.0 * a, y + 26.0), Pal.ink(0.4 * a), 1.0)
 	var total := 0.0
 	for i in final_rows.size():
@@ -650,9 +660,17 @@ func _draw_final(vp: Vector2) -> void:
 		view.draw_string(font_s, Vector2(cx + 120.0, by + 8.0), "%s  %d" % [Txt.t("hits"), game.hits_taken], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.55 * bt))
 		_run_stats(cx, by + 60.0, bt)
 		_text_c(font_s, Txt.t("room_seed") % game.run_seed, Vector2(cx, by + 122.0), 14, Pal.ink(0.32 * bt))
-		_text_c(font_s, Txt.t("done_next"), Vector2(cx, by + 150.0), 16, Pal.ink(0.45 * bt))
 		var pulse := 0.55 + 0.25 * sin(t * 3.0)
-		_text_c(font_b, Txt.t("restart"), Vector2(cx, by + 190.0), 20, Pal.ink(pulse * bt))
+		if Demo.on():
+			# what the full game holds, and the way to it
+			_text_c(font_s, Txt.t("demo_next"), Vector2(cx, by + 150.0), 16, Pal.ink(0.7 * bt))
+			wish_at = Vector2(cx, by + 192.0)
+			var hot := wishlist_hit(reticle)
+			_text_c(font_b, Txt.t("demo_wish"), wish_at, 22, Pal.red((0.75 + 0.25 * sin(t * 3.0)) * bt, 2.0 if hot else 1.6))
+			_text_c(font_s, Txt.t("restart"), Vector2(cx, by + 232.0), 16, Pal.ink(0.5 * bt))
+		else:
+			_text_c(font_s, Txt.t("done_next"), Vector2(cx, by + 150.0), 16, Pal.ink(0.45 * bt))
+			_text_c(font_b, Txt.t("restart"), Vector2(cx, by + 190.0), 20, Pal.ink(pulse * bt))
 
 
 # Best pierce, crosses, last-second recalls, and what this run unlocked.

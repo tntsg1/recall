@@ -4,6 +4,7 @@ class_name Meta
 # and running counters. Test runs (a bot is driving) never touch the file.
 
 const PATH := "user://recall_meta.json"
+const DEMO_PATH := "user://recall_meta.demo.json"   # the demo's own, never read by the full game
 
 static var data := {}
 static var test_mode := false
@@ -31,7 +32,7 @@ static func under_test() -> bool:
 
 static func path() -> String:
 	if not under_test():
-		return PATH
+		return DEMO_PATH if Demo.on() else PATH
 	var p := "user://recall_meta.test.json"
 	if not _sandbox_fresh:
 		_sandbox_fresh = true

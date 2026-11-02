@@ -45,7 +45,7 @@ static func from_save(snap: Dictionary) -> int:
 
 
 static func count() -> int:
-	return LIST.size()
+	return mini(LIST.size(), Demo.CHAPTERS) if Demo.on() else LIST.size()
 
 
 static func at(i: int) -> Dictionary:
