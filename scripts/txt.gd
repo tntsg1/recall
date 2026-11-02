@@ -42,8 +42,6 @@ const S := {
 	"a_unlimited": ["无限", "UNLIMITED"],
 	"a_retries_label": ["每局检查点回档次数", "Checkpoint retries per run"],
 	"a_keys": ["↑↓ 选择 · ←→ 调整 · Enter 切换 · Esc 返回", "↑↓ CHOOSE · ←→ ADJUST · ENTER TOGGLE · ESC BACK"],
-	"a_damage": ["敌人伤害降低 %d%%", "Enemy damage reduction: %d%%"],
-	"a_retries": ["每局检查点回档次数：%d", "Checkpoint retries per run: %d"],
 	"a_remaining": ["本局剩余回档次数：%s（调整或开关辅助不会重置已用次数）", "Retries left this run: %s (changing settings does not reset retries used)"],
 	"a_new_run": ["回档次数按整局计算，开始新一局时重置。", "The retry allowance resets when you start a new run."],
 	"a_checkpoint": ["每波开始时都会自动存一个检查点，Boss 战也一样。\n如果被打死了，就会消耗一次回档机会，直接回到这波刚开始的时候。血量、装备搭配和敌人都会恢复到当时的状态。\n回档次数用完后，再死就真的结束了！", "A checkpoint is saved at the start of every wave, boss fights included.\nIf you die, one retry is spent and you go straight back to the start of that wave, with your health, build and enemies as they were.\nOnce your retries are gone, the next death really ends the run!"],
