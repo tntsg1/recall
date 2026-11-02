@@ -7,7 +7,7 @@ class_name SteamBridge
 # (recall_meta.json + .bak under the user folder); nothing here touches files.
 
 const APP_ID := 4953700
-const DEMO_APP_ID := 0          # the demo's own app (0 until Steamworks makes it: no Steam in the demo)
+const DEMO_APP_ID := 5551920    # the demo's own app ("NEON RAID Demo")
 
 static var _ready := false
 static var _steam = null
