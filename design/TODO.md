@@ -211,6 +211,7 @@
   - [x] Steamworks 发行日改为 2027-03-11 10:00 PST（基本信息已保存）；[x] 建试玩版应用 NEON RAID Demo 5551920（depot 5551921，不单独商店页），安装文件夹 NEON RAID Demo、启动 NEONRAID_Demo.exe Windows 64 位
   - 用户（2026-11-02）："你怎么还留着训练场"（编辑器里的 E:\godot\cshi 停在 11-01，没同步）→ [x] 跑 tools/sync_to_main.sh 同步，build/RECALL.exe 重新导出
   - 用户（2026-11-02）："继续点" → [x] 发布 Steamworks 设置：试玩版已发布（Publishing successful），正式版没有待发布改动
+  - 2026-11-03 商店页审核未通过（商店页没写支持语言）→ 用户已勾英文、简体中文（界面+字幕）；发行前商店页不用单独发布；用户："你来点" → [x] 11-03 已标为就绪待审核（重新排队 3–5 个工作日）
   - [ ] 公开商店页“即将推出”（等 Valve 审核）、试玩版构建 26389916 设到 default（用户点）、试玩版提交审核
   - [x] 试玩模式：scripts/demo.gd（导出特性 demo 或 --demo）；一局 3 章；存档 recall_meta.demo.json；不发成就；标题“试玩版”标记、成就换成“加入心愿单”；结束页 W/手柄 Y/点击打开商店页；导出预设 Windows Demo → build/demo/；tests/demo_shots.gd
   - [x] DEMO_APP_ID = 5551920；上传脚本 steampipe/scripts/app_build_5551920.vdf（内容 content_demo/）；构建 26389916 已上传
