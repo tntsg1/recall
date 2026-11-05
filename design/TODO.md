@@ -216,3 +216,5 @@
   - [x] 试玩模式：scripts/demo.gd（导出特性 demo 或 --demo）；一局 3 章；存档 recall_meta.demo.json；不发成就；标题“试玩版”标记、成就换成“加入心愿单”；结束页 W/手柄 Y/点击打开商店页；导出预设 Windows Demo → build/demo/；tests/demo_shots.gd
   - [x] DEMO_APP_ID = 5551920；上传脚本 steampipe/scripts/app_build_5551920.vdf（内容 content_demo/）；构建 26389916 已上传
   - [ ] 新品节报名（1 月 10 日截止）
+- 用户（2026-11-04）："安装吧"（motion-prompt 动效名词库）→ [x] 装到 ~/.claude/skills/motion-prompt，缓存改到 G:\motion-prompt-cache；"游戏里关于霓虹的动画教我怎么使用" → [x] 已讲用法和适合霓虹行者的编号
+- 用户（2026-11-04）：pixelfx 像素特效库能不能用 → [x] 克隆到 G:\ext\pixelfx，红白调色板贴进战斗截图对比（proofs/pixelfx/compare_full.png）：方块像素和细线辉光冲突；Jev B 1.00（只借时序/动作分镜/粒子轨迹，用 fx.gd 重画）
