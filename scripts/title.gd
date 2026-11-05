@@ -52,6 +52,8 @@ var sfx: Sfx
 # motion
 var hl := Motion.Spring2.new(Vector2.ZERO, 420.0, 0.78)   # highlight centre
 var hl_w := Motion.Spring.new(0.0, 380.0, 0.8)            # highlight width
+var sweep_sel := -1        # the row the light last crossed, and when it landed there
+var sweep_from := 0.0
 var row_k: Array = []      # per row: Spring (0..1 how "lifted" it is)
 var press: Array = []      # per row: Spring for a press squash
 var cur_r := Motion.Spring.new(5.0, 520.0, 0.6)           # cursor ring radius
@@ -765,6 +767,12 @@ func _draw_highlight(a: float) -> void:
 	var uw := w * (1.0 - stretch * 0.6)
 	draw_line(Vector2(c.x - uw / 2.0, r.end.y), Vector2(c.x + uw / 2.0, r.end.y), Pal.red(0.85 * a, 2.0), 2.0)
 	draw_line(Vector2(r.position.x - 10.0, r.position.y + 8.0), Vector2(r.position.x - 10.0, r.end.y - 8.0), Pal.red(a, 2.2), 2.0)
+	if Demo.extras():
+		# a light crosses the chosen row, again every 2.35 s (Picks #022), kept faint over the words
+		if sel.menu != sweep_sel:
+			sweep_sel = sel.menu
+			sweep_from = t
+		Picks.sweep(self, r, t - sweep_from, 0.22 * a)
 
 
 func _row(i: int, pg: String, label: String, value: String, a: float, dx: float, locked: bool = false, value_key: String = "") -> void:

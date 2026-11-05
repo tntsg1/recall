@@ -613,6 +613,8 @@ func _draw_hall_cover(dim: float) -> void:
 				draw_rect(scr.grow(2.0), Pal.ink(0.7 * dim, 1.4), false, 1.5)
 				var blink := 0.5 + 0.5 * sin(t * 3.0 + i)
 				draw_rect(Rect2(scr.position + Vector2(4, 4), Vector2(scr.size.x * 0.5, 3)), Pal.ink(0.5 * blink * dim, 1.4))
+				# the coin it wants, turning
+				_screen_px(["coin"], Rect2(scr.position + Vector2(2, 9), scr.size - Vector2(4, 11)), dim, i)
 				draw_rect(Rect2(Vector2(ins.get_center().x - 10.0, ins.end.y - 12.0), Vector2(20, 4)), Pal.red(0.6 * dim, 1.4))
 			"desk":
 				# the registry desk, drawn the way it stands: a counter, two screens, the stamp
@@ -1685,6 +1687,10 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 			draw_rect(Rect2(body.position + Vector2(14 + i * 14, 108 + j * 12), Vector2(9, 7)), Pal.ink(0.22 * dim), false, 1.0)
 	draw_line(body.position + Vector2(84, 116), body.position + Vector2(118, 116), Pal.ink(0.45 * dim), 3.0)
 	var wake: float = shows.get(id, 0.0) if id != "" else 0.0
+	if wake <= 0.01:
+		# asleep: a scan running, or a monitor's picture breaking up
+		# (under the line the glass already carries at its top)
+		_screen_px(["glitch"] if id == "w7_monitor" else ["scanner", "hologram"], Rect2(scr.position + Vector2(4, 30), scr.size - Vector2(8, 34)), dim, story)
 	if wake > 0.01:
 		var full := ""
 		for w in Lore.walls(story):
@@ -1790,6 +1796,30 @@ func _draw_door(c: Vector2, dim: float, at := Vector2(80, 790)) -> void:
 
 
 # A propaganda screen on the left wall, cracked, still trying to say its line.
+# A screen's own picture while nobody reads it: the company's pixel loops
+# (PixelFx), one after another, a pause between the ones that end. The full game only.
+const SCREEN_ADS := ["heart", "chest", "coin"]
+
+
+func _screen_px(names: Array, r: Rect2, dim: float, seed: int) -> void:
+	if not Demo.extras():
+		return
+	var spans: Array = []
+	var total := 0.0
+	for n in names:
+		var s: Array = PixelSheets.S[n]
+		var span := 4.0 if s[5] else PixelFx.length(n) + 0.8
+		spans.append(span)
+		total += span
+	var tt := fposmod(t + seed * 2.3, total)
+	for k in names.size():
+		if tt < spans[k]:
+			var k2 := 1.0 if Pal.ldr else 1.3
+			PixelFx.draw_fit(self, names[k], tt, r, Color(k2, k2, k2, 0.85 * dim))
+			return
+		tt -= spans[k]
+
+
 func _draw_screen(c: Vector2, dim: float) -> void:
 	var r := Rect2(c.x + 4.0, c.y - 110.0, 150.0, 220.0)
 	draw_rect(r, Color(0.04, 0.04, 0.045, 1.0))
@@ -1805,6 +1835,8 @@ func _draw_screen(c: Vector2, dim: float) -> void:
 	draw_polyline(PackedVector2Array([r.position + Vector2(6, 40), r.position + Vector2(40, 88), r.position + Vector2(26, 130), r.position + Vector2(70, 176), r.position + Vector2(58, 220)]), Pal.ink(0.35 * dim, 1.1), 1.5)
 	draw_line(r.position + Vector2(40, 88), r.position + Vector2(86, 102), Pal.ink(0.25 * dim, 1.1), 1.0)
 	var wake: float = shows.get("w1_screen", 0.0)
+	if wake <= 0.01:
+		_screen_px(SCREEN_ADS, Rect2(r.position + Vector2(8, 4), Vector2(r.size.x - 16.0, 110.0)), dim, 0)
 	var sf := Fonts.get_font("SemiBold")
 	var full: String = Txt.t("screen_full")
 	var rows: Array = Array(full.split("\n"))

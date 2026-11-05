@@ -218,3 +218,11 @@
   - [ ] 新品节报名（1 月 10 日截止）
 - 用户（2026-11-04）："安装吧"（motion-prompt 动效名词库）→ [x] 装到 ~/.claude/skills/motion-prompt，缓存改到 G:\motion-prompt-cache；"游戏里关于霓虹的动画教我怎么使用" → [x] 已讲用法和适合霓虹行者的编号
 - 用户（2026-11-04）：pixelfx 像素特效库能不能用 → [x] 克隆到 G:\ext\pixelfx，红白调色板贴进战斗截图对比（proofs/pixelfx/compare_full.png）：方块像素和细线辉光冲突；Jev B 1.00（只借时序/动作分镜/粒子轨迹，用 fx.gd 重画）
+- 用户（2026-11-04）："OK，你就按它适合的使用，除此之外，你可以看一下这像素能不能放进去" → 四种放法对比 proofs/pixelfx/ways.png；Jev 像素 D 1.00 / 动效 C 0.72；用户答 "ab ok 可以多加几个 b"（屏幕 + 部分战斗都放、屏幕内容照提案、动效多加、只进正式版）
+  - [x] tools/pixelfx_export.py → assets/pixelfx（11 张，红白/青色阶）+ scripts/pixel_sheets.gd；scripts/pixel_fx.gd 播放；Demo.extras() 试玩版关
+  - [x] 战斗：夺壳 implosion_c、Boss 车厢爆裂 plasma、Boss 死亡 implosion+plasma；精英死亡 zap、子弹命中 spark 已接但关着（Fx.PIXEL_ELITE / PIXEL_HITS，Jev 0.17 不确定，等用户看图定）
+  - [x] 场景屏幕：墙面屏幕广告轮播、售卖亭金币、终端扫描/全息、监视器故障（只在没被读的时候）
+  - [x] scripts/picks.gd：#129 章节副标题/Boss 名字乱码解码、#023 章节标题故障、#022 标题菜单选中行扫光、#188 死亡圆形收拢、#003 成就爆开
+  - [x] THIRD_PARTY_NOTICES.txt（pixelfx、Motion Prompt 的 MIT 声明），导出时要放进 Steam 目录
+  - [x] 回归：19 过，possess2 两项（291、2/6）和 roomgen 超时与改前相同；Sonnet 评分 6.5→7.5→8→8.5→9（去掉等离子团和彩纸、故障按字号缩放、中文乱码用本行汉字、收拢圈 1.2 s 收完、战斗表去暗斑）；已同步 cshi 并推送
+  - [ ] 正式版构建等用户说再传；精英死亡/子弹命中像素特效开不开等用户看图定

@@ -38,6 +38,7 @@ func _process(_dt: float) -> bool:
 			check(m.has("wishlist") and not m.has("achievements"), "试玩版菜单：成就换成加入心愿单")
 			check(Chapters.count() == 3, "试玩版一局 3 章")
 			check(Meta.DEMO_PATH != Meta.PATH, "试玩版存档单独一个文件")
+			check(not Demo.extras(), "试玩版不放像素特效和新动效")
 			title.sel["menu"] = m.find("wishlist")
 			title._move(0)
 		300:
@@ -55,6 +56,8 @@ func _process(_dt: float) -> bool:
 			game.bot = null
 			game.ach("kills_300")
 			check(game.run_ach.is_empty(), "试玩版不发成就")
+			game.fx.pixel("implosion", Vector2(960, 540))
+			check(game.fx.pixels.is_empty(), "试玩版不放像素爆炸")
 			var rows := []
 			for i in 3:
 				rows.append([Chapters.label(i) + " · " + Chapters.title(i), 300.0, "S2 A3 B1"])

@@ -267,6 +267,8 @@ func _begin_host() -> void:
 		return
 	state = HOST
 	shell.state = Enemies.HOST
+	# the mind lands: a ring of its own light folding into the shell
+	game.fx.pixel("implosion_c", shell.pos, 2.0, 0.85)
 	if game.lore != null:
 		game.lore.on_seize(shell)
 	shell.knock = Vector2.ZERO

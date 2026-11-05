@@ -717,7 +717,8 @@ var rep_hover := -2
 var rep_armed := -1          # a number key has picked this slot; pressing it again confirms
 var cracks_shown := 5
 var crack_anim := []          # per crack: >0 breaking, <0 mending
-var flashes: Array = []       # [text, world_pos or null, t]
+var flashes: Array = []       # [text, world_pos or null, t, burst]
+var over_at := Vector2.ZERO   # where you fell, on screen
 var over_t := -1.0
 # the city's broadcast: one line typed out top-left, then gone
 var over_line := ""
@@ -794,12 +795,13 @@ func _ensure_cracks() -> void:
 				crack_anim[i] = 0.0
 
 
-func flash_text(txt: String, world = null) -> void:
-	flashes.append([txt, world, 0.0])
+func flash_text(txt: String, world = null, burst: bool = false) -> void:
+	flashes.append([txt, world, 0.0, burst])
 
 
 func game_over() -> void:
 	over_t = 0.0
+	over_at = game.get_viewport().get_canvas_transform() * game.player.pos
 	over_line = Lore.death_line(int(Meta.load_data().runs))
 
 
@@ -1684,6 +1686,10 @@ func _draw_flashes(vp: Vector2) -> void:
 		var p := Vector2(vp.x / 2.0, vp.y * 0.34)
 		if fl[1] != null:
 			p = game.get_viewport().get_canvas_transform() * (fl[1] as Vector2) + Vector2(0, -40.0 - t * 30.0)
+		if fl[3] and Demo.extras():
+			# an achievement goes off as it lands (Picks #003), round its first letter's left
+			var tw := font_b.get_string_size(fl[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x * k
+			Picks.burst(view, p + Vector2(-tw / 2.0 - 52.0, 0.0), t, 0.32, 1.0)
 		view.draw_set_transform(p, 0.0, Vector2(k, k))
 		_text_c(font_b, fl[0], Vector2(0, 8), 22, Pal.ink(a, 1.5))
 		view.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -1699,13 +1705,24 @@ func _draw_intro(vp: Vector2) -> void:
 	view.draw_line(Vector2(vp.x / 2.0 - w / 2.0, cy + 34.0), Vector2(vp.x / 2.0 + w / 2.0, cy + 34.0), Pal.ink(0.5 * a), 1.0)
 	_text_c(font_s, Chapters.label(game.chapter), Vector2(vp.x / 2.0, cy + 10.0 - 60.0 * 0.86 - 18.0), 18, Pal.ink(0.65 * a))
 	var rise := (1.0 - Pal.ease_out(clampf((t - 0.15) / 0.6, 0.0, 1.0))) * 20.0
-	_text_stagger(font_xl, Chapters.title(game.chapter), Vector2(vp.x / 2.0, cy + 10.0), 60, Pal.ink(1.0, 1.15), t - 0.15, t - 2.15, 0.05)
-	_text_c(font_s, Chapters.sub(game.chapter), Vector2(vp.x / 2.0, cy + 74.0), 20, Pal.ink(0.8 * a * clampf((t - 0.5) / 0.4, 0.0, 1.0)))
+	var extras := Demo.extras()
+	# the title breaks up for a moment as it forms (Picks #023), the line under it decodes (#129)
+	var gs := Picks.glitch_step(t) if extras else -1
+	var gx := Picks.glitch_shift(gs, 60)
+	Picks.glitch(view, font_xl, Chapters.title(game.chapter), Vector2(vp.x / 2.0 + gx, cy + 10.0), 60, a, gs)
+	_text_stagger(font_xl, Chapters.title(game.chapter), Vector2(vp.x / 2.0 + gx, cy + 10.0), 60, Pal.ink(1.0, 1.15), t - 0.15, t - 2.15, 0.05)
+	if extras:
+		Picks.scramble(view, font_s, Chapters.sub(game.chapter), Vector2(vp.x / 2.0, cy + 74.0), 20, Pal.ink(0.8 * a), t - 0.5)
+	else:
+		_text_c(font_s, Chapters.sub(game.chapter), Vector2(vp.x / 2.0, cy + 74.0), 20, Pal.ink(0.8 * a * clampf((t - 0.5) / 0.4, 0.0, 1.0)))
 
 
 func _draw_over(vp: Vector2) -> void:
 	if over_t < 0.0:
 		return
+	if Demo.extras():
+		# the view closes on where you fell (Picks #188), shut before the summary comes up
+		Picks.iris(view, vp, over_at, over_t, 0.0, 1.0)
 	var t := over_t - 1.2
 	if t < 0.0:
 		return
@@ -1799,7 +1816,11 @@ func _draw_boss_bar(vp: Vector2, cx: float, y: float, appear: float) -> void:
 	view.draw_rect(Rect2(x0, by, w * boss_hp_shown, 4.0), Pal.ink(0.9 * a, 1.0 + 1.5 * boss_flash))
 	for q in [0.25, 0.5, 0.75]:
 		view.draw_line(Vector2(x0 + w * q, by - 3.0), Vector2(x0 + w * q, by + 7.0), Pal.ink(0.5 * a), 1.0)
-	view.draw_string(font_b, Vector2(x0, by - 9.0), Txt.t(game.boss.name_key()), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.8 * a))
+	if Demo.extras() and b.state == Boss.ENTER:
+		# its name decodes as the bar opens (Picks #129)
+		Picks.scramble(view, font_b, Txt.t(game.boss.name_key()), Vector2(x0, by - 9.0), 16, Pal.ink(0.8 * a), b.t, false)
+	else:
+		view.draw_string(font_b, Vector2(x0, by - 9.0), Txt.t(game.boss.name_key()), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.ink(0.8 * a))
 	if b.core_open > 0.5:
 		var pulse := 0.5 + 0.5 * sin(game.real_time * 10.0)
 		view.draw_string(font_b, Vector2(x0 + w - 60.0, by - 8.0), Txt.t("core_label"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink((0.5 + 0.4 * pulse) * a, 1.3))

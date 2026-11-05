@@ -541,7 +541,7 @@ func ach(id: String) -> void:
 		return
 	if Meta.achieve(id):
 		run_ach.append(id)
-		hud.flash_text(Txt.t("ach_got") + " · " + Ach.name_of(id))
+		hud.flash_text(Txt.t("ach_got") + " · " + Ach.name_of(id), null, true)
 		sfx.play("relic", 1.2, -4.0)
 
 
@@ -1932,6 +1932,7 @@ func on_boss_dead(at: Vector2) -> void:
 	fx.ring(at, 20.0, 1400.0, 1.4, Pal.ink(0.8, 1.5), 4.0)
 	fx.ring(at, 10.0, 900.0, 1.0, Pal.red(0.8, 2.4), 2.5)
 	fx.flash(at, 420.0, 0.6, Pal.ink(0.7, 1.6))
+	fx.pixel("implosion", at, 3.0, 1.3)
 	fx.wave_push(at, 2000.0, 400.0)
 	_wave(at, 1.4)
 	sfx.play("boss_die", 1.0, 2.0)

@@ -12,6 +12,7 @@ var numbers: Array = []  # [text, pos, vel, t, dur, size, color, pop, value]
 var flashes: Array = []  # [pos, r, t, dur, color]
 var offs: Array = []     # [points, t, dur, color]: an outline losing its power
 var motes: Array = []    # [pos, vel, phase, size]
+var pixels: Array = []   # [name, pos, t, scale, color, flip]: PixelFx one-shots
 var add_layer: Node2D
 var glow_tex: Texture2D
 var dot_tex: Texture2D
@@ -166,6 +167,24 @@ func flash(pos: Vector2, r: float, dur: float, c: Color) -> void:
 	flashes.append([pos, r, 0.0, dur, c])
 
 
+# The pixel art bursts (PixelFx) for the fight's rarer moments, in the full game
+# only. An elite's death and every bullet's hit can take one too: off until the
+# user picks (2026-11-04).
+const PIXEL_ELITE := false
+const PIXEL_HITS := false
+
+
+func pixel(name: String, pos: Vector2, scale: float = 3.0, k: float = 1.2, flip: bool = false) -> void:
+	if not Demo.extras() or pixels.size() >= 24:
+		return
+	var a := 1.0
+	if Settings.soft:
+		# softer flashes: dimmer, and not as bright
+		a = 0.5
+		k = minf(k, 1.0)
+	pixels.append([name, pos, 0.0, scale, Color(k, k, k, a), flip])
+
+
 func wave_push(center: Vector2, radius: float, strength: float) -> void:
 	for m in motes:
 		var d: Vector2 = m[0] - center
@@ -182,6 +201,7 @@ func clear_room() -> void:
 	numbers.clear()
 	flashes.clear()
 	offs.clear()
+	pixels.clear()
 
 
 func step(dt: float, real_dt: float) -> void:
@@ -202,6 +222,13 @@ func step(dt: float, real_dt: float) -> void:
 		n[2] *= exp(-5.0 * dt)
 	_age(flashes, 2, 3, dt)
 	_age(offs, 1, 2, dt)
+	var i := 0
+	while i < pixels.size():
+		pixels[i][2] += dt
+		if pixels[i][2] >= PixelFx.length(pixels[i][0]):
+			pixels.remove_at(i)
+		else:
+			i += 1
 	var room := Arena.ROOM
 	for m in motes:
 		m[2] += dt
@@ -288,6 +315,9 @@ func _draw() -> void:
 
 
 func _draw_add() -> void:
+	# the pixel bursts add their light like the flashes do
+	for px in pixels:
+		PixelFx.draw(add_layer, px[0], px[2], px[1], px[3], px[4], px[5])
 	for fl in flashes:
 		var k: float = 1.0 - fl[2] / fl[3]
 		var r: float = fl[1] * (0.6 + 0.4 * Pal.ease_out(fl[2] / fl[3] * 2.0))

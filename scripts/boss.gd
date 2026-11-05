@@ -519,6 +519,7 @@ func _burst(k: int, big: float) -> void:
 	game.fx.sparks(tr.origin, Vector2.UP, int(16 * big), Pal.foe(1.0, 1.9), 800.0 * big, 0.5, PI)
 	game.fx.ring(tr.origin, 20.0, 180.0 * big, 0.55, Pal.foe(0.9, 1.5), 2.5)
 	game.fx.flash(tr.origin, 90.0 * big, 0.3, Pal.foe(0.5, 1.4))
+	game.fx.pixel("implosion", tr.origin, 2.0, 1.1)
 	game.sfx.play("die", randf_range(0.7, 0.8), 0.0)
 	game.cam.add_trauma(0.3 * big)
 	game.add_hitstop(0.05)

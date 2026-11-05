@@ -314,6 +314,8 @@ func _hit(e: E, dmg: float, dir: Vector2, at: Vector2, ret: bool) -> void:
 	game.fx.number(at, dmg, ret)
 	var c := Pal.red(1.0, 3.2) if ret else Pal.foe(1.0, 1.8)
 	game.fx.sparks(at, dir, 7 if ret else 4, c, 520.0 if ret else 380.0, 0.26, 0.7)
+	if Fx.PIXEL_HITS:
+		game.fx.pixel("spark", at, 2.0, 1.4, dir.x < 0.0)
 	game.fx.sparks(at, -dir, 2, Pal.foe(0.8, 1.4), 200.0, 0.2, 1.2)
 	game.fx.flash(at, 30.0 if ret else 22.0, 0.14, Color(c.r, c.g, c.b, 0.35))
 	game.on_target_hit(ret)
@@ -448,6 +450,8 @@ func _die(e: E, dir: Vector2) -> void:
 	# (a short flash: the tube's outline going out has to read through it)
 	game.fx.flash(e.pos, e.r * 2.0, 0.12, Color(col.r, col.g, col.b, 0.08))
 	game.fx.sparks(e.pos, dir, 10 + e.sides * 2, col, 700.0, 0.4, 1.3)
+	if Fx.PIXEL_ELITE and e.red > 0.5:
+		game.fx.pixel("zap", e.pos, 2.0, 1.6, dir.x < 0.0)
 	game.on_target_die(e.pos, e.kind)
 
 
