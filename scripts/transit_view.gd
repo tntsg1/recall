@@ -66,7 +66,7 @@ func _draw_map() -> void:
 	draw_rect(Rect2(Vector2.ZERO, Vector2(1920, 1080)), Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, a))
 	var hc := head if tr.view_map() == "ring" else CUT_C + (head - CUT_C) * CUT_K
 	# (where the way ends goes to the middle of the screen as the map grows: the deck is there)
-	var land := hc.lerp(Vector2(960, 540), Pal.ease_io(zoom_u))
+	var land := hc.lerp(Vector2(960, 540), Pal.ease_io(clampf(zoom_u * 1.4, 0.0, 1.0)))
 	var off := land - hc
 	draw_set_transform(hc - hc * s + off, 0.0, Vector2(s, s))
 	if tr.view_map() == "ring":
@@ -309,9 +309,9 @@ func _draw_ride() -> void:
 	# (the whole width round the progress line goes quiet, so no red of the city reads as it)
 	var c4 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.0)
 	var c5 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.97 * a)
-	draw_polygon(PackedVector2Array([Vector2(0, 130), Vector2(1920, 130), Vector2(1920, 190), Vector2(0, 190)]), PackedColorArray([c4, c4, c5, c5]))
-	draw_rect(Rect2(0, 190, 1920, 60), c5)
-	draw_polygon(PackedVector2Array([Vector2(0, 250), Vector2(1920, 250), Vector2(1920, 290), Vector2(0, 290)]), PackedColorArray([c5, c5, c4, c4]))
+	draw_polygon(PackedVector2Array([Vector2(0, 110), Vector2(1920, 110), Vector2(1920, 140), Vector2(0, 140)]), PackedColorArray([c4, c4, c5, c5]))
+	draw_rect(Rect2(0, 140, 1920, 150), c5)
+	draw_polygon(PackedVector2Array([Vector2(0, 290), Vector2(1920, 290), Vector2(1920, 300), Vector2(0, 300)]), PackedColorArray([c5, c5, c4, c4]))
 	var c9 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.94 * a)
 	draw_rect(Rect2(560, 0, 800, 200), c9)
 	draw_polygon(PackedVector2Array([Vector2(560, 200), Vector2(1360, 200), Vector2(1360, 270), Vector2(560, 270)]), PackedColorArray([c9, c9, c1, c1]))

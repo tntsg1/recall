@@ -696,8 +696,12 @@ func _box(o: Array) -> void:
 		# the hero: a halo, a hard bright rim, a red edge and red lights at its corners
 		draw_polyline(top, Pal.ink(0.16 * a), 14.0)
 		draw_polyline(top, Pal.ink(a, 2.0), 3.5)
-		draw_line(T[3], T[2], Pal.red(0.25 * a), 12.0)
-		draw_line(T[3], T[2], Pal.red(a, 2.0), 3.0)
+		if o[7] == 3:
+			draw_polyline(top, Pal.red(0.22 * a), 20.0)
+			draw_polyline(top, Pal.red(a, 2.0), 7.0)
+		else:
+			draw_line(T[3], T[2], Pal.red(0.25 * a), 12.0)
+			draw_line(T[3], T[2], Pal.red(a, 2.0), 3.0)
 		var blink := 0.35 + 0.65 * absf(sin(t * 2.4))
 		for q in T:
 			draw_circle(q, 6.0, Pal.red(blink * a, 2.4))
@@ -746,7 +750,13 @@ func _box(o: Array) -> void:
 			draw_line(T[0].lerp(T[1], f), T[3].lerp(T[2], f), faint, 1.0)
 		draw_line(T[0].lerp(T[3], 0.5), T[1].lerp(T[2], 0.5), Pal.ink(0.4 * a, 1.3), 1.0)
 		if glow == 2:
-			# a warship: lit ports down both flanks, the drives red at its stern
+			# a warship: a pointed bow ahead, its keel lit along its length
+			var mid := T[1].lerp(T[2], 0.5)
+			var tip := mid + (T[1] - T[0]).normalized() * (T[2] - T[1]).length() * 0.7
+			draw_colored_polygon(PackedVector2Array([T[1], tip, T[2]]), _fill(a, 1.1))
+			draw_polyline(PackedVector2Array([T[1], tip, T[2]]), Pal.ink(a, 1.9), 3.5)
+			draw_line(T[0].lerp(T[3], 0.5), tip, Pal.ink(0.8 * a, 1.6), 2.5)
+			# lit ports down both flanks, the drives red at its stern
 			for k in 36:
 				var f2 := (k + 0.5) / 36.0
 				for side in [0.62, 0.74, 0.86]:
@@ -987,7 +997,8 @@ func _text(o: Array) -> void:
 	var tw := font.get_string_size(o[4], HORIZONTAL_ALIGNMENT_LEFT, -1, size)
 	if visible_rect_hits_deck(Rect2(Vector2(c.x, c.y - tw.y * 0.8), tw)):
 		return
-	draw_string(font, Vector2(c.x, c.y), o[4], HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.6 * a, 1.1))
+	var loud: bool = o.size() > 6 and o[6]
+	draw_string(font, Vector2(c.x, c.y), o[4], HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(a, 1.6) if loud else Pal.ink(0.6 * a, 1.1))
 
 
 # A floor slab round the shaft at height z: a square ring, the shaft's inside
@@ -1293,8 +1304,8 @@ func _heroes(st: int) -> void:
 				objs.append([BOX, x, -1500.0, x + 3800.0, 1700.0, -D0 - 4400.0, -D0 - 170.0, 3, 2])
 				var tx := x + 120.0
 				while tx < x + 3500.0:
-					objs.append([TEXT, tx, 700.0, -D0 - 170.0, "100%", 180])
-					tx += 760.0
+					objs.append([TEXT, tx, 340.0, -D0 - 170.0, "100%", 270, true])
+					tx += 820.0
 		3:
 			# the stacks, taller than anything, their crowns alight
 			for b in at:
@@ -1336,7 +1347,7 @@ func _heroes(st: int) -> void:
 		10:
 			# a warship on its slip, the length of a city, going by underneath
 			for b in [0.2, 0.5, 0.8]:
-				var x: float = ease_way(b) * length - 2500.0
+				var x: float = ease_way(b) * length - 500.0
 				objs.append([BOX, x, -300.0, x + 7000.0, 1250.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
 
 

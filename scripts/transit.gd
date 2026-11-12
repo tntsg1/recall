@@ -159,6 +159,7 @@ func _begin(ch: int) -> void:
 	visible = true
 	view.visible = true
 	groups = [[2.2, Enemies.CHASER, 3], [6.0, d.kinds[1], 1], [6.3, Enemies.CHASER, 2], [9.8, d.kinds[2], 2], [10.1, Enemies.CHASER, 2]]
+	game.hud.visible = false
 	game.sfx.play("title", 0.8, -4.0)
 
 
@@ -173,6 +174,7 @@ func step(dt: float) -> void:
 			if t >= MAP_T:
 				state = RIDE
 				t = 0.0
+				game.hud.visible = true
 				game.sfx.play("dash", 0.6, -6.0)
 		RIDE:
 			t += dt
