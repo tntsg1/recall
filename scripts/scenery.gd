@@ -269,7 +269,7 @@ func _top(o: Array) -> float:
 		TUBE: return o[4]
 		TRAIN: return o[2]
 		CAR: return o[5]
-		SHIP: return o[5]
+		SHIP: return 1e9      # (whole ships go over the slips' frames round them)
 	return 0.0
 
 

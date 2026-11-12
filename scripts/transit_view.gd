@@ -163,13 +163,17 @@ func _cut_map(a: float) -> void:
 		draw_rect(Rect2(x, ground - h, 16, h), ik(0.25), false, 1.0)
 	draw_rect(Rect2(884, 352, 32, ground - 352), Color(0.05, 0.05, 0.056, a))
 	draw_rect(Rect2(884, 352, 32, ground - 352), ik(0.85, 1.5), false, 1.5)
-	# the bedrock under the city, in faint strata
-	for k in 4:
+	# the bedrock under the city and the sea, in faint strata the whole width
+	for k in 6:
 		var st := PackedVector2Array()
-		for i in 18:
-			var x := 570.0 + i * 40.0
-			st.append(Vector2(x, ground + 70.0 + k * 60.0 + 8.0 * sin(i * 0.8 + k * 1.7)))
-		draw_polyline(st, ik(0.09), 1.0)
+		for i in 37:
+			var x := 240.0 + i * 40.0
+			st.append(Vector2(x, ground + 40.0 + k * 46.0 + 8.0 * sin(i * 0.8 + k * 1.7)))
+		draw_polyline(st, ik(0.07), 1.0)
+	# the sea darkens with depth
+	var s0 := Color(0.5, 0.55, 0.6, 0.0)
+	var s1 := Color(0.5, 0.55, 0.6, 0.07 * ma)
+	draw_polygon(PackedVector2Array([Vector2(1250, ground), Vector2(1680, ground), Vector2(1680, 910), Vector2(1250, 910)]), PackedColorArray([s0, s0, s1, s1]))
 	# the undercity: twelve floors below the street
 	for k in 13:
 		var y := ground + 18.0 + k * 19.0
@@ -247,9 +251,9 @@ func _way(a: float, k: float) -> void:
 			draw_circle(shown[i], 4.0, Pal.red(0.9 * a, 1.4))
 		draw_circle(shown[shown.size() - 1], 8.0, Pal.red(a, 2.2))
 		if k >= 1.0:
-			for kk in 2:
-				var rip := fmod(tr.t * 1.4 + kk * 0.5, 1.0)
-				draw_arc(shown[shown.size() - 1], 10.0 + rip * 46.0, 0, TAU, 32, Pal.red((1.0 - rip) * 0.8 * a, 1.8), 2.0)
+			for kk in 3:
+				var rip := fmod(tr.t * 1.2 + kk / 3.0, 1.0)
+				draw_arc(shown[shown.size() - 1], 12.0 + rip * 80.0, 0, TAU, 40, Pal.red((1.0 - rip) * 0.95 * a, 2.0), 3.0)
 
 
 func _uses_map(story: int) -> String:
