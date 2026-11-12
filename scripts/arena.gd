@@ -74,12 +74,12 @@ class GlassView extends Node2D:
 			var fc := [foot.position, Vector2(foot.end.x, foot.position.y), foot.end, Vector2(foot.position.x, foot.end.y)]
 			for i in 4:
 				draw_line(rc[i], fc[i], Pal.ink(0.22), 1.0)
-			draw_rect(roof, Color(0.09, 0.09, 0.1))
-			draw_rect(roof, Pal.ink(0.5, 1.2), false, 1.5)
+			draw_rect(roof, Color(0.13, 0.13, 0.145))
+			draw_rect(roof, Pal.ink(0.85, 1.5), false, 2.0)
 			for r in 3:
 				for c in 2:
 					if (k + r + c) % 3 != 0:
-						draw_rect(Rect2(roof.position + Vector2(8 + c * (w - 22.0), 10 + r * (h - 20.0) / 3.0), Vector2(6, 3)), Pal.ink(0.55, 1.4))
+						draw_rect(Rect2(roof.position + Vector2(8 + c * (w - 22.0), 10 + r * (h - 20.0) / 3.0), Vector2(6, 3)), Pal.ink(0.85, 1.7))
 		# the line between them, and the train on it
 		var a0 := Vector2(g.position.x + g.size.x * 0.52, g.position.y + 6.0)
 		var a1 := Vector2(g.position.x + g.size.x * 0.52, g.end.y - 6.0)

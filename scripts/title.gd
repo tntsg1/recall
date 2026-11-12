@@ -606,6 +606,7 @@ func _draw() -> void:
 	var bm := bg.material as ShaderMaterial
 	bm.set_shader_parameter("cursor", cur_p.x)
 	bm.set_shader_parameter("size", vp)
+	_draw_red_sweep(vp, _page_k("menu", 0).x)
 	_draw_searchlight(vp, _page_k("menu", 0).x)
 	_draw_word(vp)
 	var dim_word := 0.0
@@ -676,6 +677,18 @@ func _draw_camera(par: Vector2, a: float) -> void:
 
 
 # A searchlight from somewhere above the city sweeps slowly behind the menu.
+# (full game) a red beam far off in the city behind, slowly sweeping the sky
+func _draw_red_sweep(vp: Vector2, on: float) -> void:
+	if vista == null or on <= 0.01:
+		return
+	var o := Vector2(vp.x * 0.86, vp.y + 80.0)
+	var a := -PI * 0.5 + sin(t * 0.13) * 0.55
+	var len := vp.length() * 1.1
+	for li in 10:
+		var w: float = lerpf(0.09, 0.012, li / 9.0)
+		draw_polygon(PackedVector2Array([o, o + Vector2.from_angle(a - w) * len, o + Vector2.from_angle(a + w) * len]), PackedColorArray([Pal.red(0.006 * on, 1.0), Pal.red(0.0), Pal.red(0.0)]))
+
+
 func _draw_searchlight(vp: Vector2, on: float) -> void:
 	var o := Vector2(vp.x * 0.12, -60.0)
 	var a := 1.05 + sin(t * 0.21) * 0.32

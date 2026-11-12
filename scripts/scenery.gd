@@ -511,22 +511,25 @@ func _leg_tower_down() -> void:
 	fog = 16000.0
 	path.append(Vector3(-6500, 0, 0))
 	path.append(Vector3(0, 0, 0))
-	var roof := -D0 - 160.0
+	var top := -D0 - 160.0
+	var roof := -D0 - 900.0
 	var foot := -26000.0
-	# the tower: its wall toward you windowed floor on floor, its roof a landing ring
+	# the tower: its wall toward you windowed floor on floor; two narrower tiers
+	# stepping up off its roof, the landing on the topmost
 	objs.append([BOX, -1100.0, -820.0, 1100.0, 820.0, foot, roof, 2, 2])
+	objs.append([BOX, -760.0, -560.0, 760.0, 560.0, roof, roof + 420.0, 2, 2])
+	objs.append([BOX, -460.0, -340.0, 460.0, 340.0, roof + 420.0, top, 2, 2])
 	var fz := roof - 420.0
 	while fz > roof - 9000.0:
 		objs.append([LINE, PackedVector3Array([Vector3(-1100.0, -820.0, fz), Vector3(-1100.0, 820.0, fz)]), 1.5, 3.0])
 		objs.append([LINE, PackedVector3Array([Vector3(-1100.0, -820.0, fz - 60.0), Vector3(-1100.0, 820.0, fz - 60.0)]), 1.0, 1.0])
 		fz -= 420.0
-	objs.append([BEAM, 0.0, 0.0, roof, roof + 600.0])
-	objs.append([RING, 0.0, 0.0, 300.0, roof + 4.0, 1.0, 48, true])
+	objs.append([RING, 0.0, 0.0, 300.0, top + 4.0, 1.0, 48, true])
 	objs.append([LINE, PackedVector3Array([Vector3(-1100.0, 0.0, roof), Vector3(-1100.0, 0.0, foot)]), 2.2, 6.0, true])
 	for y in [-820.0, 820.0]:
 		objs.append([LINE, PackedVector3Array([Vector3(-1100.0, y, roof), Vector3(-1100.0, y, foot)]), 2.0, 3.0, true])
-	objs.append([RING, 0.0, 0.0, 560.0, roof + 2.0, 1.0, 64])
-	objs.append([RING, 0.0, 0.0, 700.0, roof + 2.0, 1.0, 72, true])
+	objs.append([RING, 0.0, 0.0, 560.0, top + 2.0, 1.0, 64])
+	objs.append([RING, 0.0, 0.0, 700.0, top + 2.0, 1.0, 72, true])
 	for s2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
 		objs.append([BEAM, s2.x * 1100.0, s2.y * 820.0, roof, roof + 380.0])
 	# its crown's lower tiers, stepping out under the roof
@@ -699,6 +702,11 @@ func _box(o: Array) -> void:
 		if o[7] == 3:
 			draw_polyline(top, Pal.red(0.22 * a), 20.0)
 			draw_polyline(top, Pal.red(a, 2.0), 7.0)
+			for fy in [0.36, 0.66]:
+				var l0 := T[0].lerp(T[3], fy)
+				var l1 := T[1].lerp(T[2], fy)
+				draw_line(l0, l1, Pal.red(0.2 * a), 26.0)
+				draw_line(l0, l1, Pal.red(0.9 * a, 1.8), 6.0)
 		else:
 			draw_line(T[3], T[2], Pal.red(0.25 * a), 12.0)
 			draw_line(T[3], T[2], Pal.red(a, 2.0), 3.0)
@@ -752,13 +760,13 @@ func _box(o: Array) -> void:
 		if glow == 2:
 			# a warship: a pointed bow ahead, its keel lit along its length
 			var mid := T[1].lerp(T[2], 0.5)
-			var tip := mid + (T[1] - T[0]).normalized() * (T[2] - T[1]).length() * 0.7
+			var tip := mid + (T[1] - T[0]).normalized() * (T[2] - T[1]).length() * 0.24
 			draw_colored_polygon(PackedVector2Array([T[1], tip, T[2]]), _fill(a, 1.1))
 			draw_polyline(PackedVector2Array([T[1], tip, T[2]]), Pal.ink(a, 1.9), 3.5)
 			draw_line(T[0].lerp(T[3], 0.5), tip, Pal.ink(0.8 * a, 1.6), 2.5)
 			# lit ports down both flanks, the drives red at its stern
-			for k in 36:
-				var f2 := (k + 0.5) / 36.0
+			for k in 14:
+				var f2 := (k + 0.5) / 14.0
 				for side in [0.62, 0.74, 0.86]:
 					var pp: Vector2 = T[0].lerp(T[1], f2).lerp(T[3].lerp(T[2], f2), side)
 					draw_rect(Rect2(pp - Vector2(6, 4), Vector2(12, 8)), Pal.ink(0.9 * a, 1.9))
@@ -1347,8 +1355,8 @@ func _heroes(st: int) -> void:
 		10:
 			# a warship on its slip, the length of a city, going by underneath
 			for b in [0.2, 0.5, 0.8]:
-				var x: float = ease_way(b) * length - 500.0
-				objs.append([BOX, x, -300.0, x + 7000.0, 1250.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
+				var x: float = ease_way(b) * length - 1500.0
+				objs.append([BOX, x, -300.0, x + 2000.0, 1250.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
 
 
 # (rides only: the rooms' and the title's views have no deck)
