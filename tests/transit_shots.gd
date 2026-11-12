@@ -15,6 +15,7 @@ var li := 0
 var f := 0           # frames into this leg
 var cracks0 := 0
 var us := 0
+var draw_sum := 0.0
 
 
 func _initialize() -> void:
@@ -50,6 +51,8 @@ func _process(_dt: float) -> bool:
 		return true
 	var leg: int = legs[li]
 	var tr: Transit = game.transit
+	if f > 220 and f < 260:
+		draw_sum += tr.scenery.draw_us
 	match f:
 		30:
 			while Chapters.story(game.chapter) < leg:
@@ -78,8 +81,9 @@ func _process(_dt: float) -> bool:
 			tr.u = 0.5
 		220:
 			us = Time.get_ticks_usec()
+			draw_sum = 0.0
 		259:
-			print("  ride frame %.2f ms, scenery draw %.2f ms, %d objects (leg %d)" % [(Time.get_ticks_usec() - us) / 39000.0, tr.scenery.draw_us / 1000.0, tr.scenery.objs.size(), leg])
+			print("  ride frame %.2f ms, scenery draw %.2f ms, %d objects (leg %d)" % [(Time.get_ticks_usec() - us) / 39000.0, draw_sum / 39000.0, tr.scenery.objs.size(), leg])
 		260:
 			Cap.save(root, DIR % ("%02d_ride_b" % leg))
 			check(game.enemies.remaining() > 0, "第 %d 段有敌人爬上平台" % leg)

@@ -33,6 +33,7 @@ var dust: Array[Vector3] = []
 var planet := false
 var linear := false         # the title's endless drift: no easing at the ends
 var plain := false          # (the title) no heroes, no fly-bys
+var level := false          # the eye keeps its height (sideways legs): a building's light never changes
 const BEATS := [0.3, 0.6, 0.9]   # where something huge goes by close
 var beat := 0               # set when the way passes one of BEATS (Transit shakes and sounds it)
 var beats_done := 0
@@ -70,6 +71,7 @@ func begin(from_story: int) -> void:
 	# a ride looks ahead and down: the deep middle sits above the deck, where
 	# what is coming can be seen coming
 	C = Vector2(960, 230) if [1, 7, 8, 9].has(from_story) else Vector2(1260, 250)
+	level = not [1, 7, 8, 9].has(from_story)
 	if from_story == 11:
 		# (the tower comes in ahead: the view leans the other way to see it come)
 		C = Vector2(640, 260)
@@ -661,13 +663,26 @@ func _box(o: Array) -> void:
 	var bx := C.x + (x1 - eye.x) * s1
 	var ay := C.y + (y0 - eye.y) * s1
 	var by := C.y + (y1 - eye.y) * s1
-	if bx < -80.0 or ax > 2000.0 or by < -80.0 or ay > 1160.0:
-		# (its foot leans in toward the middle, so the top shows the most of it)
+	# a roof gone off the screen takes its walls with it gradually: they fade
+	# over the next 600 px it moves away, so nothing blinks out at the edge
+	var off := maxf(maxf(-80.0 - bx, ax - 2000.0), maxf(-80.0 - by, ay - 1160.0))
+	if off > 600.0:
 		return
 	var zb := maxf(z0, eye.z - D0 - fog * 1.4)
 	var s0 := F / (eye.z - zb)
 	var cx := C.x - eye.x * s0
 	var cy := C.y - eye.y * s0
+	# off the screen only when roof and the still-visible part of its walls are:
+	# a wall leans in from a roof past the edge toward the middle, fading as it
+	# goes, and must not blink out with its roof; past where it has faded to
+	# nothing it does not count
+	var fv := clampf(1.0 - 0.05 / maxf(a, 0.001), 0.0, 1.0)
+	var vx0 := lerpf(ax, cx + x0 * s0, fv)
+	var vx1 := lerpf(bx, cx + x1 * s0, fv)
+	var vy0 := lerpf(ay, cy + y0 * s0, fv)
+	var vy1 := lerpf(by, cy + y1 * s0, fv)
+	if maxf(bx, vx1) < -80.0 or minf(ax, vx0) > 2000.0 or maxf(by, vy1) < -80.0 or minf(ay, vy0) > 1160.0:
+		return
 	var T := PackedVector2Array([Vector2(ax, ay), Vector2(bx, ay), Vector2(bx, by), Vector2(ax, by)])
 	var B := PackedVector2Array([Vector2(cx + x0 * s0, cy + y0 * s0), Vector2(cx + x1 * s0, cy + y0 * s0), Vector2(cx + x1 * s0, cy + y1 * s0), Vector2(cx + x0 * s0, cy + y1 * s0)])
 	var hull := Rect2(T[0], T[2] - T[0]).merge(Rect2(B[0], B[2] - B[0]))
@@ -675,25 +690,38 @@ func _box(o: Array) -> void:
 		return
 	var glow: int = int(o[8])     # 0 plain, 1 lit, 2 the leg's hero
 	var faint := Pal.ink(0.22 * a, 1.0)
-	if a > 0.3:
+	# (where the eye keeps its height a dim building stays dim: its roof is all it needs)
+	var walls_k := 0.0 if level and a < 0.3 else smoothstep(0.04, 0.3, a)
+	if bx < -80.0 or ax > 2000.0 or by < -80.0 or ay > 1160.0:
+		if walls_k <= 0.0:
+			return
+		# its roof is off the screen: only the walls leaning in show, nothing else to draw
+		var c_t := _fill(a * walls_k * (1.0 - clampf(off / 600.0, 0.0, 1.0)), 1.0)
+		var walls := [eye.y < y0, eye.x > x1, eye.y > y1, eye.x < x0]
+		for i in 4:
+			if walls[i]:
+				var j := (i + 1) % 4
+				draw_polygon(PackedVector2Array([T[i], T[j], B[j], B[i]]), PackedColorArray([c_t, c_t, Pal.BG, Pal.BG]))
+		return
+	if walls_k > 0.0:
 		# the sides that face the eye: lit at the top, gone into the dark at the foot
 		var faces := [eye.y < y0, eye.x > x1, eye.y > y1, eye.x < x0]
-		var c_top := _fill(a, (0.8 if o[7] == 4 else 1.45) if glow == 2 else 1.0)
+		var c_top := _fill(a * walls_k, (0.8 if o[7] == 4 else 1.45) if glow == 2 else 1.0)
 		var c_bot := Pal.BG
 		var e_top := Pal.ink((0.95 if glow == 2 else 0.22) * a, 1.7 if glow == 2 else 1.0)
 		var e_bot := Pal.ink(0.0)
-		var win: int = o[7] if a > 0.45 else 0
+		# (windows fade in with nearness rather than switching on)
+		var win: int = o[7] if a > 0.42 else 0
+		var wa := a * smoothstep(0.42, 0.6, a)
 		for i in 4:
 			if not faces[i]:
 				continue
 			var j := (i + 1) % 4
-			if glow == 2 and leg != 0 and Rect2(T[i], Vector2.ZERO).expand(T[j]).expand(B[i]).expand(B[j]).intersects(DECK.grow(-20.0)):
-				# (a hero's wall would stand across the deck: its roof says enough)
-				continue
 			draw_polygon(PackedVector2Array([T[i], T[j], B[j], B[i]]), PackedColorArray([c_top, c_top, c_bot, c_bot]))
-			draw_polyline_colors(PackedVector2Array([T[i], B[i], B[j], T[j]]), PackedColorArray([e_top, e_bot, e_bot, e_top]), 1.0)
+			if a > 0.2:
+				draw_polyline_colors(PackedVector2Array([T[i], B[i], B[j], T[j]]), PackedColorArray([e_top, e_bot, e_bot, e_top]), 1.0)
 			if win > 0:
-				_windows(T[i], T[j], B[j], B[i], win, a, x0 + y0 + i)
+				_windows(T[i], T[j], B[j], B[i], win, wa, x0 + y0 + i)
 	draw_colored_polygon(T, _fill(a, (1.1 if o[7] == 4 else 2.4) if glow == 2 else 1.6))
 	var top := T.duplicate()
 	top.append(T[0])
@@ -839,9 +867,13 @@ func _cyl(o: Array) -> void:
 	var tx := C.x + (cx - eye.x) * s1
 	var ty := C.y + (cy - eye.y) * s1
 	var rr := r * s1
-	if tx + rr < -60.0 or tx - rr > 1980.0 or ty + rr < -60.0 or ty - rr > 1140.0:
-		return
 	var tc := Vector3(tx, ty, s1)
+	# (as a building's: a top gone off the screen fades its side out over 600 px)
+	var off := maxf(maxf(-60.0 - (tx + rr), (tx - rr) - 1980.0), maxf(-60.0 - (ty + rr), (ty - rr) - 1140.0))
+	if off > 600.0:
+		return
+	if off > 0.0:
+		a *= 1.0 - off / 600.0
 	var zb := maxf(z0, eye.z - D0 - fog * 1.4)
 	var bc := proj(Vector3(cx, cy, zb))
 	var tr := r * tc.z
@@ -1003,9 +1035,6 @@ func _text(o: Array) -> void:
 	var c := proj(Vector3(o[1], o[2], z))
 	var size := int(float(o[5]) * c.z)
 	if size < 8 or size > 420 or a < 0.05:
-		return
-	var tw := font.get_string_size(o[4], HORIZONTAL_ALIGNMENT_LEFT, -1, size)
-	if visible_rect_hits_deck(Rect2(Vector2(c.x, c.y - tw.y * 0.8), tw)):
 		return
 	var loud: bool = o.size() > 6 and o[6]
 	draw_string(font, Vector2(c.x, c.y), o[4], HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(a, 1.6) if loud else Pal.ink(0.6 * a, 1.1))
