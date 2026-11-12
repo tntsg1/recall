@@ -236,5 +236,11 @@
   - [x] 新碎片 22 条（lore.gd 追加在列表末尾，不动已有编号）：Li Berty 档案、十二层宿舍、宪章第二/三/四/五/六/七/九/十条、职业测评、Free 病历与复查、芯片提示音、环城往下看、白塔云上、买债券享人生、宁静的头脑、两条 Li 死亡句；字体子集已重建
   - [x] 新文案文档“霓虹行者 玩家可见文字（分部分，待去 AI 味，2026-11-12）”1PQaekSXsxe_cjFJdrvNCfNN-ApULFjo2K56HJrTVmAc：878 条分 16 部分（【新】22、【未看过】84）；导出 steam-release/NEONRAID-4953700/texts/export_doc.py → entries_doc.json（按编号写回用）；11-02 旧文档已改名作废
   - [ ] 用户改完后按 entries_doc.json 编号写回、重译英文
-  - [ ] 乘坐段文字补进文档第 17 节
+  - [x] 乘坐段文字 34 条另建补充文档“霓虹行者 玩家可见文字 · 第 17 部分 章节切换（2026-11-12 补）”1n0_BlCXT1pnp1b-4HJMtwss3N1pYncDIRf0Gm2cKXFs（#879–#912，主文档 #1–#878 编号不变）
+  - [x] 章节乘坐段：scripts/transit.gd（流程/平台/刷敌/跳过，Waves 章末调 transit.take）+ scenery.gd（透视线框巨构：眼睛沿路径移动，F/(eye.z-z) 投影，深的先画）+ transit_view.gd（环城俯视图/海底至轨道剖面、红线、字幕、按住 Tab/Select 跳过）；11 段各有载具和巨构；敌人伤不到人（波次不在 FIGHT），game.live() 让夺壳在平台上可用；看过的段记在 Meta rides
+  - [x] 房间巨构：arena 地板格栅（floor.gdshader grates）+ 每章第 2/5 个房间无出入口的一侧外墙换落地窗；game.vista = Scenery.under(章) 每章一层静态脚下巨构
+  - [x] 标题背景：Scenery 楼宇峡谷 160 秒一圈，亮度 0.16
+  - [x] 性能：盒子直算投影、远处只画顶面、窗户查表一次画完、线和筒仓先剔除 → 每段 60 帧，背景每帧 1.3–6 ms
+  - [x] 测试：tests/transit_shots.gd（11 段地图/乘坐/到站，不受伤、回到房间）、tests/vista_shots.gd；回归 20 项与改前相同（possess2 两条旧失败；boss/wall 只是测量工具跑得久）
+  - [ ] Sonnet 评分 ≥9
   - [ ] 开工：①导出文案新文档 ②新碎片句（Li/Free/宪章/环形城市）③11 段乘坐切换+地图 ④房间格栅/开放边缘巨构 ⑤标题画面巨构；只进正式版（Demo.extras）；交付前 Sonnet ≥9
