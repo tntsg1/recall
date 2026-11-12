@@ -1262,9 +1262,9 @@ func _heroes(st: int) -> void:
 			# a tower whose whole roof is a screen: 100%
 			for b in at:
 				var x: float = ease_way(b) * length - 400.0
-				objs.append([BOX, x, 650.0, x + 2600.0, 1500.0, -D0 - 4400.0, -D0 - 160.0, 3, 2])
-				objs.append([TEXT, x + 160.0, 760.0, -D0 - 160.0, "100%", 200])
-				objs.append([TEXT, x + 1300.0, 760.0, -D0 - 160.0, "100%", 200])
+				objs.append([BOX, x, 680.0, x + 2600.0, 1500.0, -D0 - 4400.0, -D0 - 160.0, 3, 2])
+				objs.append([TEXT, x + 160.0, 880.0, -D0 - 160.0, "100%", 190])
+				objs.append([TEXT, x + 1300.0, 880.0, -D0 - 160.0, "100%", 190])
 		3:
 			# the stacks, taller than anything, their crowns alight
 			for b in at:
@@ -1307,7 +1307,7 @@ func _heroes(st: int) -> void:
 			# a warship on its slip, the length of a city, going by underneath
 			for b in [0.2, 0.5, 0.8]:
 				var x: float = ease_way(b) * length - 1500.0
-				objs.append([BOX, x, 640.0, x + 6000.0, 1300.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
+				objs.append([BOX, x, 600.0, x + 6000.0, 980.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
 
 
 # (rides only: the rooms' and the title's views have no deck)
