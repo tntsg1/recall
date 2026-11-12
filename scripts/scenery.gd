@@ -10,12 +10,13 @@ extends Node2D
 
 const F := 1000.0
 const D0 := 1000.0          # the deck's depth below the eye
-const C := Vector2(960, 540)
+const C0 := Vector2(960, 540)
+var C := C0                 # where straight down falls on screen (above the deck on a ride)
 const NEAR := 140.0         # nothing closer than this to the eye is drawn
 const SCREEN := Rect2(-80, -80, 2080, 1240)
 const DECK := Transit.DECK
 
-enum { BOX, CYL, LINE, RING, CLOUD, TEXT, FRAME, GRID, ARC, BEAM, TUBE }
+enum { BOX, CYL, LINE, RING, CLOUD, TEXT, FRAME, GRID, ARC, BEAM, TUBE, TRAIN, CAR }
 
 var leg := 0
 var objs: Array = []        # sorted deepest first
@@ -31,6 +32,9 @@ var star_pts: Array = []
 var dust: Array[Vector3] = []
 var planet := false
 var linear := false         # the title's endless drift: no easing at the ends
+const BEATS := [0.3, 0.6, 0.9]   # where something huge goes by close
+var beat := 0               # set when the way passes one of BEATS (Transit shakes and sounds it)
+var beats_done := 0
 var font: Font
 var rng := RandomNumberGenerator.new()
 static var LIT: Array[bool] = []   # which windows burn, a fixed pattern
@@ -60,6 +64,11 @@ func begin(from_story: int) -> void:
 	planet = false
 	fog = 4200.0
 	rng.seed = 7919 * from_story + 17
+	beat = 0
+	beats_done = 0
+	# a ride looks ahead and down: the deep middle sits above the deck, where
+	# what is coming can be seen coming
+	C = Vector2(960, 230) if [1, 7, 8, 9, 11].has(from_story) else Vector2(1260, 250)
 	match from_story:
 		1: _leg_undercity()
 		2: _leg_side("corp", "industry", 0.0)
@@ -72,6 +81,7 @@ func begin(from_story: int) -> void:
 		9: _leg_space_up()
 		10: _leg_orbit()
 		_: _leg_tower_down()
+	_heroes(from_story)
 	objs.sort_custom(func(a, b): return _top(a) < _top(b))
 	star_pts.clear()
 	for i in 160:
@@ -102,6 +112,7 @@ const UNDER := {1: "dorms", 2: "corp", 3: "industry", 4: "silos", 5: "rails", 6:
 
 
 func under(story: int) -> void:
+	C = C0
 	objs.clear()
 	path.clear()
 	dust.clear()
@@ -187,6 +198,9 @@ func under(story: int) -> void:
 func step(dt: float, progress: float) -> void:
 	t += dt
 	u = progress
+	while beats_done < BEATS.size() and u >= BEATS[beats_done] and path.size() >= 2 and not linear:
+		beats_done += 1
+		beat = beats_done
 	eye_prev = eye
 	eye = _eye_at(u)
 	if dt > 0.0:
@@ -237,6 +251,8 @@ func _top(o: Array) -> float:
 		ARC: return o[3]
 		BEAM: return o[3]
 		TUBE: return o[4]
+		TRAIN: return o[2]
+		CAR: return o[5]
 	return 0.0
 
 
@@ -473,11 +489,11 @@ func _leg_orbit() -> void:
 # Down from orbit onto the white tower: the clouds coming up, the crown
 # widening tier by tier round the landing deck, a beacon at every corner.
 func _leg_tower_down() -> void:
-	var tiers := [[5200.0, 3400.0, -2600.0], [3500.0, 2300.0, -1700.0], [2200.0, 1450.0, -950.0], [1060.0, 700.0, -300.0]]
+	var tiers := [[5200.0, 3400.0, -2600.0], [3500.0, 2300.0, -1700.0]]
 	for tr in tiers:
-		objs.append([BOX, -tr[0], -tr[1], tr[0], tr[1], tr[2] - 700.0, tr[2], 5, true])
+		objs.append([BOX, 1500.0 - tr[0], -tr[1], 1500.0 + tr[0], tr[1], tr[2] - 700.0, tr[2], 5, true])
 		for s in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
-			objs.append([BEAM, s.x * tr[0], s.y * tr[1], tr[2], tr[2] + 260.0])
+			objs.append([BEAM, 1500.0 + s.x * tr[0], s.y * tr[1], tr[2], tr[2] + 260.0])
 	for i in 36:
 		var p := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(2000, 5200)
 		objs.append([CLOUD, p.x, p.y, rng.randf_range(700, 1300), rng.randf_range(320, 640), -3400.0 + rng.randf_range(-250, 250)])
@@ -552,6 +568,8 @@ func _draw() -> void:
 			ARC: _arc(o)
 			BEAM: _beam(o)
 			TUBE: _tube(o)
+			TRAIN: _train(o)
+			CAR: _car(o)
 	_dust()
 	draw_us = Time.get_ticks_usec() - t0
 
@@ -611,14 +629,14 @@ func _box(o: Array) -> void:
 	var hull := Rect2(T[0], T[2] - T[0]).merge(Rect2(B[0], B[2] - B[0]))
 	if DECK.grow(-4).encloses(hull):
 		return
-	var glow: bool = o[8]
+	var glow: int = int(o[8])     # 0 plain, 1 lit, 2 the leg's hero
 	var faint := Pal.ink(0.22 * a, 1.0)
 	if a > 0.3:
 		# the sides that face the eye: lit at the top, gone into the dark at the foot
 		var faces := [eye.y < y0, eye.x > x1, eye.y > y1, eye.x < x0]
 		var c_top := _fill(a, 1.0)
 		var c_bot := Pal.BG
-		var e_top := Pal.ink(0.5 * a, 1.0)
+		var e_top := Pal.ink((0.9 if glow == 2 else 0.36) * a, 1.6 if glow == 2 else 1.0)
 		var e_bot := Pal.ink(0.0)
 		var win: int = o[7] if a > 0.45 else 0
 		for i in 4:
@@ -632,7 +650,11 @@ func _box(o: Array) -> void:
 	draw_colored_polygon(T, _fill(a, 1.7))
 	var top := T.duplicate()
 	top.append(T[0])
-	draw_polyline(top, Pal.ink(0.85 * a, 1.6) if glow else Pal.ink(0.65 * a, 1.1), 1.5)
+	if glow == 2:
+		draw_polyline(top, Pal.ink(0.14 * a), 10.0)
+		draw_polyline(top, Pal.ink(a, 1.9), 3.0)
+	else:
+		draw_polyline(top, Pal.ink(0.8 * a, 1.5) if glow == 1 else Pal.ink(0.48 * a, 1.0), 1.5)
 	if o[7] == 1:
 		# a factory roof: saw-tooth ridges across the top
 		for k in range(1, 6):
@@ -770,9 +792,10 @@ func _line3(o: Array) -> void:
 		amin = minf(amin, fade(d))
 	if amin < 0.02 or hi.x < -60.0 or lo.x > 1980.0 or hi.y < -60.0 or lo.y > 1140.0:
 		return
+	var red: bool = o.size() > 4 and o[4]
 	if k >= 1.3:
-		draw_polyline(out, Pal.ink(0.12 * amin, 1.0), w + 5.0)
-	draw_polyline(out, Pal.ink(0.7 * amin, k), w)
+		draw_polyline(out, Pal.red(0.14 * amin) if red else Pal.ink(0.12 * amin, 1.0), w + 6.0)
+	draw_polyline(out, Pal.red(0.9 * amin, k) if red else Pal.ink(0.7 * amin, k), w)
 
 
 func _ring(o: Array) -> void:
@@ -789,6 +812,10 @@ func _ring(o: Array) -> void:
 		return
 	var p := Vector2(c.x, c.y)
 	if r < 520.0 and DECK.grow(-4).has_point(p - Vector2(r, r)) and DECK.grow(-4).has_point(p + Vector2(r, r)):
+		return
+	if o.size() > 7 and o[7]:
+		draw_arc(p, r, 0, TAU, int(o[6]), Pal.red(0.2 * a), 10.0)
+		draw_arc(p, r, 0, TAU, int(o[6]), Pal.red(0.95 * a, 1.9), 3.0)
 		return
 	draw_arc(p, r, 0, TAU, int(o[6]), Pal.ink(0.12 * a), 6.0)
 	draw_arc(p, r, 0, TAU, int(o[6]), Pal.ink(0.7 * a, 1.25), 1.5)
@@ -993,6 +1020,17 @@ func _beam(o: Array) -> void:
 # Motes in the air between here and the floor below, drawn as streaks along
 # the way you are going: the faster, the longer.
 func _dust() -> void:
+	if leg == 7 or leg == 8:
+		# under the sea the motes are bubbles, rising past
+		for p in dust:
+			var q := proj(p)
+			if q.z <= 0.0:
+				continue
+			var a := Vector2(q.x, q.y)
+			if DECK.has_point(a):
+				continue
+			draw_arc(a, clampf(4.0 * q.z, 1.5, 9.0), 0, TAU, 10, Pal.ink(clampf(0.5 * q.z, 0.1, 0.6), 1.2), 1.0)
+		return
 	var pts := PackedVector2Array()
 	for p in dust:
 		var q := proj(p)
@@ -1041,3 +1079,124 @@ func _tube(o: Array) -> void:
 		var fs := int(34.0 * s)
 		if fs >= 10 and fs < 160:
 			draw_string(font, p + Vector2(-r - th + 6.0 * s, -10.0 * s), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.75 * a, 1.3))
+
+
+# A train on the line beside you: a string of lit cars running its own way
+# (x at t: start + speed * t), so the city's scale has something to go by.
+# [TRAIN, y, z, speed, cars, start]
+func _train(o: Array) -> void:
+	var y: float = o[1]
+	var z: float = o[2]
+	var d := eye.z - z
+	if d < NEAR:
+		return
+	var a := fade(d)
+	if a < 0.03:
+		return
+	var sc := F / d
+	var x0: float = float(o[5]) + float(o[3]) * t
+	var cars: int = o[4]
+	for k in cars:
+		var cx := x0 + k * 190.0
+		var px := C.x + (cx - eye.x) * sc
+		if px < -300.0 or px > 2220.0:
+			continue
+		var py := C.y + (y - eye.y) * sc
+		var r := Rect2(px, py - 26.0 * sc, 170.0 * sc, 52.0 * sc)
+		draw_rect(r, _fill(a, 1.4))
+		draw_rect(r, Pal.ink(0.75 * a, 1.5), false, 1.5)
+		var n := 6
+		for w in n:
+			draw_rect(Rect2(r.position.x + (w + 0.3) * r.size.x / n, r.position.y + r.size.y * 0.3, r.size.x / n * 0.4, r.size.y * 0.4), Pal.ink(0.7 * a, 1.6))
+	# its headlight down the line
+	var hx := C.x + (x0 - eye.x) * sc
+	draw_line(Vector2(hx, C.y + (y - eye.y) * sc), Vector2(hx - 260.0 * sc * signf(float(o[3])), C.y + (y - eye.y) * sc), Pal.ink(0.35 * a, 1.8), 6.0 * sc)
+
+
+# A cage on the shaft's wall going its own way up or down: [CAR, x, y, w, speed, z0]
+func _car(o: Array) -> void:
+	var z: float = float(o[5]) + float(o[4]) * t
+	var d := eye.z - z
+	if d < NEAR or d > D0 + 2600.0:
+		return
+	var a := fade(d)
+	var sc := F / d
+	var p := Vector2(C.x + (float(o[1]) - eye.x) * sc, C.y + (float(o[2]) - eye.y) * sc)
+	var w: float = float(o[3]) * sc
+	var r := Rect2(p - Vector2(w, w * 0.7) / 2.0, Vector2(w, w * 0.7))
+	draw_rect(r, _fill(a, 1.5))
+	draw_rect(r, Pal.ink(0.8 * a, 1.6), false, 2.0)
+	draw_circle(r.get_center(), maxf(2.0, 5.0 * sc), Pal.ink(0.9 * a, 2.0))
+
+
+# Each leg's hero (the one thing you will remember it by), the near
+# fly-bys at the beats, and things moving at their own pace to give scale.
+func _heroes(st: int) -> void:
+	var lateral := not [1, 7, 8, 9, 11].has(st)
+	var length := 24000.0
+	if lateral:
+		# at each beat a gate goes by under the deck: two columns, a beam across
+		for b in BEATS:
+			var x: float = ease_way(b) * length + 400.0
+			for side in [-1.0, 1.0]:
+				objs.append([BOX, x, side * 470.0 - 90.0, x + 180.0, side * 470.0 + 90.0, -D0 - 4400.0, -D0 - 70.0, 0, 2])
+			objs.append([BOX, x, -620.0, x + 180.0, 620.0, -D0 - 260.0, -D0 - 120.0, 0, 1])
+		# trains on the lines alongside, both ways
+		for k in 3:
+			var y: float = [-640.0, 640.0, -900.0][k]
+			objs.append([TRAIN, y, -D0 - 520.0, [-2600.0, 1800.0, -3400.0][k], 9, rng.randf_range(2000, 16000)])
+	match st:
+		1:
+			# the white tower, far off across the centre, its spine red
+			var g := 12 * 300.0
+			objs.append([BOX, 1000.0, 500.0, 1500.0, 1000.0, g, g + 300.0, 2, 2])
+			objs.append([LINE, PackedVector3Array([Vector3(1000.0, 750.0, g + 300.0), Vector3(1000.0, 750.0, g)]), 1.8, 3.0, true])
+			for k in 6:
+				objs.append([CAR, [-560.0, 560.0][k % 2], [-300.0, 200.0, 0.0][k % 3], 90.0, [-260.0, 220.0][k % 2], k * 600.0])
+		2, 6:
+			# a tower whose whole face is a screen
+			var x: float = ease_way(0.6) * length - 300.0
+			objs.append([BOX, x, 760.0, x + 900.0, 1500.0, -D0 - 4400.0, -D0 - 260.0, 3, 2])
+			objs.append([TEXT, x + 120.0, 1160.0, -D0 - 260.0, "100%", 150])
+		3:
+			# the stacks: two chimneys taller than anything, their tops alight
+			var x: float = ease_way(0.6) * length
+			objs.append([CYL, x, -900.0, 200.0, -D0 - 2600.0, -D0 - 150.0, 4])
+			objs.append([CYL, x + 700.0, -1000.0, 170.0, -D0 - 2600.0, -D0 - 260.0, 4])
+		4:
+			# the strategic reserve: a silo the size of a district, named on its roof
+			var x: float = ease_way(0.45) * length
+			objs.append([CYL, x, -1500.0, 950.0, -D0 - 2800.0, -D0 - 420.0, 3])
+			objs.append([TEXT, x - 360.0, -1500.0, -D0 - 420.0, Txt.t("crate_reserve"), 120])
+		5:
+			# the fusion dome, its rings breathing
+			var x: float = ease_way(0.65) * length
+			objs.append([CYL, x, 1800.0, 1150.0, -D0 - 2600.0, -D0 - 900.0, 4])
+		7:
+			# the archive's vault on the sea floor, coming up to meet you, a red light on its crown
+			objs.append([CYL, 0.0, -400.0, 1500.0, -5200.0 - 400.0, -5200.0 + 900.0, 3])
+			objs.append([RING, 0.0, -400.0, 1150.0, -5200.0 + 900.0, 1.0, 72, true])
+			for k in 3:
+				objs.append([TUBE, 0.0, 0.0, 760.0, -(BEATS[k] * 4800.0) - 200.0, 150.0, ""])
+		8:
+			# the lift's anchor: a foundation ring on the sea floor, the cable lit to the surface
+			objs.append([CYL, 0.0, 0.0, 1300.0, -400.0, 300.0, 3])
+			objs.append([LINE, PackedVector3Array([Vector3(0, 0, 300.0), Vector3(0, 0, 9000.0)]), 1.8, 4.0, true])
+			for k in 3:
+				objs.append([TUBE, 0.0, 0.0, 760.0, 1700.0 + BEATS[k] * 5200.0, 140.0, ""])
+		9:
+			# the capital below, its tower a needle of light up toward you
+			objs.append([LINE, PackedVector3Array([Vector3(0, 0, 0.0), Vector3(0, 0, 3000.0)]), 2.0, 4.0, true])
+			for k in 3:
+				objs.append([TUBE, 0.0, 0.0, 760.0, 4800.0 + BEATS[k] * 9600.0, 140.0, ""])
+		10:
+			# a warship on its slip, the length of a city, going by underneath
+			var x: float = ease_way(0.35) * length
+			objs.append([BOX, x, 520.0, x + 9000.0, 1500.0, -D0 - 1600.0, -D0 - 240.0, 4, 2])
+			objs.append([LINE, PackedVector3Array([Vector3(x, 1010.0, -D0 - 240.0), Vector3(x + 9000.0, 1010.0, -D0 - 240.0)]), 1.8, 3.0, true])
+		11:
+			# the white tower itself: you come down beside it to its top, its spine red
+			objs.append([BOX, 560.0, -900.0, 2300.0, 900.0, -12000.0, -320.0, 2, 2])
+			objs.append([LINE, PackedVector3Array([Vector3(560.0, 0, -320.0), Vector3(560.0, 0, -11000.0)]), 2.0, 4.0, true])
+			for k in 3:
+				objs.append([FRAME, 900.0, 700.0, 6800.0 - BEATS[k] * 6900.0, 120.0, "", false])

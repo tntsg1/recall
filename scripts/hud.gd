@@ -416,16 +416,18 @@ func _draw_view() -> void:
 		if combo_stamp > 0.0:
 			var e := 1.0 - combo_stamp
 			view.draw_arc(cp, lerpf(40.0, 150.0, Pal.ease_out(e)), 0.0, TAU, 64, Possess.cyan(combo_stamp * 0.8, 2.0) if combo_seize else Pal.red(combo_stamp * 0.8, 2.0), 2.0, false)
+	var riding: bool = game.transit != null and game.transit.state != Transit.OFF
 	if game.tutorial == null:
-		_draw_timer(vp)
-		_draw_title(vp)
+		if not riding:
+			_draw_timer(vp)
+			_draw_title(vp)
 		_draw_radio(vp)
 	_draw_stamp(vp)
 	_draw_cards(vp)
 	_draw_final(vp)
 	_draw_dev(vp)
-	# hints
-	if hint_a > 0.0:
+	# hints (a ride shows its own line there)
+	if hint_a > 0.0 and not riding:
 		# one line in the band, left-aligned to the arena's edge
 		var hint_keys := ["hint_fire", "hint_recall", "hint_dash"]
 		if game.lightwalk != null and game.lightwalk.available():

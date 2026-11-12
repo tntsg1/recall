@@ -12,7 +12,7 @@ var rects: Array[Rect2] = []   # every solid; mirrors last
 var inner: Array[Rect2] = []   # pillars and bars (drawn with full outline)
 var open := false              # a ride's deck (Transit): solid as ever, drawn by Transit
 var grates: Array[Rect2] = []  # floor grates over the megastructure below (full game)
-var window_side := ""          # an outer wall opened onto it as a window ("L" / "R")
+var glass := Rect2()           # a glass floor along one wall, onto the same depths (two rooms a chapter)
 var mirrors: Array[Rect2] = [] # panels that reflect instead of holding a round
 var mirror_from := 9999        # index in rects where mirrors begin
 var movers: Array[Rect2] = []
@@ -156,7 +156,7 @@ func setup(ch: int, lay := {}) -> void:
 # wall with no door in it becomes a window.
 func _pick_vista(lay: Dictionary) -> void:
 	grates.clear()
-	window_side = ""
+	glass = Rect2()
 	if game != null and Demo.extras() and not open and game.tutorial == null:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = hash([game.run_seed, game.chapter, int(lay.get("index", -1))])
@@ -191,13 +191,27 @@ func _pick_vista(lay: Dictionary) -> void:
 			if ok:
 				grates.append(r)
 		if generated and [1, 4].has(int(lay.get("index", -1))):
-			# (the enemies' spawn gates sit on every wall; only the ways in and on rule one out)
-			var used := {}
-			for d: Dictionary in doors.slice(0, doors.size() - (lay.get("gates", []) as Array).size()):
-				used[d.get("side", "")] = true
-			for s in ["L", "R"]:
-				if not used.has(s):
-					window_side = s
+			# a strip of glass floor along the left or right wall, where it is clear
+			for side in ([-1.0, 1.0] if rng.randf() < 0.5 else [1.0, -1.0]):
+				var x := ROOM.position.x + 10.0 if side < 0.0 else ROOM.end.x - 170.0
+				var y := ROOM.position.y + 60.0
+				while y + 480.0 < ROOM.end.y - 60.0 and glass.size.x == 0.0:
+					var r := Rect2(x, y, 160.0, 480.0)
+					var ok := true
+					for w: Rect2 in rects.slice(4) + soft:
+						if w.grow(20.0).intersects(r):
+							ok = false
+							break
+					for p: Vector2 in avoid:
+						if r.grow(90.0).has_point(p):
+							ok = false
+					for g: Rect2 in grates:
+						if g.grow(60.0).intersects(r):
+							ok = false
+					if ok:
+						glass = r
+					y += 40.0
+				if glass.size.x > 0.0:
 					break
 	if game != null and game.floor_mat != null:
 		var arr: Array[Vector4] = []
@@ -207,6 +221,7 @@ func _pick_vista(lay: Dictionary) -> void:
 			arr.append(Vector4.ZERO)
 		game.floor_mat.set_shader_parameter("grates", arr)
 		game.floor_mat.set_shader_parameter("grate_n", grates.size())
+		game.floor_mat.set_shader_parameter("glass", Vector4(glass.position.x, glass.position.y, glass.size.x, glass.size.y))
 
 
 # The way round the shipyard's plates changes as they drift: Plates calls
@@ -396,15 +411,16 @@ func _draw() -> void:
 	var big := ROOM.grow(OUTER)
 	draw_rect(Rect2(big.position, Vector2(big.size.x, ROOM.position.y - big.position.y)), Pal.WALL)
 	draw_rect(Rect2(Vector2(big.position.x, ROOM.end.y), Vector2(big.size.x, big.end.y - ROOM.end.y)), Pal.WALL)
-	var left := Rect2(Vector2(big.position.x, ROOM.position.y), Vector2(ROOM.position.x - big.position.x, ROOM.size.y))
-	var right := Rect2(Vector2(ROOM.end.x, ROOM.position.y), Vector2(big.end.x - ROOM.end.x, ROOM.size.y))
-	if window_side != "L":
-		draw_rect(left, Pal.WALL)
-	if window_side != "R":
-		draw_rect(right, Pal.WALL)
-	if window_side != "":
-		_draw_window(left if window_side == "L" else right, f)
+	draw_rect(Rect2(Vector2(big.position.x, ROOM.position.y), Vector2(ROOM.position.x - big.position.x, ROOM.size.y)), Pal.WALL)
+	draw_rect(Rect2(Vector2(ROOM.end.x, ROOM.position.y), Vector2(big.end.x - ROOM.end.x, ROOM.size.y)), Pal.WALL)
 	draw_rect(ROOM, edge, false, 2.0)
+	if glass.size.x > 0.0:
+		# the glass floor's frame: a lit rim, a mullion cap at every pane
+		draw_rect(glass, Pal.ink(0.55 - 0.2 * f, 1.2), false, 2.0)
+		var gy := glass.position.y + 120.0
+		while gy < glass.end.y - 4.0:
+			draw_line(Vector2(glass.position.x - 4.0, gy), Vector2(glass.end.x + 4.0, gy), Pal.ink(0.4 - 0.15 * f), 3.0)
+			gy += 120.0
 	for g in grates:
 		draw_rect(g, Pal.ink(0.42 - 0.18 * f), false, 2.0)
 		draw_rect(g.grow(-6.0), faint, false, 1.0)
@@ -533,29 +549,6 @@ func _faces(w: Rect2) -> Array:
 
 func game_t() -> float:
 	return game.real_time if game else 0.0
-
-
-# An outer wall opened up: tall panes onto the megastructure, mullions across,
-# a slant of reflected light on the glass.
-func _draw_window(r: Rect2, f: float) -> void:
-	var g := Rect2(Vector2(r.end.x - 84.0, r.position.y), Vector2(84.0, r.size.y))
-	if window_side == "R":
-		g = Rect2(r.position, Vector2(84.0, r.size.y))
-	draw_rect(g, Color(0.6, 0.65, 0.7, 0.035))
-	var y := g.position.y + 94.0
-	while y < g.end.y:
-		draw_line(Vector2(g.position.x, y), Vector2(g.end.x, y), Pal.ink(0.32 - 0.12 * f), 3.0)
-		y += 94.0
-	var x := g.position.x + g.size.x * 0.5
-	draw_line(Vector2(x, g.position.y), Vector2(x, g.end.y), Pal.ink(0.18), 1.0)
-	var k := 0.0
-	while k < g.size.y:
-		var a := Vector2(g.position.x, g.position.y + k)
-		draw_line(a, a + Vector2(g.size.x, -g.size.x * 0.8), Pal.ink(0.06), 6.0)
-		k += 310.0
-	# beyond the glass, the rest of the wall is dark
-	var rest := Rect2(r.position, Vector2(r.size.x - 84.0, r.size.y)) if window_side == "L" else Rect2(Vector2(r.position.x + 84.0, r.position.y), Vector2(r.size.x - 84.0, r.size.y))
-	draw_rect(rest, Pal.WALL)
 
 
 func _corner_marks(r: Rect2, c: Color) -> void:

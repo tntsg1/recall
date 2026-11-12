@@ -187,7 +187,7 @@ func _ready() -> void:
 	add_child(floor_rect)
 	if Demo.extras():
 		vista = Scenery.new()
-		vista.modulate = Color(1, 1, 1, 0.85)
+		vista.modulate = Color(1, 1, 1, 0.72)
 		add_child(vista)
 
 	sfx = Sfx.new()
@@ -1059,6 +1059,9 @@ func _run_frame(dt: float) -> void:
 	if prof_on:
 		_lap("cam+post+hud+sfx")
 	_update_floor(dt)
+	if vista != null and vista.visible:
+		# what lies deep below shifts a little as you move over it
+		vista.position = vista.position.lerp((player.pos - Cam.CENTER) * 0.07, 1.0 - exp(-6.0 * dt))
 	if absf(focus - last_focus_drawn) > 0.004:
 		last_focus_drawn = focus
 		arena.queue_redraw()

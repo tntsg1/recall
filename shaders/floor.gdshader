@@ -18,6 +18,8 @@ uniform vec4 infect[8];
 // xy corner, zw size; bars run along the longer side.
 uniform vec4 grates[4];
 uniform int grate_n = 0;
+// A strip of glass floor along a wall (zw 0: none): nearly clear, panes and a sheen.
+uniform vec4 glass = vec4(0.0);
 
 float hash(vec2 v) {
 	return fract(sin(dot(v, vec2(127.1, 311.7))) * 43758.5453);
@@ -89,6 +91,17 @@ void fragment() {
 		float rib = smoothstep(29.6, 30.8, abs(mod(across, 64.0) - 32.0));
 		hole = (1.0 - max(bar, rib)) * smoothstep(5.0, 9.0, edge);
 		srgb = mix(srgb, vec3(0.16, 0.16, 0.17), max(bar, rib) * 0.9);
+	}
+	if (glass.z > 0.0) {
+		vec2 lp = p - glass.xy;
+		if (lp.x >= 0.0 && lp.y >= 0.0 && lp.x <= glass.z && lp.y <= glass.w) {
+			float edge = min(min(lp.x, lp.y), min(glass.z - lp.x, glass.w - lp.y));
+			float pane = smoothstep(56.0, 58.5, abs(mod(lp.y, 120.0) - 60.0));
+			float sheen = smoothstep(0.92, 1.0, sin((lp.x + lp.y) * 0.035 + t * 0.15)) * 0.25;
+			hole = max(hole, (1.0 - pane) * smoothstep(4.0, 10.0, edge) * 0.95);
+			srgb = mix(srgb, vec3(0.2, 0.21, 0.23), pane * 0.9);
+			srgb += vec3(sheen * 0.4);
+		}
 	}
 	// the canvas buffer is linear (HDR 2D); this shader works in sRGB terms
 	COLOR = vec4(pow(max(srgb, vec3(0.0)), vec3(gamma)), 1.0 - 0.9 * hole);

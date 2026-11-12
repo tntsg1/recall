@@ -50,7 +50,7 @@ func _process(_dt: float) -> bool:
 				if game.rooms.active:
 					game.rooms.build(1, "L", false)
 			100:
-				Cap.save(root, DIR % ("%02d_room1%s" % [st, game.arena.window_side]))
+				Cap.save(root, DIR % ("%02d_room1%s" % [st, ("G" if game.arena.glass.size.x > 0.0 else "")]))
 				si += 1
 				f = 39
 		return false

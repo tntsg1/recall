@@ -14,7 +14,7 @@ enum { OFF, MAP, RIDE, ARRIVE }
 const DECK := Rect2(500, 300, 920, 480)
 const MAP_T := 1.75         # the map, before the ride
 const ZOOM_T := 0.45        # its last part: the map falls away into the ride
-const RIDE_MIN := 13.0
+const RIDE_MIN := 15.0
 const RIDE_MAX := 22.0
 const ARRIVE_T := 1.0       # the view goes dark and comes up on the next chapter
 const SKIP_HOLD := 0.7
@@ -32,7 +32,7 @@ const LEGS := {
 	8: {"deck": "lift", "map": "cut", "kinds": [Enemies.CHASER, Enemies.GUARD, Enemies.PULSE]},
 	9: {"deck": "lift", "map": "cut", "kinds": [Enemies.CHASER, Enemies.CHARGER, Enemies.PRISM]},
 	10: {"deck": "car", "map": "cut", "kinds": [Enemies.CHASER, Enemies.GUARD, Enemies.PHASE]},
-	11: {"deck": "capsule", "map": "cut", "kinds": [Enemies.CHASER, Enemies.CHARGER, Enemies.PULSE]},
+	11: {"deck": "pad", "map": "cut", "kinds": [Enemies.CHASER, Enemies.CHARGER, Enemies.PULSE]},
 }
 
 static var force := false   # tests: ride even with a bot playing
@@ -181,6 +181,10 @@ func step(dt: float) -> void:
 				spawned += 1
 			if spawned >= groups.size() and game.enemies.remaining() == 0:
 				end_at = minf(end_at, maxf(t + 2.6, RIDE_MIN))
+			if scenery.beat > 0:
+				scenery.beat = 0
+				game.cam.add_trauma(0.14)
+				game.sfx.play("dash", 0.5, -5.0)
 			if absf(t - 1.2) < dt * 0.6:
 				game.hud.radio(Txt.t("ride_r_%d" % leg))
 			var left := maxf(end_at - t, 0.001)
@@ -278,74 +282,129 @@ func _draw() -> void:
 	if state == OFF or swapped:
 		return
 	var f: float = game.focus
-	var rim := Pal.ink(0.9 - 0.3 * f, 1.25)
-	var faint := Pal.ink(0.14 - 0.05 * f)
+	var rim := Pal.ink(0.95 - 0.3 * f, 1.35)
+	var faint := Pal.ink(0.16 - 0.05 * f)
 	var r := DECK
-	# a hair of vibration along the rim: the deck is moving
-	var jit := Vector2(0, 0.6 * sin(scenery.t * 37.0)) * minf(scenery.vel.length() / 900.0, 1.5)
+	var t := scenery.t
+	var round := deck_kind == "capsule"
+	# hung over the drop: a shadow cast down on what lies below, then the deck's thickness
+	for k in 4:
+		var g := r.grow(10.0 + k * 9.0)
+		g.position += Vector2(10, 14)
+		if round:
+			_round_rect(g, 76.0 + k * 9.0, Color(0, 0, 0, 0.16), true)
+		else:
+			draw_rect(g, Color(0, 0, 0, 0.16))
+	var side := r.grow(9.0)
+	side.position += Vector2(4, 7)
+	if round:
+		_round_rect(side, 78.0, Color(0.1, 0.1, 0.11), true)
+	else:
+		draw_rect(side, Color(0.1, 0.1, 0.11))
+	# the floor: dark, but not so dark the drop beneath does not show through
+	if round:
+		_round_rect(r, 70.0, Color(0.035, 0.035, 0.04, 0.8), true)
+	else:
+		draw_rect(r, Color(0.035, 0.035, 0.04, 0.8))
 	match deck_kind:
-		"capsule":
-			_round_rect(r, 70.0, Color(0.05, 0.05, 0.056), true)
-			_round_rect(r.grow(-2.0), 68.0, rim, false, 3.0)
-			_round_rect(r.grow(-16.0), 56.0, faint, false, 1.0)
-			# rivets round the hull
-			for k in 28:
-				var fpos := float(k) / 28.0
-				var p := _round_rect_point(r.grow(-9.0), 62.0, fpos)
-				draw_circle(p, 2.0, Pal.ink(0.35))
-		_:
-			draw_rect(r, Color(0.05, 0.05, 0.056))
-			# floor: plates for a lift, slats along a car, a grid on a flatcar
-			match deck_kind:
-				"lift":
-					var x := r.position.x + 90.0
-					while x < r.end.x:
-						draw_line(Vector2(x, r.position.y), Vector2(x, r.end.y), faint, 1.0)
-						x += 90.0
-					var y := r.position.y + 96.0
-					while y < r.end.y:
-						draw_line(Vector2(r.position.x, y), Vector2(r.end.x, y), faint, 1.0)
-						y += 96.0
-				"car":
-					var y := r.position.y + 36.0
-					while y < r.end.y:
-						draw_line(Vector2(r.position.x + 30, y), Vector2(r.end.x - 30, y), faint, 1.0)
-						y += 36.0
-				_:
-					var x := r.position.x + 60.0
-					while x < r.end.x:
-						draw_line(Vector2(x, r.position.y + 20), Vector2(x, r.end.y - 20), faint, 1.0)
-						x += 60.0
-			draw_rect(Rect2(r.position + jit, r.size), rim, false, 3.0)
-			draw_rect(r.grow(-12.0), faint, false, 1.0)
-			# hazard stripes along the edge you would fall from
-			var step := 22.0
-			var hz := Pal.ink(0.22)
-			var x2 := r.position.x + 8.0
-			while x2 < r.end.x - 20.0:
-				draw_line(Vector2(x2, r.position.y + 4), Vector2(x2 + 10, r.position.y + 12), hz, 2.0)
-				draw_line(Vector2(x2, r.end.y - 12), Vector2(x2 + 10, r.end.y - 4), hz, 2.0)
-				x2 += step
-			# corner posts (a lift's guide shoes; a car's couplings)
+		"lift":
+			# a cage: floor plates, the cables up from its corners, its guide shoes
 			for c in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
-				var q := Rect2(c - Vector2(14, 14), Vector2(28, 28))
-				draw_rect(q, Pal.WALL)
-				draw_rect(q, rim, false, 2.0)
-				draw_circle(c, 3.0, Pal.ink(0.9, 1.8))
-	# the stencil on the floor
+				var out: Vector2 = (c - r.get_center()).normalized()
+				draw_line(c, c + out * 900.0, Pal.ink(0.22), 2.0)
+				draw_line(c + out.orthogonal() * 6.0, c + out * 900.0 + out.orthogonal() * 6.0, Pal.ink(0.1), 1.0)
+			var x := r.position.x + 92.0
+			while x < r.end.x - 4.0:
+				draw_line(Vector2(x, r.position.y + 8), Vector2(x, r.end.y - 8), faint, 1.0)
+				x += 92.0
+			var y := r.position.y + 96.0
+			while y < r.end.y - 4.0:
+				draw_line(Vector2(r.position.x + 8, y), Vector2(r.end.x - 8, y), faint, 1.0)
+				y += 96.0
+			for gy in [r.position.y + 120.0, r.end.y - 120.0]:
+				draw_rect(Rect2(r.position.x - 22.0, gy - 26.0, 14.0, 52.0), rim, false, 2.0)
+				draw_rect(Rect2(r.end.x + 8.0, gy - 26.0, 14.0, 52.0), rim, false, 2.0)
+		"car":
+			# a maglev car: windows down both long sides, a chamfered nose and tail
+			for wy in [r.position.y + 18.0, r.end.y - 30.0]:
+				var x2 := r.position.x + 70.0
+				while x2 < r.end.x - 90.0:
+					draw_rect(Rect2(x2, wy, 54.0, 12.0), Pal.ink(0.32, 1.2), false, 1.5)
+					draw_rect(Rect2(x2 + 2.0, wy + 2.0, 50.0, 8.0), Pal.ink(0.06 + 0.04 * sin(t * 3.0 + x2)))
+					x2 += 76.0
+			var y2 := r.position.y + 56.0
+			while y2 < r.end.y - 50.0:
+				draw_line(Vector2(r.position.x + 40, y2), Vector2(r.end.x - 40, y2), faint, 1.0)
+				y2 += 40.0
+			for e in [-1.0, 1.0]:
+				var x0: float = r.position.x if e < 0.0 else r.end.x
+				draw_colored_polygon(PackedVector2Array([Vector2(x0, r.position.y), Vector2(x0 + e * 60.0, r.position.y + 70.0), Vector2(x0 + e * 60.0, r.end.y - 70.0), Vector2(x0, r.end.y)]), Color(0.06, 0.06, 0.068))
+				draw_polyline(PackedVector2Array([Vector2(x0, r.position.y), Vector2(x0 + e * 60.0, r.position.y + 70.0), Vector2(x0 + e * 60.0, r.end.y - 70.0), Vector2(x0, r.end.y)]), rim, 2.0)
+				draw_circle(Vector2(x0 + e * 44.0, r.get_center().y), 5.0, Pal.ink(0.9, 1.8))
+		"capsule":
+			# a pressure capsule: a heavy rim, rivets, portholes
+			_round_rect(r.grow(-16.0), 56.0, faint, false, 1.0)
+			for k in 32:
+				draw_circle(_round_rect_point(r.grow(-8.0), 62.0, float(k) / 32.0), 2.2, Pal.ink(0.45))
+			for p in [Vector2(r.position.x + 120, r.position.y + 70), Vector2(r.end.x - 120, r.position.y + 70), Vector2(r.position.x + 120, r.end.y - 70), Vector2(r.end.x - 120, r.end.y - 70)]:
+				draw_circle(p, 26.0, Color(0.06, 0.06, 0.07))
+				draw_arc(p, 26.0, 0, TAU, 32, rim, 2.0)
+				draw_arc(p, 18.0, -0.6, 0.9, 12, Pal.ink(0.35), 2.0)
+		"pad":
+			# a landing deck: the ring and cross of the pad, thrusters at the corners, warning lights
+			var c := r.get_center()
+			draw_arc(c, 190.0, 0, TAU, 64, Pal.ink(0.2), 3.0)
+			draw_arc(c, 160.0, 0, TAU, 64, faint, 1.0)
+			draw_line(c - Vector2(110, 0), c + Vector2(110, 0), Pal.ink(0.12), 6.0)
+			draw_line(c - Vector2(0, 110), c + Vector2(0, 110), Pal.ink(0.12), 6.0)
+			for q in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
+				var p2: Vector2 = q + (c - q).normalized() * 40.0
+				draw_circle(p2, 22.0, Color(0.07, 0.07, 0.08))
+				draw_arc(p2, 22.0, 0, TAU, 24, rim, 2.0)
+				var blink := 1.0 if fmod(t * 1.6, 1.0) < 0.4 else 0.2
+				draw_circle(q, 5.0, Pal.red(blink, 2.0))
+		_:
+			# a flatcar: slats across, tie-down eyes along the edges
+			var x3 := r.position.x + 60.0
+			while x3 < r.end.x - 4.0:
+				draw_line(Vector2(x3, r.position.y + 20), Vector2(x3, r.end.y - 20), faint, 1.0)
+				x3 += 60.0
+			var x4 := r.position.x + 40.0
+			while x4 < r.end.x:
+				draw_circle(Vector2(x4, r.position.y + 10), 3.0, Pal.ink(0.35))
+				draw_circle(Vector2(x4, r.end.y - 10), 3.0, Pal.ink(0.35))
+				x4 += 120.0
+	# the rim, alive with the deck's shudder
+	var jit := Vector2(0, 0.6 * sin(t * 37.0)) * minf(scenery.vel.length() / 900.0, 1.5)
+	if round:
+		_round_rect(Rect2(r.position + jit, r.size).grow(-2.0), 68.0, rim, false, 3.0)
+	else:
+		draw_rect(Rect2(r.position + jit, r.size), rim, false, 3.0)
+		draw_rect(r.grow(-12.0), faint, false, 1.0)
+		var hz := Pal.ink(0.24)
+		var x5 := r.position.x + 8.0
+		while x5 < r.end.x - 20.0:
+			draw_line(Vector2(x5, r.position.y + 4), Vector2(x5 + 10, r.position.y + 12), hz, 2.0)
+			draw_line(Vector2(x5, r.end.y - 12), Vector2(x5 + 10, r.end.y - 4), hz, 2.0)
+			x5 += 22.0
+		for c2 in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
+			var q2 := Rect2(c2 - Vector2(14, 14), Vector2(28, 28))
+			draw_rect(q2, Pal.WALL)
+			draw_rect(q2, rim, false, 2.0)
+			draw_circle(c2, 3.0, Pal.ink(0.9, 1.8))
 	var label := "FCU-%02d" % (leg * 7 % 97)
-	draw_string(font, r.position + Vector2(40, r.size.y - 34), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 46, Pal.ink(0.07))
+	draw_string(font, r.position + Vector2(44, r.size.y - 40), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 46, Pal.ink(0.07))
 	if _has_cable():
 		# the lift's cable runs up through the middle of the deck
-		var c := CABLE.get_center()
+		var cc := CABLE.get_center()
 		draw_rect(CABLE, Pal.WALL)
 		draw_rect(CABLE, rim, false, 2.0)
-		draw_circle(c, 30.0, Color(0.09, 0.09, 0.1))
-		draw_arc(c, 30.0, 0, TAU, 32, Pal.ink(0.8, 1.6), 2.0)
-		var spin := scenery.t * 9.0
+		draw_circle(cc, 30.0, Color(0.09, 0.09, 0.1))
+		draw_arc(cc, 30.0, 0, TAU, 32, Pal.ink(0.8, 1.6), 2.0)
+		var spin := t * 9.0
 		for k in 6:
 			var v := Vector2.from_angle(spin + TAU * k / 6.0)
-			draw_line(c + v * 12.0, c + v * 28.0, Pal.ink(0.5), 1.5)
+			draw_line(cc + v * 12.0, cc + v * 28.0, Pal.ink(0.5), 1.5)
 
 
 func _round_rect(r: Rect2, rad: float, c: Color, filled: bool, w := 1.0) -> void:

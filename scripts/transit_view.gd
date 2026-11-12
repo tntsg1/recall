@@ -7,6 +7,8 @@ extends Node2D
 # comes up on the next chapter.
 
 const RING_C := Vector2(960, 590)
+const CUT_C := Vector2(960, 500)   # the section is drawn this much larger, about this point
+const CUT_K := 1.15
 # the capital from above: where each place is, as (angle in degrees, radius)
 const RING_AT := {1: Vector2(212, 410), 2: Vector2(196, 104), 3: Vector2(292, 282), 4: Vector2(22, 288),
 	5: Vector2(100, 224), 6: Vector2(148, 402), 7: Vector2(326, 100), 12: Vector2(0, 0)}
@@ -62,12 +64,18 @@ func _draw_map() -> void:
 	# it falls away toward where you are going, into the ride
 	var s := 1.0 + Pal.ease_in(zoom_u) * 2.2 + (1.0 - Pal.ease_out(clampf(t / 0.35, 0.0, 1.0))) * 0.04
 	draw_rect(Rect2(Vector2.ZERO, Vector2(1920, 1080)), Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, a))
-	draw_set_transform(head - head * s, 0.0, Vector2(s, s))
+	var hc := head if tr.view_map() == "ring" else CUT_C + (head - CUT_C) * CUT_K
+	draw_set_transform(hc - hc * s, 0.0, Vector2(s, s))
 	if tr.view_map() == "ring":
 		_ring_map(a)
 	else:
+		# (the section is drawn half as large again, about the screen's middle)
+		draw_set_transform(hc - hc * s + (CUT_C - CUT_C * CUT_K) * s, 0.0, Vector2(s, s) * CUT_K)
 		_cut_map(a)
+	if tr.view_map() != "ring":
+		draw_set_transform(hc - hc * s + (CUT_C - CUT_C * CUT_K) * s, 0.0, Vector2(s, s) * CUT_K)
 	_way(a, clampf((t - 0.3) / 0.8, 0.0, 1.0))
+	_markers(a, tr.view_map() == "ring")
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# the title of the map and what you are taking
 	var title := Txt.t("map_ring" if tr.view_map() == "ring" else "map_cut")
@@ -75,7 +83,7 @@ func _draw_map() -> void:
 	draw_line(Vector2(120, 104), Vector2(560, 104), Pal.ink(0.25 * a), 1.0)
 	var from := Chapters.title_story(tr.leg)
 	var to := Chapters.title_story(tr.leg + 1)
-	Picks.scramble(self, font, from + "  →  " + to, Vector2(960, 1000), 30, Pal.ink(0.95 * a, 1.2), (t - 0.1) * 1.9, true)
+	Picks.scramble(self, font, from + "  →  " + to, Vector2(960, 1000), 30, Pal.ink(0.95 * a, 1.2), (t - 0.1) * 2.6, true)
 	draw_string(font_s, Vector2(960, 1040), Txt.t("ride_v_%d" % tr.leg), HORIZONTAL_ALIGNMENT_CENTER, -1, 20, Pal.ink(0.5 * a))
 
 
@@ -124,7 +132,6 @@ func _ring_map(a: float) -> void:
 	var u := _ring_pos(1)
 	_dashed_rect(Rect2(u - Vector2(34, 26), Vector2(68, 52)), ik(0.5))
 	draw_string(font_s, u + Vector2(-160, 46), Txt.t("map_under"), HORIZONTAL_ALIGNMENT_CENTER, 320, 13, ik(0.35))
-	_markers(a, true)
 
 
 func _cut_map(a: float) -> void:
@@ -174,7 +181,6 @@ func _cut_map(a: float) -> void:
 	# the institute: rings in orbit
 	draw_arc(Vector2(1085, 214), 24.0, 0, TAU, 32, ik(0.6, 1.3), 1.5)
 	draw_arc(Vector2(1085, 214), 36.0, 0.4, TAU - 0.6, 32, ik(0.3), 1.0)
-	_markers(a, false)
 
 
 # Every place on this map: a dim mark, the two of this ride bright, their names.
@@ -190,13 +196,15 @@ func _markers(a: float, ring: bool) -> void:
 			draw_arc(p, 14.0 + pulse * 6.0, 0, TAU, 24, Pal.red(0.7 * a, 1.6), 2.0)
 		draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Pal.red(0.8 * a, 1.2) if past or story == tr.leg else Color(0, 0, 0, 0))
 		draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), c, false, 1.5)
-		if here or (ring and story != 12):
+		if here or story != 12:
 			var side := 1.0 if p.x >= (RING_C.x if ring else 960.0) else -1.0
 			var name := Chapters.title_story(story)
-			var size := 20 if here else 14
-			var w := font_s.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-			var at := p + Vector2(16.0 if side > 0.0 else -16.0 - w, 6.0)
-			draw_string(font if here else font_s, at, name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, c)
+			var size := 22 if here else 13
+			var w := (font if here else font_s).get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+			var at := p + Vector2(18.0 if side > 0.0 else -18.0 - w, 7.0)
+			if here:
+				draw_rect(Rect2(at + Vector2(-8, -size - 2.0), Vector2(w + 16, size + 12.0)), Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.88 * a))
+			draw_string(font if here else font_s, at, name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, c if here else Pal.ink(0.25 * a))
 
 
 # The way taken so far (dim) and this ride's leg (drawn on as k goes 0..1).
@@ -210,9 +218,11 @@ func _way(a: float, k: float) -> void:
 	var n := int(pts.size() * Pal.ease_io(k))
 	if n >= 2:
 		var shown := pts.slice(0, n)
-		draw_polyline(shown, Pal.red(0.15 * a), 10.0)
-		draw_polyline(shown, Pal.red(0.95 * a, 1.8), 3.0)
-		draw_circle(shown[shown.size() - 1], 6.0, Pal.red(a, 2.2))
+		draw_polyline(shown, Pal.red(0.15 * a), 14.0)
+		draw_polyline(shown, Pal.red(0.95 * a, 1.8), 4.0)
+		for i in range(0, n, 8):
+			draw_circle(shown[i], 4.0, Pal.red(0.9 * a, 1.4))
+		draw_circle(shown[shown.size() - 1], 8.0, Pal.red(a, 2.2))
 
 
 func _uses_map(story: int) -> String:
@@ -265,18 +275,23 @@ func _draw_ride() -> void:
 	var a := clampf(tr.t / 0.5, 0.0, 1.0) if tr.state == Transit.RIDE else 1.0
 	var to := Chapters.title_story(tr.leg + 1)
 	var line := Txt.t("ride_v_%d" % tr.leg)
-	# (below the HUD's wave band, above the deck)
-	draw_string(font_s, Vector2(660, 196), line, HORIZONTAL_ALIGNMENT_CENTER, 600, 18, Pal.ink(0.5 * a))
-	draw_string(font, Vector2(560, 230), "→  " + to, HORIZONTAL_ALIGNMENT_CENTER, 800, 26, Pal.ink(0.92 * a, 1.25))
-	# how far along
-	var w := 360.0
+	# a dark band down from the top, so the line reads over the city
+	var c0 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.88 * a)
+	var c1 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.0)
+	draw_polygon(PackedVector2Array([Vector2(0, 0), Vector2(1920, 0), Vector2(1920, 270), Vector2(0, 270)]), PackedColorArray([c0, c0, c1, c1]))
+	draw_string(font_s, Vector2(560, 150), line, HORIZONTAL_ALIGNMENT_CENTER, 800, 19, Pal.ink(0.6 * a))
+	draw_string(font, Vector2(460, 192), "→  " + to, HORIZONTAL_ALIGNMENT_CENTER, 1000, 30, Pal.ink(0.95 * a, 1.25))
+	# how far along: a red line, the way on the map
+	var w := 480.0
 	var x0 := 960.0 - w / 2.0
-	draw_line(Vector2(x0, 250), Vector2(x0 + w, 250), Pal.ink(0.15 * a), 2.0)
-	draw_line(Vector2(x0, 250), Vector2(x0 + w * tr.u, 250), Pal.ink(0.75 * a, 1.4), 2.0)
+	draw_line(Vector2(x0, 220), Vector2(x0 + w, 220), Pal.ink(0.14 * a), 4.0)
+	draw_line(Vector2(x0, 220), Vector2(x0 + w * tr.u, 220), Pal.red(0.95 * a, 1.6), 4.0)
+	draw_circle(Vector2(x0 + w * tr.u, 220), 5.0, Pal.red(a, 2.2))
 	if tr.seen and tr.state == Transit.RIDE:
 		var k := tr.skip_t / Transit.SKIP_HOLD
 		var txt := Txt.t("ride_skip")
-		var tw := font_s.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
-		var p := Vector2(960 - tw / 2.0, 1046)
-		draw_string(font_s, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink((0.45 + 0.5 * k) * a))
-		draw_line(p + Vector2(0, 8), p + Vector2(tw * k, 8), Pal.ink(0.9, 1.4), 2.0)
+		var tw := font_s.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+		var p := Vector2(Hud.BAND_EDGE, 1040)
+		draw_string(font_s, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Pal.ink((0.5 + 0.45 * k) * a))
+		draw_line(p + Vector2(0, 8), p + Vector2(tw, 8), Pal.ink(0.15 * a), 2.0)
+		draw_line(p + Vector2(0, 8), p + Vector2(tw * k, 8), Pal.red(0.95, 1.6), 2.0)
