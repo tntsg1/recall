@@ -30,6 +30,8 @@ var plates: Plates          # the shipyard's hull plates adrift (chapter 10)
 var stasis: Stasis          # the institute's stasis fields (chapter 11)
 var nodes: ControlNodes     # the board's control nodes (chapter 12)
 var ending: Ending          # the true ending, after the last boss
+var transit: Transit        # the ride from one chapter's place to the next (full game)
+var vista: Scenery          # what lies under the rooms, seen through grates and windows (full game)
 var rooms: Rooms            # room to room, in the chapters laid out fresh each run
 var run_seed := 0           # the run's rooms come from this (shown on the results)
 var radio_n := 0
@@ -183,6 +185,10 @@ func _ready() -> void:
 	floor_rect.material = floor_mat
 	floor_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(floor_rect)
+	if Demo.extras():
+		vista = Scenery.new()
+		vista.modulate = Color(1, 1, 1, 0.85)
+		add_child(vista)
 
 	sfx = Sfx.new()
 	add_child(sfx)
@@ -222,6 +228,9 @@ func _ready() -> void:
 	ending = Ending.new()
 	ending.game = self
 	add_child(ending)
+	transit = Transit.new()
+	transit.game = self
+	add_child(transit)
 	rooms = Rooms.new()
 	rooms.game = self
 	add_child(rooms)
@@ -267,6 +276,7 @@ func _ready() -> void:
 	if bot == null:
 		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 	hud.chapter_intro()
+	show_vista()
 	rooms.setup(0)
 	if rooms.active:
 		player.pos = rooms.start_pos()
@@ -936,6 +946,14 @@ func _run_frame(dt: float) -> void:
 		post.step(dt)
 		return
 	real_time += dt
+	if transit.holds():
+		# a ride's map, or the cut to the next chapter: the world holds still
+		transit.step(dt)
+		cam.step(dt)
+		post.step(dt)
+		hud.step(dt)
+		sfx.step(dt, focus)
+		return
 	if rooms.sliding():
 		rooms.step(dt)
 		cam.step(dt)
@@ -970,7 +988,7 @@ func _run_frame(dt: float) -> void:
 
 	var move := _in_move()
 	var pnow := _in_possess()
-	if pnow and not possess_prev and not picking and replacing.is_empty() and wave_ctl.phase == Waves.FIGHT and not lost:
+	if pnow and not possess_prev and not picking and replacing.is_empty() and live() and not lost:
 		possess.press()
 	possess_prev = pnow
 	var dash := _in_dash() and not possess.busy()
@@ -1001,6 +1019,7 @@ func _run_frame(dt: float) -> void:
 	stasis.step(sdt)
 	nodes.step(sdt)
 	rooms.step(dt)
+	transit.step(dt)
 	ending.step(dt)
 	hud.visible = not ending.running()
 	if prof_on:
@@ -1813,6 +1832,18 @@ func _resume(snap: Dictionary) -> void:
 	resume_note = true
 
 
+# The megastructure under this chapter's rooms: where its ride arrived.
+func show_vista() -> void:
+	if vista == null:
+		return
+	vista.under(Chapters.story(chapter))
+
+
+# The fight is on: a wave, or a ride's deck with units climbing aboard.
+func live() -> bool:
+	return wave_ctl.phase == Waves.FIGHT or transit.riding()
+
+
 func next_chapter() -> void:
 	chapter += 1
 	lightwalk.stop()
@@ -1833,6 +1864,7 @@ func next_chapter() -> void:
 	plates.setup(Chapters.story(chapter))
 	stasis.setup(Chapters.story(chapter))
 	nodes.setup(Chapters.story(chapter))
+	show_vista()
 	rooms.setup(chapter)
 	lore.start_chapter(chapter)
 	sfx.start_chapter(Chapters.music(chapter))

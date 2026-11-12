@@ -27,6 +27,8 @@ const ROW_H := 58.0
 const ROW_W := 520.0
 const PAGE_T := 0.42
 
+var vista: Scenery          # the megastructure drifting by behind the menu (full game)
+var vista_u := 0.0
 var t := 0.0
 var rounds: Array = []
 var stroke_letter: Array = []   # which letter each stroke belongs to
@@ -115,6 +117,16 @@ func _ready() -> void:
 		mat.set_shader_parameter("gamma", 1.0)
 	bg.material = mat
 	add_child(bg)
+	if Demo.extras():
+		# the city going by far below, behind the menu (full game)
+		vista = Scenery.new()
+		vista.show_behind_parent = true
+		add_child(vista)
+		vista.z_index = 0
+		vista.z_as_relative = true
+		vista.begin(2)
+		vista.linear = true
+		vista_u = 0.12
 	dot_tex = _make_dot()
 	# load the run in the background so Start never stalls
 	ResourceLoader.load_threaded_request("res://scenes/main.tscn")
@@ -242,6 +254,11 @@ func _vol(k: String) -> float:
 func _process(dt: float) -> void:
 	Meta.poll_cloud()
 	t += dt
+	if vista != null:
+		# slowly; it fades out and back in where the loop closes
+		vista_u = fmod(vista_u + dt / 160.0, 1.0)
+		vista.step(dt, vista_u)
+		vista.modulate.a = 0.16 * clampf(minf(vista_u, 1.0 - vista_u) * 50.0, 0.0, 1.0)
 	page_t += dt
 	val_t += dt
 	glint += dt

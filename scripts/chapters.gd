@@ -73,6 +73,10 @@ static func boss(i: int) -> String:
 
 
 # "Chapter 5 · The Superconducting Line": the story number, not the run's
+static func title_story(story: int) -> String:
+	return Txt.t("chapter_%d" % story)
+
+
 static func title(i: int) -> String:
 	return Txt.t("chapter_%d" % story(i))
 

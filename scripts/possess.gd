@@ -437,7 +437,7 @@ func step(sdt: float, dt: float) -> void:
 		flow_t += dt
 		if flow_t >= FLOW_TIME:
 			_begin_host()
-	if state == HOST and game.wave_ctl.phase != Waves.FIGHT:
+	if state == HOST and not game.live():
 		end(false, true)
 	_step_wakes(sdt)
 	_update_infection(dt)

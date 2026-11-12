@@ -14,6 +14,10 @@ uniform vec4 waves[4]; // xy centre, z age (s), w strength
 // cyan pixel squares and stray pixels creep into the cells; where it has been the
 // infection lingers and heals back into dots. xy centre, z radius, w strength.
 uniform vec4 infect[8];
+// Floor grates (full game): through them the megastructure far below shows.
+// xy corner, zw size; bars run along the longer side.
+uniform vec4 grates[4];
+uniform int grate_n = 0;
 
 float hash(vec2 v) {
 	return fract(sin(dot(v, vec2(127.1, 311.7))) * 43758.5453);
@@ -71,6 +75,21 @@ void fragment() {
 		float pa = clamp(sq * (0.3 + 0.4 * inf) * (0.6 + 0.4 * flick) + stray * 0.45 * inf, 0.0, 1.0);
 		srgb = mix(srgb * (1.0 - 0.5 * inf * sq), cyan, pa * inf);
 	}
+	float hole = 0.0;
+	for (int i = 0; i < 4; i++) {
+		if (i >= grate_n) break;
+		vec4 g = grates[i];
+		vec2 lp = p - g.xy;
+		if (lp.x < 0.0 || lp.y < 0.0 || lp.x > g.z || lp.y > g.w) continue;
+		float edge = min(min(lp.x, lp.y), min(g.z - lp.x, g.w - lp.y));
+		float along = g.z >= g.w ? lp.y : lp.x;
+		float across = g.z >= g.w ? lp.x : lp.y;
+		// (distance from the middle of a slot: bars where it nears the slot's edge)
+		float bar = smoothstep(5.4, 6.4, abs(mod(along, 15.0) - 7.5));
+		float rib = smoothstep(29.6, 30.8, abs(mod(across, 64.0) - 32.0));
+		hole = (1.0 - max(bar, rib)) * smoothstep(5.0, 9.0, edge);
+		srgb = mix(srgb, vec3(0.16, 0.16, 0.17), max(bar, rib) * 0.9);
+	}
 	// the canvas buffer is linear (HDR 2D); this shader works in sRGB terms
-	COLOR = vec4(pow(max(srgb, vec3(0.0)), vec3(gamma)), 1.0);
+	COLOR = vec4(pow(max(srgb, vec3(0.0)), vec3(gamma)), 1.0 - 0.9 * hole);
 }

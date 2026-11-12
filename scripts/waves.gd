@@ -280,7 +280,9 @@ func step(dt: float) -> void:
 					t = 0.0
 					game.on_run_done(chapter_log)
 				elif index + 1 >= COUNT:
-					game.next_chapter()
+					# (the full game rides on to the next place first: Transit)
+					if not game.transit.take(chapter):
+						game.next_chapter()
 				elif game.rooms.active and game.rooms.room_index == index and not game.rooms.lay.is_empty():
 					# the ways on open; the next wave's title follows you through
 					game.rooms.open_doors()

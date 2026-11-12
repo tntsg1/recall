@@ -10,6 +10,9 @@ const OUTER := 900.0
 
 var rects: Array[Rect2] = []   # every solid; mirrors last
 var inner: Array[Rect2] = []   # pillars and bars (drawn with full outline)
+var open := false              # a ride's deck (Transit): solid as ever, drawn by Transit
+var grates: Array[Rect2] = []  # floor grates over the megastructure below (full game)
+var window_side := ""          # an outer wall opened onto it as a window ("L" / "R")
 var mirrors: Array[Rect2] = [] # panels that reflect instead of holding a round
 var mirror_from := 9999        # index in rects where mirrors begin
 var movers: Array[Rect2] = []
@@ -144,7 +147,66 @@ func setup(ch: int, lay := {}) -> void:
 		for b: Array in lay.get("banks", []):
 			tracks.append(Rect2(b[0], b[1], Shelves.span(), Shelves.H))
 	_build_nav(tracks)
+	_pick_vista(lay)
 	queue_redraw()
+
+
+# Where this room shows what lies below it (full game): a couple of floor
+# grates in open floor, away from the doors; in two rooms a chapter, an outer
+# wall with no door in it becomes a window.
+func _pick_vista(lay: Dictionary) -> void:
+	grates.clear()
+	window_side = ""
+	if game != null and Demo.extras() and not open and game.tutorial == null:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash([game.run_seed, game.chapter, int(lay.get("index", -1))])
+		var avoid: Array = []
+		var doors: Array = []
+		if lay.has("entry"):
+			doors.append(lay.entry)
+		doors.append_array(lay.get("exits", []))
+		doors.append_array(lay.get("gates", []))
+		for d: Dictionary in doors:
+			avoid.append(d.get("pos", Vector2(-999, -999)))
+		avoid.append(lay.get("start", Vector2(960, 860)))
+		var tries := 0
+		while grates.size() < 2 and tries < 90:
+			tries += 1
+			var sz := Vector2(rng.randf_range(210, 300), rng.randf_range(110, 140))
+			if rng.randf() < 0.5:
+				sz = Vector2(sz.y, sz.x)
+			var c := Vector2(rng.randf_range(ROOM.position.x + 220, ROOM.end.x - 220), rng.randf_range(ROOM.position.y + 190, ROOM.end.y - 200))
+			var r := Rect2(c - sz / 2.0, sz)
+			var ok := true
+			for w: Rect2 in rects.slice(4) + soft:
+				if w.grow(34.0).intersects(r):
+					ok = false
+					break
+			for g: Rect2 in grates:
+				if g.grow(180.0).intersects(r):
+					ok = false
+			for p: Vector2 in avoid:
+				if r.grow(150.0).has_point(p):
+					ok = false
+			if ok:
+				grates.append(r)
+		if generated and [1, 4].has(int(lay.get("index", -1))):
+			# (the enemies' spawn gates sit on every wall; only the ways in and on rule one out)
+			var used := {}
+			for d: Dictionary in doors.slice(0, doors.size() - (lay.get("gates", []) as Array).size()):
+				used[d.get("side", "")] = true
+			for s in ["L", "R"]:
+				if not used.has(s):
+					window_side = s
+					break
+	if game != null and game.floor_mat != null:
+		var arr: Array[Vector4] = []
+		for g in grates:
+			arr.append(Vector4(g.position.x, g.position.y, g.size.x, g.size.y))
+		while arr.size() < 4:
+			arr.append(Vector4.ZERO)
+		game.floor_mat.set_shader_parameter("grates", arr)
+		game.floor_mat.set_shader_parameter("grate_n", grates.size())
 
 
 # The way round the shipyard's plates changes as they drift: Plates calls
@@ -325,6 +387,8 @@ func is_free(p: Vector2, rad: float) -> bool:
 
 
 func _draw() -> void:
+	if open:
+		return
 	var f: float = game.focus if game else 0.0
 	var edge := Pal.ink(0.9 - 0.35 * f)
 	var faint := Pal.ink(0.13 - 0.06 * f)
@@ -332,9 +396,20 @@ func _draw() -> void:
 	var big := ROOM.grow(OUTER)
 	draw_rect(Rect2(big.position, Vector2(big.size.x, ROOM.position.y - big.position.y)), Pal.WALL)
 	draw_rect(Rect2(Vector2(big.position.x, ROOM.end.y), Vector2(big.size.x, big.end.y - ROOM.end.y)), Pal.WALL)
-	draw_rect(Rect2(Vector2(big.position.x, ROOM.position.y), Vector2(ROOM.position.x - big.position.x, ROOM.size.y)), Pal.WALL)
-	draw_rect(Rect2(Vector2(ROOM.end.x, ROOM.position.y), Vector2(big.end.x - ROOM.end.x, ROOM.size.y)), Pal.WALL)
+	var left := Rect2(Vector2(big.position.x, ROOM.position.y), Vector2(ROOM.position.x - big.position.x, ROOM.size.y))
+	var right := Rect2(Vector2(ROOM.end.x, ROOM.position.y), Vector2(big.end.x - ROOM.end.x, ROOM.size.y))
+	if window_side != "L":
+		draw_rect(left, Pal.WALL)
+	if window_side != "R":
+		draw_rect(right, Pal.WALL)
+	if window_side != "":
+		_draw_window(left if window_side == "L" else right, f)
 	draw_rect(ROOM, edge, false, 2.0)
+	for g in grates:
+		draw_rect(g, Pal.ink(0.42 - 0.18 * f), false, 2.0)
+		draw_rect(g.grow(-6.0), faint, false, 1.0)
+		for c in [g.position, Vector2(g.end.x, g.position.y), g.end, Vector2(g.position.x, g.end.y)]:
+			draw_circle(c + (g.get_center() - c).normalized() * 9.0, 2.0, Pal.ink(0.5 - 0.2 * f))
 	draw_rect(ROOM.grow(10), faint, false, 1.0)
 	_corner_marks(ROOM.grow(22), Pal.ink(0.35 - 0.2 * f))
 	# a generated room's wall blocks: the same dark mass, edged where they face the floor
@@ -458,6 +533,29 @@ func _faces(w: Rect2) -> Array:
 
 func game_t() -> float:
 	return game.real_time if game else 0.0
+
+
+# An outer wall opened up: tall panes onto the megastructure, mullions across,
+# a slant of reflected light on the glass.
+func _draw_window(r: Rect2, f: float) -> void:
+	var g := Rect2(Vector2(r.end.x - 84.0, r.position.y), Vector2(84.0, r.size.y))
+	if window_side == "R":
+		g = Rect2(r.position, Vector2(84.0, r.size.y))
+	draw_rect(g, Color(0.6, 0.65, 0.7, 0.035))
+	var y := g.position.y + 94.0
+	while y < g.end.y:
+		draw_line(Vector2(g.position.x, y), Vector2(g.end.x, y), Pal.ink(0.32 - 0.12 * f), 3.0)
+		y += 94.0
+	var x := g.position.x + g.size.x * 0.5
+	draw_line(Vector2(x, g.position.y), Vector2(x, g.end.y), Pal.ink(0.18), 1.0)
+	var k := 0.0
+	while k < g.size.y:
+		var a := Vector2(g.position.x, g.position.y + k)
+		draw_line(a, a + Vector2(g.size.x, -g.size.x * 0.8), Pal.ink(0.06), 6.0)
+		k += 310.0
+	# beyond the glass, the rest of the wall is dark
+	var rest := Rect2(r.position, Vector2(r.size.x - 84.0, r.size.y)) if window_side == "L" else Rect2(Vector2(r.position.x + 84.0, r.position.y), Vector2(r.size.x - 84.0, r.size.y))
+	draw_rect(rest, Pal.WALL)
 
 
 func _corner_marks(r: Rect2, c: Color) -> void:
