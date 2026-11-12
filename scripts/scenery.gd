@@ -16,7 +16,7 @@ const NEAR := 140.0         # nothing closer than this to the eye is drawn
 const SCREEN := Rect2(-80, -80, 2080, 1240)
 const DECK := Transit.DECK
 
-enum { BOX, CYL, LINE, RING, CLOUD, TEXT, FRAME, GRID, ARC, BEAM, TUBE, TRAIN, CAR }
+enum { BOX, CYL, LINE, RING, CLOUD, TEXT, FRAME, GRID, ARC, BEAM, TUBE, TRAIN, CAR, SHIP }
 
 var leg := 0
 var objs: Array = []        # sorted deepest first
@@ -269,6 +269,7 @@ func _top(o: Array) -> float:
 		TUBE: return o[4]
 		TRAIN: return o[2]
 		CAR: return o[5]
+		SHIP: return o[5]
 	return 0.0
 
 
@@ -612,6 +613,7 @@ func _draw() -> void:
 			TUBE: _tube(o)
 			TRAIN: _train(o)
 			CAR: _car(o)
+			SHIP: _ship(o)
 	_dust()
 	draw_us = Time.get_ticks_usec() - t0
 
@@ -1355,10 +1357,55 @@ func _heroes(st: int) -> void:
 		10:
 			# a warship on its slip, the length of a city, going by underneath
 			for b in [0.24, 0.56, 0.88]:
-				var x: float = ease_way(b) * length - 1500.0
-				objs.append([BOX, x, -300.0, x + 2000.0, 1250.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
+				var x: float = ease_way(b) * length
+				objs.append([SHIP, x + 950.0, 100.0, 1400.0, 300.0, -D0 - 1300.0])
+				objs.append([SHIP, x - 1900.0, 100.0, 1400.0, 300.0, -D0 - 1300.0])
 
 
 # (rides only: the rooms' and the title's views have no deck)
 func visible_rect_hits_deck(r: Rect2) -> bool:
 	return leg != 0 and DECK.grow(30.0).intersects(r)
+
+
+# A warship berthed across the way, seen whole from above: [SHIP, x, y, length, beam, z]
+# (bow toward -y): a bright outline with a pointed bow, a lit keel, rows of
+# ports down its length, three drives burning red at its stern.
+func _ship(o: Array) -> void:
+	var z: float = o[5]
+	var d := eye.z - z
+	if d < NEAR:
+		return
+	var a := fade(d)
+	if a < 0.03:
+		return
+	var sc := F / d
+	var x0: float = o[1]
+	var y0: float = o[2]
+	var ln: float = o[3]
+	var bm: float = o[4]
+	var c := Vector2(C.x + (x0 - eye.x) * sc, C.y + (y0 - eye.y) * sc)
+	var L := ln * sc
+	var B := bm * sc
+	if c.x + B < -60.0 or c.x - B > 1980.0:
+		return
+	var bow := L * 0.2
+	var hull := PackedVector2Array([c + Vector2(-B / 2.0, bow), c + Vector2(0, 0), c + Vector2(B / 2.0, bow),
+		c + Vector2(B / 2.0, L), c + Vector2(-B / 2.0, L)])
+	draw_colored_polygon(hull, _fill(a, 1.5))
+	var rim := hull.duplicate()
+	rim.append(hull[0])
+	draw_polyline(rim, Pal.ink(0.16 * a), 12.0)
+	draw_polyline(rim, Pal.ink(0.9 * a, 1.9), 3.0)
+	draw_line(c, c + Vector2(0, L), Pal.ink(0.6 * a, 1.5), 2.0)
+	# a bridge tower amidships
+	draw_rect(Rect2(c + Vector2(-B * 0.22, L * 0.42), Vector2(B * 0.44, L * 0.12)), Pal.ink(0.75 * a, 1.6), false, 2.0)
+	for k in 12:
+		var fy := bow + (L - bow) * (k + 0.5) / 12.0
+		for fx in [-0.3, 0.3]:
+			draw_rect(Rect2(c + Vector2(B * fx - 6.0, fy - 4.0), Vector2(12, 8)), Pal.ink(0.9 * a, 1.9))
+	for k in 3:
+		var q := c + Vector2(B * (k - 1) * 0.3, L + B * 0.12)
+		var r := maxf(10.0, B * 0.16)
+		draw_circle(q, r * 2.2, Pal.red(0.16 * a))
+		draw_circle(q, r * 1.4, Pal.red(0.4 * a, 1.6))
+		draw_circle(q, r, Pal.red(0.95 * a, 2.4))
