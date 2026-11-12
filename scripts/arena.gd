@@ -416,8 +416,16 @@ func _draw() -> void:
 	draw_rect(ROOM, edge, false, 2.0)
 	if glass.size.x > 0.0:
 		# the glass floor's frame: light spilling round it, a lit rim, a mullion cap at every pane
-		for k in 5:
-			draw_rect(glass.grow(4.0 + k * 8.0), Pal.ink((0.05 - k * 0.009) * (1.0 - 0.5 * f), 1.2), false, 8.0)
+		# light spilling out round it: a soft oval, not a frame
+		var gc := glass.get_center()
+		var fan := PackedVector2Array([gc])
+		var cols := PackedColorArray([Pal.ink(0.07 * (1.0 - 0.5 * f), 1.2)])
+		for k in 33:
+			var v := Vector2.from_angle(TAU * k / 32.0)
+			fan.append(gc + Vector2(v.x * glass.size.x * 0.95, v.y * glass.size.y * 0.68))
+			cols.append(Pal.ink(0.0))
+		for k in 32:
+			draw_polygon(PackedVector2Array([fan[0], fan[k + 1], fan[k + 2]]), PackedColorArray([cols[0], cols[k + 1], cols[k + 2]]))
 		draw_rect(glass, Pal.ink(0.65 - 0.2 * f, 1.4), false, 2.5)
 		var gy := glass.position.y + 120.0
 		while gy < glass.end.y - 4.0:

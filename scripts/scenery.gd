@@ -87,6 +87,15 @@ func begin(from_story: int) -> void:
 		_: _leg_tower_down()
 	if not plain:
 		_heroes(from_story)
+	for o in objs:
+		if int(o[0]) == LINE and (o[1] as PackedVector3Array).size() == 2:
+			var a0: Vector3 = o[1][0]
+			var a1: Vector3 = o[1][1]
+			if absf(a0.z - a1.z) > 1500.0:
+				var dense := PackedVector3Array()
+				for k in 13:
+					dense.append(a0.lerp(a1, k / 12.0))
+				o[1] = dense
 	objs.sort_custom(func(a, b): return _top(a) < _top(b))
 	star_pts.clear()
 	for i in 160:
@@ -510,7 +519,7 @@ func _leg_tower_down() -> void:
 	while fz > roof - 9000.0:
 		objs.append([LINE, PackedVector3Array([Vector3(-1100.0, -820.0, fz), Vector3(-1100.0, 820.0, fz)]), 1.0, 1.0])
 		fz -= 420.0
-	objs.append([LINE, PackedVector3Array([Vector3(-1100.0, 0.0, roof), Vector3(-1100.0, 0.0, foot)]), 2.0, 4.0, true])
+	objs.append([LINE, PackedVector3Array([Vector3(-1100.0, 0.0, roof), Vector3(-1100.0, 0.0, foot)]), 2.2, 6.0, true])
 	for y in [-820.0, 820.0]:
 		objs.append([LINE, PackedVector3Array([Vector3(-1100.0, y, roof), Vector3(-1100.0, y, foot)]), 2.0, 3.0, true])
 	objs.append([RING, 0.0, 0.0, 560.0, roof + 2.0, 1.0, 64])
@@ -670,6 +679,9 @@ func _box(o: Array) -> void:
 			if not faces[i]:
 				continue
 			var j := (i + 1) % 4
+			if glow == 2 and leg != 0 and Rect2(T[i], Vector2.ZERO).expand(T[j]).expand(B[i]).expand(B[j]).intersects(DECK.grow(-20.0)):
+				# (a hero's wall would stand across the deck: its roof says enough)
+				continue
 			draw_polygon(PackedVector2Array([T[i], T[j], B[j], B[i]]), PackedColorArray([c_top, c_top, c_bot, c_bot]))
 			draw_polyline_colors(PackedVector2Array([T[i], B[i], B[j], T[j]]), PackedColorArray([e_top, e_bot, e_bot, e_top]), 1.0)
 			if win > 0:
@@ -686,6 +698,10 @@ func _box(o: Array) -> void:
 		var blink := 0.35 + 0.65 * absf(sin(t * 2.4))
 		for q in T:
 			draw_circle(q, 6.0, Pal.red(blink * a, 2.4))
+		for k in range(1, 8):
+			draw_line(T[0].lerp(T[1], k / 8.0), T[3].lerp(T[2], k / 8.0), Pal.ink(0.12 * a), 1.0)
+		for k in range(1, 4):
+			draw_line(T[0].lerp(T[3], k / 4.0), T[1].lerp(T[2], k / 4.0), Pal.ink(0.12 * a), 1.0)
 	else:
 		draw_polyline(top, Pal.ink(0.75 * a, 1.5) if glow == 1 else Pal.ink(0.3 * a, 1.0), 1.5)
 	if o[7] == 1:
@@ -712,6 +728,17 @@ func _box(o: Array) -> void:
 			var f := k / 12.0
 			draw_line(T[0].lerp(T[1], f), T[3].lerp(T[2], f), faint, 1.0)
 		draw_line(T[0].lerp(T[3], 0.5), T[1].lerp(T[2], 0.5), Pal.ink(0.4 * a, 1.3), 1.0)
+		if glow == 2:
+			# a warship: lit ports down both flanks, the drives red at its stern
+			for k in 40:
+				var f2 := (k + 0.5) / 40.0
+				draw_rect(Rect2(T[0].lerp(T[1], f2).lerp(T[3].lerp(T[2], f2), 0.12) - Vector2(2, 2), Vector2(4, 4)), Pal.ink(0.75 * a, 1.6))
+				draw_rect(Rect2(T[0].lerp(T[1], f2).lerp(T[3].lerp(T[2], f2), 0.88) - Vector2(2, 2), Vector2(4, 4)), Pal.ink(0.75 * a, 1.6))
+			for k in 3:
+				var q2 := T[0].lerp(T[3], 0.25 + k * 0.25)
+				var rr := (T[3] - T[0]).length() * 0.09
+				draw_circle(q2, rr * 1.6, Pal.red(0.18 * a))
+				draw_circle(q2, rr, Pal.red(0.9 * a, 2.2))
 
 
 # Lit windows across a side face (a quad from top-left round to bottom-left).
@@ -822,25 +849,51 @@ func _line3(o: Array) -> void:
 	var out := PackedVector2Array()
 	out.resize(pts.size())
 	var amin := 1.0
+	var amax := 0.0
+	var al := PackedFloat32Array()
+	al.resize(pts.size())
 	var lo := Vector2(1e9, 1e9)
 	var hi := Vector2(-1e9, -1e9)
+	# (points up past the eye are cut away: the line runs on out of sight)
+	var keep := PackedVector3Array()
+	for p in pts:
+		if eye.z - p.z >= NEAR:
+			keep.append(p)
+	if keep.size() < 2:
+		return
+	pts = keep
+	out.resize(pts.size())
+	al.resize(pts.size())
 	for i in pts.size():
 		var p := pts[i]
 		var d := eye.z - p.z
-		if d < NEAR:
-			return
 		var sc := F / d
 		var q := Vector2(C.x + (p.x - eye.x) * sc, C.y + (p.y - eye.y) * sc)
 		out[i] = q
 		lo = lo.min(q)
 		hi = hi.max(q)
-		amin = minf(amin, fade(d))
-	if amin < 0.02 or hi.x < -60.0 or lo.x > 1980.0 or hi.y < -60.0 or lo.y > 1140.0:
+		al[i] = fade(d)
+		amin = minf(amin, al[i])
+		amax = maxf(amax, al[i])
+	if amax < 0.02 or hi.x < -60.0 or lo.x > 1980.0 or hi.y < -60.0 or lo.y > 1140.0:
 		return
 	var red: bool = o.size() > 4 and o[4]
+	if amax - amin < 0.05:
+		if k >= 1.3:
+			draw_polyline(out, Pal.red(0.14 * amin) if red else Pal.ink(0.12 * amin, 1.0), w + 6.0)
+		draw_polyline(out, Pal.red(0.9 * amin, k) if red else Pal.ink(0.7 * amin, k), w)
+		return
+	# (a long line into the depths: bright where it is near, gone where it is far)
+	var cs := PackedColorArray()
+	var gs := PackedColorArray()
+	cs.resize(pts.size())
+	gs.resize(pts.size())
+	for i in pts.size():
+		cs[i] = Pal.red(0.9 * al[i], k) if red else Pal.ink(0.7 * al[i], k)
+		gs[i] = Pal.red(0.14 * al[i]) if red else Pal.ink(0.12 * al[i])
 	if k >= 1.3:
-		draw_polyline(out, Pal.red(0.14 * amin) if red else Pal.ink(0.12 * amin, 1.0), w + 6.0)
-	draw_polyline(out, Pal.red(0.9 * amin, k) if red else Pal.ink(0.7 * amin, k), w)
+		draw_polyline_colors(out, gs, w + 6.0)
+	draw_polyline_colors(out, cs, w)
 
 
 func _ring(o: Array) -> void:
@@ -886,18 +939,17 @@ func _cloud(o: Array) -> void:
 	var p := Vector2(c.x, c.y)
 	if not SCREEN.intersects(Rect2(p - Vector2(rx, ry), Vector2(rx, ry) * 2.0)):
 		return
-	for k in 3:
-		var f := 1.0 - k * 0.25
-		var q := PackedVector2Array()
-		for i in 24:
-			var v := Vector2.from_angle(TAU * i / 24.0)
-			q.append(p + Vector2(v.x * rx * f, v.y * ry * f) * (1.0 + 0.06 * sin(i * 2.3 + k)))
-		draw_colored_polygon(q, Color(0.11, 0.115, 0.125, 0.16 * a))
-	var edge := PackedVector2Array()
-	for i in 25:
-		var v := Vector2.from_angle(TAU * i / 24.0)
-		edge.append(p + Vector2(v.x * rx, v.y * ry) * (1.0 + 0.06 * sin(i * 2.3)))
-	draw_polyline(edge, Pal.ink(0.18 * a), 1.0)
+	# haze: a few thin streaks across it, longest through the middle
+	var pts := PackedVector2Array()
+	var n := 6
+	for k in n:
+		var fy := (k + 0.5) / n * 2.0 - 1.0
+		var half := rx * sqrt(maxf(0.0, 1.0 - fy * fy)) * (0.8 + 0.2 * sin(k * 2.7 + float(o[1]) * 0.01))
+		var y := p.y + fy * ry
+		var x0 := p.x - half + sin(k * 1.9) * rx * 0.1
+		pts.append(Vector2(x0, y))
+		pts.append(Vector2(x0 + half * 2.0, y))
+	draw_multiline(pts, Pal.ink(0.13 * a), maxf(1.0, 3.0 * c.z))
 
 
 func _text(o: Array) -> void:
@@ -1158,6 +1210,8 @@ func _train(o: Array) -> void:
 		var n := 6
 		for w in n:
 			draw_rect(Rect2(r.position.x + (w + 0.3) * r.size.x / n, r.position.y + r.size.y * 0.3, r.size.x / n * 0.4, r.size.y * 0.4), Pal.ink(0.7 * a, 1.6))
+	var tail := x0 + (cars - 1) * 190.0 + 170.0
+	draw_circle(Vector2(C.x + (tail - eye.x) * sc, C.y + (y - eye.y) * sc), maxf(2.0, 6.0 * sc), Pal.red(0.9 * a, 2.2))
 	# its headlight down the line
 	var hx := C.x + (x0 - eye.x) * sc
 	draw_line(Vector2(hx, C.y + (y - eye.y) * sc), Vector2(hx - 260.0 * sc * signf(float(o[3])), C.y + (y - eye.y) * sc), Pal.ink(0.35 * a, 1.8), 6.0 * sc)
@@ -1207,9 +1261,10 @@ func _heroes(st: int) -> void:
 		2, 6:
 			# a tower whose whole roof is a screen: 100%
 			for b in at:
-				var x: float = ease_way(b) * length + 120.0
-				objs.append([BOX, x, -20.0, x + 1100.0, 760.0, -D0 - 4400.0, -D0 - 160.0, 3, 2])
-				objs.append([TEXT, x + 90.0, 470.0, -D0 - 160.0, "100%", 300])
+				var x: float = ease_way(b) * length - 400.0
+				objs.append([BOX, x, 650.0, x + 2600.0, 1500.0, -D0 - 4400.0, -D0 - 160.0, 3, 2])
+				objs.append([TEXT, x + 160.0, 760.0, -D0 - 160.0, "100%", 200])
+				objs.append([TEXT, x + 1300.0, 760.0, -D0 - 160.0, "100%", 200])
 		3:
 			# the stacks, taller than anything, their crowns alight
 			for b in at:
@@ -1235,20 +1290,24 @@ func _heroes(st: int) -> void:
 		8:
 			# the lift's anchor: a foundation ring on the sea floor, the cable lit to the surface
 			objs.append([CYL, 0.0, 0.0, 1300.0, -400.0, 300.0, 3, true])
-			objs.append([LINE, PackedVector3Array([Vector3(0, 0, 300.0), Vector3(0, 0, 9000.0)]), 1.8, 4.0, true])
+			for v in [Vector2(-680, 0), Vector2(680, 0), Vector2(0, -680), Vector2(0, 680)]:
+				objs.append([LINE, PackedVector3Array([Vector3(v.x, v.y, 300.0), Vector3(v.x, v.y, 9000.0)]), 1.8, 4.0, true])
 			for k in 3:
 				objs.append([TUBE, 0.0, 0.0, 760.0, 1700.0 + BEATS[k] * 5200.0, 140.0, ""])
 		9:
 			# the capital below, its tower a needle of red light up toward you
-			objs.append([LINE, PackedVector3Array([Vector3(0, 0, 0.0), Vector3(0, 0, 3000.0)]), 2.0, 5.0, true])
 			objs.append([CYL, 0.0, 0.0, 420.0, -60.0, 0.0, 4, true])
+			# the capital's defence beams, four pillars of red light up past you
+			for k in 4:
+				var v := Vector2.from_angle(TAU * k / 4.0 + 0.6) * 1500.0
+				objs.append([LINE, PackedVector3Array([Vector3(v.x, v.y, 0.0), Vector3(v.x, v.y, 14000.0)]), 2.0, 5.0, true])
 			for k in 3:
 				objs.append([TUBE, 0.0, 0.0, 760.0, 4800.0 + BEATS[k] * 9600.0, 140.0, ""])
 		10:
 			# a warship on its slip, the length of a city, going by underneath
-			for b in [0.25, 0.65]:
-				var x: float = ease_way(b) * length
-				objs.append([BOX, x, 60.0, x + 7000.0, 820.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
+			for b in [0.2, 0.5, 0.8]:
+				var x: float = ease_way(b) * length - 1500.0
+				objs.append([BOX, x, 640.0, x + 6000.0, 1300.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
 
 
 # (rides only: the rooms' and the title's views have no deck)

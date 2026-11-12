@@ -160,6 +160,13 @@ func _cut_map(a: float) -> void:
 		draw_rect(Rect2(x, ground - h, 16, h), ik(0.25), false, 1.0)
 	draw_rect(Rect2(884, 352, 32, ground - 352), Color(0.05, 0.05, 0.056, a))
 	draw_rect(Rect2(884, 352, 32, ground - 352), ik(0.85, 1.5), false, 1.5)
+	# the bedrock under the city, in faint strata
+	for k in 4:
+		var st := PackedVector2Array()
+		for i in 18:
+			var x := 570.0 + i * 40.0
+			st.append(Vector2(x, ground + 70.0 + k * 60.0 + 8.0 * sin(i * 0.8 + k * 1.7)))
+		draw_polyline(st, ik(0.09), 1.0)
 	# the undercity: twelve floors below the street
 	for k in 13:
 		var y := ground + 18.0 + k * 19.0
@@ -175,7 +182,8 @@ func _cut_map(a: float) -> void:
 		var y := ground + 60.0 + k * 62.0
 		draw_line(Vector2(1258, y), Vector2(1290, y), ik(0.4), 1.0)
 		draw_line(Vector2(1300, y), Vector2(1440, y), ik(0.08), 1.0)
-		draw_string(font_s, Vector2(1296, y - 4), ["-1000 M", "-2000 M", "-3000 M", "-4200 M"][k], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ik(0.45))
+		draw_rect(Rect2(1532, y - 16, 58, 18), Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.92 * ma))
+		draw_string(font_s, Vector2(1536, y - 3), ["-1000 M", "-2000 M", "-3000 M", "-4200 M"][k], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ik(0.5))
 	var bed := PackedVector2Array()
 	for i in 22:
 		bed.append(Vector2(1250 + i * 20.0, 900.0 + 14.0 * sin(i * 0.7) + fmod(i * 13.0, 9.0)))
@@ -295,7 +303,9 @@ func _draw_ride() -> void:
 	var c0 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.88 * a)
 	var c1 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.0)
 	# (only behind the words: the deep middle of the view sits up here too)
-	draw_polygon(PackedVector2Array([Vector2(560, 0), Vector2(1360, 0), Vector2(1360, 250), Vector2(560, 250)]), PackedColorArray([c0, c0, c1, c1]))
+	var c9 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.94 * a)
+	draw_rect(Rect2(560, 0, 800, 200), c9)
+	draw_polygon(PackedVector2Array([Vector2(560, 200), Vector2(1360, 200), Vector2(1360, 270), Vector2(560, 270)]), PackedColorArray([c9, c9, c1, c1]))
 	draw_polygon(PackedVector2Array([Vector2(360, 0), Vector2(560, 0), Vector2(560, 250), Vector2(360, 250)]), PackedColorArray([c1, c0, c1, c1]))
 	draw_polygon(PackedVector2Array([Vector2(1360, 0), Vector2(1560, 0), Vector2(1560, 250), Vector2(1360, 250)]), PackedColorArray([c0, c1, c1, c1]))
 	var b0 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.0)
