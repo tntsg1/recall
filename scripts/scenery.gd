@@ -702,7 +702,7 @@ func _box(o: Array) -> void:
 		if o[7] == 3:
 			draw_polyline(top, Pal.red(0.22 * a), 20.0)
 			draw_polyline(top, Pal.red(a, 2.0), 7.0)
-			for fy in [0.36, 0.66]:
+			for fy in [0.69, 0.75]:
 				var l0 := T[0].lerp(T[3], fy)
 				var l1 := T[1].lerp(T[2], fy)
 				draw_line(l0, l1, Pal.red(0.2 * a), 26.0)
@@ -1354,7 +1354,7 @@ func _heroes(st: int) -> void:
 				objs.append([TUBE, 0.0, 0.0, 760.0, 4800.0 + BEATS[k] * 9600.0, 140.0, ""])
 		10:
 			# a warship on its slip, the length of a city, going by underneath
-			for b in [0.2, 0.5, 0.8]:
+			for b in [0.24, 0.56, 0.88]:
 				var x: float = ease_way(b) * length - 1500.0
 				objs.append([BOX, x, -300.0, x + 2000.0, 1250.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
 

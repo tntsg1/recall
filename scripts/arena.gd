@@ -260,6 +260,13 @@ func _pick_vista(lay: Dictionary) -> void:
 					for g: Rect2 in grates:
 						if g.grow(60.0).intersects(r):
 							ok = false
+					for spec in lay.get("arms", []):
+						var base = spec[0] if spec is Array else (spec as Dictionary).get("base", Vector2(-9999, -9999))
+						if base is Vector2 and r.grow(Arms.L + 40.0).has_point(base):
+							ok = false
+					for bl in lay.get("belts", []):
+						if bl is Array and bl.size() >= 2 and bl[0] is Vector2 and r.grow(60.0).intersects(Rect2(bl[0], Vector2.ZERO).expand(bl[1])):
+							ok = false
 					if ok:
 						glass = r
 					y += 40.0
