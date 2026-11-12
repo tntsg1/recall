@@ -48,9 +48,13 @@ func _process(_dt: float) -> bool:
 				check(not game.arena.grates.is_empty() or not game.rooms.active, "第 %d 章第一个房间有格栅" % st)
 				Cap.save(root, DIR % ("%02d_room0" % st))
 				if game.rooms.active:
+					# (rooms 1 and 4 may have the glass floor: show one that does)
 					game.rooms.build(1, "L", false)
+					if game.arena.glass.size.x == 0.0:
+						game.rooms.build(4, "R", false)
 			100:
-				Cap.save(root, DIR % ("%02d_room1%s" % [st, ("G" if game.arena.glass.size.x > 0.0 else "")]))
+				Cap.save(root, DIR % ("%02d_room1" % st))
+				print("  room 1 of chapter %d: glass %s" % [st, str(game.arena.glass)])
 				si += 1
 				f = 39
 		return false

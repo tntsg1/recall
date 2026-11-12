@@ -32,6 +32,7 @@ var star_pts: Array = []
 var dust: Array[Vector3] = []
 var planet := false
 var linear := false         # the title's endless drift: no easing at the ends
+var plain := false          # (the title) no heroes, no fly-bys
 const BEATS := [0.3, 0.6, 0.9]   # where something huge goes by close
 var beat := 0               # set when the way passes one of BEATS (Transit shakes and sounds it)
 var beats_done := 0
@@ -68,7 +69,10 @@ func begin(from_story: int) -> void:
 	beats_done = 0
 	# a ride looks ahead and down: the deep middle sits above the deck, where
 	# what is coming can be seen coming
-	C = Vector2(960, 230) if [1, 7, 8, 9, 11].has(from_story) else Vector2(1260, 250)
+	C = Vector2(960, 230) if [1, 7, 8, 9].has(from_story) else Vector2(1260, 250)
+	if from_story == 11:
+		# (the tower comes in ahead: the view leans the other way to see it come)
+		C = Vector2(640, 260)
 	match from_story:
 		1: _leg_undercity()
 		2: _leg_side("corp", "industry", 0.0)
@@ -81,7 +85,8 @@ func begin(from_story: int) -> void:
 		9: _leg_space_up()
 		10: _leg_orbit()
 		_: _leg_tower_down()
-	_heroes(from_story)
+	if not plain:
+		_heroes(from_story)
 	objs.sort_custom(func(a, b): return _top(a) < _top(b))
 	star_pts.clear()
 	for i in 160:
@@ -488,31 +493,51 @@ func _leg_orbit() -> void:
 	stars = 1.0
 
 
-# Down from orbit onto the white tower: the clouds coming up, the crown
-# widening tier by tier round the landing deck, a beacon at every corner.
+# Over the clouds to the white tower: you come in level above the cloud
+# deck, the tower's crown grows ahead, its walls go down through the clouds
+# out of sight, red down its corners and its middle, and the deck comes to
+# rest over its roof.
 func _leg_tower_down() -> void:
-	var tiers := [[5200.0, 3400.0, -2600.0], [3500.0, 2300.0, -1700.0]]
-	for tr in tiers:
-		objs.append([BOX, 2150.0 - tr[0], -tr[1], 2150.0 + tr[0], tr[1], tr[2] - 700.0, tr[2], 5, true])
-		for s in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
-			objs.append([BEAM, 2150.0 + s.x * tr[0], s.y * tr[1], tr[2], tr[2] + 260.0])
-	for i in 36:
-		var p := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(2000, 5200)
-		objs.append([CLOUD, p.x, p.y, rng.randf_range(700, 1300), rng.randf_range(320, 640), -3400.0 + rng.randf_range(-250, 250)])
-	_city_below(-9000.0)
-	# the orbital defence platforms you drop past: a body, two wings of panels
-	for i in 16:
-		var p := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(800, 2400)
-		var z := rng.randf_range(1200.0, 6600.0)
+	stars = 1.0
+	fog = 16000.0
+	path.append(Vector3(-6500, 0, 0))
+	path.append(Vector3(0, 0, 0))
+	var roof := -D0 - 160.0
+	var foot := -26000.0
+	# the tower: its wall toward you windowed floor on floor, its roof a landing ring
+	objs.append([BOX, -1100.0, -820.0, 1100.0, 820.0, foot, roof, 2, 2])
+	var fz := roof - 420.0
+	while fz > roof - 9000.0:
+		objs.append([LINE, PackedVector3Array([Vector3(-1100.0, -820.0, fz), Vector3(-1100.0, 820.0, fz)]), 1.0, 1.0])
+		fz -= 420.0
+	objs.append([LINE, PackedVector3Array([Vector3(-1100.0, 0.0, roof), Vector3(-1100.0, 0.0, foot)]), 2.0, 4.0, true])
+	for y in [-820.0, 820.0]:
+		objs.append([LINE, PackedVector3Array([Vector3(-1100.0, y, roof), Vector3(-1100.0, y, foot)]), 2.0, 3.0, true])
+	objs.append([RING, 0.0, 0.0, 560.0, roof + 2.0, 1.0, 64])
+	objs.append([RING, 0.0, 0.0, 700.0, roof + 2.0, 1.0, 72, true])
+	for s2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+		objs.append([BEAM, s2.x * 1100.0, s2.y * 820.0, roof, roof + 380.0])
+	# its crown's lower tiers, stepping out under the roof
+	for tr in [[1500.0, 1150.0, roof - 1400.0], [1950.0, 1500.0, roof - 2900.0]]:
+		objs.append([BOX, -tr[0], -tr[1], tr[0], tr[1], tr[2] - 600.0, tr[2], 5, true])
+	# the cloud deck far below, and the lesser towers that do not reach it
+	for i in 70:
+		var p := Vector2(rng.randf_range(-19000, 3000), rng.randf_range(-5200, 5200))
+		objs.append([CLOUD, p.x, p.y, rng.randf_range(900, 1700), rng.randf_range(420, 800), -7000.0 + rng.randf_range(-400, 400)])
+	for i in 26:
+		var p := Vector2(rng.randf_range(-18000, 2000), rng.randf_range(-4800, 4800) )
+		if absf(p.y) < 1400.0:
+			continue
+		var w := rng.randf_range(500, 900)
+		objs.append([BOX, p.x, p.y, p.x + w, p.y + w * 0.7, foot, -rng.randf_range(4200, 6400), 2, false])
+	# the defence platforms riding the sky
+	for i in 10:
+		var p := Vector2(rng.randf_range(-15000, -2000), rng.randf_range(-2600, 2600))
+		var z := -D0 - rng.randf_range(600, 2600)
 		var w := rng.randf_range(160, 260)
 		objs.append([BOX, p.x - w / 2.0, p.y - 70.0, p.x + w / 2.0, p.y + 70.0, z - 90.0, z, 0, true])
-		var span := rng.randf_range(420, 700)
-		objs.append([BOX, p.x - w / 2.0 - span, p.y - 120.0, p.x - w / 2.0 - 30.0, p.y + 120.0, z - 30.0, z - 10.0, 4, false])
-		objs.append([BOX, p.x + w / 2.0 + 30.0, p.y - 120.0, p.x + w / 2.0 + span, p.y + 120.0, z - 30.0, z - 10.0, 4, false])
-	path.append(Vector3(0, 0, 7000.0 + D0))
-	path.append(Vector3(0, 0, 100.0 + D0))
-	fog = 9000.0
-	stars = 1.0
+		objs.append([BOX, p.x - w / 2.0 - 520.0, p.y - 120.0, p.x - w / 2.0 - 30.0, p.y + 120.0, z - 30.0, z - 10.0, 4, false])
+		objs.append([BOX, p.x + w / 2.0 + 30.0, p.y - 120.0, p.x + w / 2.0 + 520.0, p.y + 120.0, z - 30.0, z - 10.0, 4, false])
 
 
 # ------------------------------------------------------------------ drawing
@@ -885,7 +910,10 @@ func _text(o: Array) -> void:
 	var size := int(float(o[5]) * c.z)
 	if size < 8 or size > 420 or a < 0.05:
 		return
-	draw_string(font, Vector2(c.x, c.y), o[4], HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.7 * a, 1.2))
+	var tw := font.get_string_size(o[4], HORIZONTAL_ALIGNMENT_LEFT, -1, size)
+	if visible_rect_hits_deck(Rect2(Vector2(c.x, c.y - tw.y * 0.8), tw)):
+		return
+	draw_string(font, Vector2(c.x, c.y), o[4], HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.6 * a, 1.1))
 
 
 # A floor slab round the shaft at height z: a square ring, the shaft's inside
@@ -1154,7 +1182,7 @@ func _car(o: Array) -> void:
 # Each leg's hero (the one thing you will remember it by), the near
 # fly-bys at the beats, and things moving at their own pace to give scale.
 func _heroes(st: int) -> void:
-	var lateral := not [1, 7, 8, 9, 11].has(st)
+	var lateral := not [1, 7, 8, 9, 11].has(st)   # (11 flies level too, but over the clouds: no gates, no trains)
 	var length := 24000.0
 	if lateral:
 		# at each beat a gate goes by under the deck: two columns, a beam across
@@ -1221,11 +1249,8 @@ func _heroes(st: int) -> void:
 			for b in [0.25, 0.65]:
 				var x: float = ease_way(b) * length
 				objs.append([BOX, x, 60.0, x + 7000.0, 820.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
-		11:
-			# the white tower: a wall of it beside you all the way down, red down its
-			# corners, its windows lighting floor by floor as you pass
-			objs.append([BOX, 700.0, -1400.0, 3600.0, 1400.0, -12000.0, -320.0, 2, 2])
-			for y in [-1400.0, 1400.0]:
-				objs.append([LINE, PackedVector3Array([Vector3(700.0, y, -320.0), Vector3(700.0, y, -12000.0)]), 2.2, 4.0, true])
-			for k in 3:
-				objs.append([FRAME, 900.0, 700.0, 6800.0 - BEATS[k] * 6900.0, 120.0, "", false])
+
+
+# (rides only: the rooms' and the title's views have no deck)
+func visible_rect_hits_deck(r: Rect2) -> bool:
+	return leg != 0 and DECK.grow(30.0).intersects(r)

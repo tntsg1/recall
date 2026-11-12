@@ -60,6 +60,7 @@ func _process(_dt: float) -> bool:
 			game.wave_ctl.pick_state = 2
 			game.picking = false
 			game.hud.cards_t = -1.0
+			game.hud.intro_t = -1.0
 			cracks0 = game.cracks
 			check(tr.take(game.chapter), "第 %d 段开始" % leg)
 		90:

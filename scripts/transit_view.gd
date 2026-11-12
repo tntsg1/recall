@@ -171,6 +171,11 @@ func _cut_map(a: float) -> void:
 		sea.append(Vector2(1250 + i * 20.0, ground + 3.0 * sin(i * 1.3)))
 	draw_polyline(sea, ik(0.5), 1.0)
 	draw_string(font_s, Vector2(1560, ground - 10), Txt.t("map_sea"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ik(0.4))
+	for k in 4:
+		var y := ground + 60.0 + k * 62.0
+		draw_line(Vector2(1258, y), Vector2(1290, y), ik(0.4), 1.0)
+		draw_line(Vector2(1300, y), Vector2(1440, y), ik(0.08), 1.0)
+		draw_string(font_s, Vector2(1296, y - 4), ["-1000 M", "-2000 M", "-3000 M", "-4200 M"][k], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ik(0.45))
 	var bed := PackedVector2Array()
 	for i in 22:
 		bed.append(Vector2(1250 + i * 20.0, 900.0 + 14.0 * sin(i * 0.7) + fmod(i * 13.0, 9.0)))
@@ -202,7 +207,9 @@ func _markers(a: float, ring: bool) -> void:
 			var size := 22 if here else 14
 			var w := (font if here else font_s).get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 			var at := p + Vector2(18.0 if side > 0.0 else -18.0 - w, 7.0)
-			draw_rect(Rect2(at + Vector2(-6, -size - 1.0), Vector2(w + 12, size + 10.0)), Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, (0.9 if here else 0.7) * a))
+			if not ring:
+				at.y -= 30.0
+			draw_rect(Rect2(at + Vector2(-6, -size - 1.0), Vector2(w + 12, size + 10.0)), Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.95 * a))
 			draw_string(font if here else font_s, at, name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, c if here else Pal.ink(0.45 * a))
 
 
@@ -228,6 +235,10 @@ func _way(a: float, k: float) -> void:
 		for i in range(0, n, 8):
 			draw_circle(shown[i], 4.0, Pal.red(0.9 * a, 1.4))
 		draw_circle(shown[shown.size() - 1], 8.0, Pal.red(a, 2.2))
+		if k >= 1.0:
+			for kk in 2:
+				var rip := fmod(tr.t * 1.4 + kk * 0.5, 1.0)
+				draw_arc(shown[shown.size() - 1], 10.0 + rip * 46.0, 0, TAU, 32, Pal.red((1.0 - rip) * 0.8 * a, 1.8), 2.0)
 
 
 func _uses_map(story: int) -> String:
@@ -287,6 +298,9 @@ func _draw_ride() -> void:
 	draw_polygon(PackedVector2Array([Vector2(560, 0), Vector2(1360, 0), Vector2(1360, 250), Vector2(560, 250)]), PackedColorArray([c0, c0, c1, c1]))
 	draw_polygon(PackedVector2Array([Vector2(360, 0), Vector2(560, 0), Vector2(560, 250), Vector2(360, 250)]), PackedColorArray([c1, c0, c1, c1]))
 	draw_polygon(PackedVector2Array([Vector2(1360, 0), Vector2(1560, 0), Vector2(1560, 250), Vector2(1360, 250)]), PackedColorArray([c0, c1, c1, c1]))
+	var b0 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.0)
+	var b1 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.9 * a)
+	draw_polygon(PackedVector2Array([Vector2(0, 930), Vector2(1920, 930), Vector2(1920, 1080), Vector2(0, 1080)]), PackedColorArray([b0, b0, b1, b1]))
 	draw_string(font_s, Vector2(560, 150), line, HORIZONTAL_ALIGNMENT_CENTER, 800, 19, Pal.ink(0.6 * a))
 	draw_string(font, Vector2(460, 192), "→  " + to, HORIZONTAL_ALIGNMENT_CENTER, 1000, 30, Pal.ink(0.95 * a, 1.25))
 	# how far along: a red line, the way on the map

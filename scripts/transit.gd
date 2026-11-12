@@ -302,10 +302,11 @@ func _draw() -> void:
 	else:
 		draw_rect(side, Color(0.13, 0.13, 0.14), false, 10.0)
 	# the floor: dark, but not so dark the drop beneath does not show through
+	var floor_a := 0.8 if [1, 7, 8, 9].has(leg) else 0.93
 	if round:
-		_round_rect(r, 70.0, Color(0.035, 0.035, 0.04, 0.8), true)
+		_round_rect(r, 70.0, Color(0.035, 0.035, 0.04, floor_a), true)
 	else:
-		draw_rect(r, Color(0.035, 0.035, 0.04, 0.8))
+		draw_rect(r, Color(0.035, 0.035, 0.04, floor_a))
 	match deck_kind:
 		"lift":
 			# a cage: floor plates, the cables up from its corners, its guide shoes

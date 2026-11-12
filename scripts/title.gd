@@ -124,6 +124,7 @@ func _ready() -> void:
 		add_child(vista)
 		vista.z_index = 0
 		vista.z_as_relative = true
+		vista.plain = true
 		vista.begin(2)
 		vista.linear = true
 		vista_u = 0.12
@@ -598,7 +599,7 @@ func _draw() -> void:
 		var cols := PackedColorArray([Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.92)])
 		for k in 41:
 			var v := Vector2.from_angle(TAU * k / 40.0)
-			pts.append(Vector2(960, 700) + Vector2(v.x * 560.0, v.y * 420.0))
+			pts.append(Vector2(960, 700) + Vector2(v.x * 680.0, v.y * 500.0))
 			cols.append(Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.0))
 		for k in 40:
 			draw_polygon(PackedVector2Array([pts[0], pts[k + 1], pts[k + 2]]), PackedColorArray([cols[0], cols[k + 1], cols[k + 2]]))
