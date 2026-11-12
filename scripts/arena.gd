@@ -38,6 +38,58 @@ func _init() -> void:
 	setup(0)
 
 
+func _ready() -> void:
+	var gv := GlassView.new()
+	gv.arena = self
+	add_child(gv)
+
+
+# What the glass floor looks down on, drawn just under the floor (so the glass
+# shows it and the floor round it hides it): a cluster of towers far below,
+# their roofs lit, a red light running between them.
+class GlassView extends Node2D:
+	var arena
+
+	func _ready() -> void:
+		z_index = -11
+		z_as_relative = false
+
+	func _process(_dt: float) -> void:
+		visible = arena.glass.size.x > 0.0 and not arena.open
+		if visible:
+			queue_redraw()
+
+	func _draw() -> void:
+		var g: Rect2 = arena.glass
+		var t: float = arena.game_t()
+		var vp := g.get_center() + Vector2(0, g.size.y * 0.1)
+		for k in 4:
+			var cx: float = g.position.x + g.size.x * [0.22, 0.68, 0.36, 0.78][k]
+			var cy: float = g.position.y + g.size.y * [0.18, 0.34, 0.62, 0.82][k]
+			var w: float = [52.0, 40.0, 60.0, 44.0][k]
+			var h: float = [70.0, 90.0, 64.0, 80.0][k]
+			var roof := Rect2(cx - w / 2.0, cy - h / 2.0, w, h)
+			var foot := Rect2(vp.lerp(roof.position, 0.45), roof.size * 0.45)
+			var rc := [roof.position, Vector2(roof.end.x, roof.position.y), roof.end, Vector2(roof.position.x, roof.end.y)]
+			var fc := [foot.position, Vector2(foot.end.x, foot.position.y), foot.end, Vector2(foot.position.x, foot.end.y)]
+			for i in 4:
+				draw_line(rc[i], fc[i], Pal.ink(0.22), 1.0)
+			draw_rect(roof, Color(0.09, 0.09, 0.1))
+			draw_rect(roof, Pal.ink(0.5, 1.2), false, 1.5)
+			for r in 3:
+				for c in 2:
+					if (k + r + c) % 3 != 0:
+						draw_rect(Rect2(roof.position + Vector2(8 + c * (w - 22.0), 10 + r * (h - 20.0) / 3.0), Vector2(6, 3)), Pal.ink(0.55, 1.4))
+		# the line between them, and the train on it
+		var a0 := Vector2(g.position.x + g.size.x * 0.52, g.position.y + 6.0)
+		var a1 := Vector2(g.position.x + g.size.x * 0.52, g.end.y - 6.0)
+		draw_line(a0, a1, Pal.ink(0.18), 2.0)
+		var u := fmod(t * 0.18, 1.0)
+		var p := a0.lerp(a1, u)
+		draw_rect(Rect2(p - Vector2(5, 26), Vector2(10, 52)), Pal.ink(0.4, 1.3))
+		draw_circle(p + Vector2(0, 28), 4.0, Pal.red(0.95, 2.2))
+
+
 # `lay` (RoomGen) replaces the chapter's hand-made room with a generated one.
 func setup(ch: int, lay := {}) -> void:
 	rects.clear()

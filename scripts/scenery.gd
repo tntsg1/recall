@@ -517,8 +517,11 @@ func _leg_tower_down() -> void:
 	objs.append([BOX, -1100.0, -820.0, 1100.0, 820.0, foot, roof, 2, 2])
 	var fz := roof - 420.0
 	while fz > roof - 9000.0:
-		objs.append([LINE, PackedVector3Array([Vector3(-1100.0, -820.0, fz), Vector3(-1100.0, 820.0, fz)]), 1.0, 1.0])
+		objs.append([LINE, PackedVector3Array([Vector3(-1100.0, -820.0, fz), Vector3(-1100.0, 820.0, fz)]), 1.5, 3.0])
+		objs.append([LINE, PackedVector3Array([Vector3(-1100.0, -820.0, fz - 60.0), Vector3(-1100.0, 820.0, fz - 60.0)]), 1.0, 1.0])
 		fz -= 420.0
+	objs.append([BEAM, 0.0, 0.0, roof, roof + 600.0])
+	objs.append([RING, 0.0, 0.0, 300.0, roof + 4.0, 1.0, 48, true])
 	objs.append([LINE, PackedVector3Array([Vector3(-1100.0, 0.0, roof), Vector3(-1100.0, 0.0, foot)]), 2.2, 6.0, true])
 	for y in [-820.0, 820.0]:
 		objs.append([LINE, PackedVector3Array([Vector3(-1100.0, y, roof), Vector3(-1100.0, y, foot)]), 2.0, 3.0, true])
@@ -670,7 +673,7 @@ func _box(o: Array) -> void:
 	if a > 0.3:
 		# the sides that face the eye: lit at the top, gone into the dark at the foot
 		var faces := [eye.y < y0, eye.x > x1, eye.y > y1, eye.x < x0]
-		var c_top := _fill(a, 1.45 if glow == 2 else 1.0)
+		var c_top := _fill(a, (0.8 if o[7] == 4 else 1.45) if glow == 2 else 1.0)
 		var c_bot := Pal.BG
 		var e_top := Pal.ink((0.95 if glow == 2 else 0.22) * a, 1.7 if glow == 2 else 1.0)
 		var e_bot := Pal.ink(0.0)
@@ -686,7 +689,7 @@ func _box(o: Array) -> void:
 			draw_polyline_colors(PackedVector2Array([T[i], B[i], B[j], T[j]]), PackedColorArray([e_top, e_bot, e_bot, e_top]), 1.0)
 			if win > 0:
 				_windows(T[i], T[j], B[j], B[i], win, a, x0 + y0 + i)
-	draw_colored_polygon(T, _fill(a, 2.4 if glow == 2 else 1.6))
+	draw_colored_polygon(T, _fill(a, (1.1 if o[7] == 4 else 2.4) if glow == 2 else 1.6))
 	var top := T.duplicate()
 	top.append(T[0])
 	if glow == 2:
@@ -730,15 +733,17 @@ func _box(o: Array) -> void:
 		draw_line(T[0].lerp(T[3], 0.5), T[1].lerp(T[2], 0.5), Pal.ink(0.4 * a, 1.3), 1.0)
 		if glow == 2:
 			# a warship: lit ports down both flanks, the drives red at its stern
-			for k in 40:
-				var f2 := (k + 0.5) / 40.0
-				draw_rect(Rect2(T[0].lerp(T[1], f2).lerp(T[3].lerp(T[2], f2), 0.12) - Vector2(2, 2), Vector2(4, 4)), Pal.ink(0.75 * a, 1.6))
-				draw_rect(Rect2(T[0].lerp(T[1], f2).lerp(T[3].lerp(T[2], f2), 0.88) - Vector2(2, 2), Vector2(4, 4)), Pal.ink(0.75 * a, 1.6))
+			for k in 48:
+				var f2 := (k + 0.5) / 48.0
+				for side in [0.14, 0.86]:
+					var pp: Vector2 = T[0].lerp(T[1], f2).lerp(T[3].lerp(T[2], f2), side)
+					draw_rect(Rect2(pp - Vector2(4, 2.5), Vector2(8, 5)), Pal.ink(0.85 * a, 1.8))
 			for k in 3:
 				var q2 := T[0].lerp(T[3], 0.25 + k * 0.25)
-				var rr := (T[3] - T[0]).length() * 0.09
-				draw_circle(q2, rr * 1.6, Pal.red(0.18 * a))
-				draw_circle(q2, rr, Pal.red(0.9 * a, 2.2))
+				var rr := maxf(10.0, (T[3] - T[0]).length() * 0.1)
+				draw_circle(q2 + (T[0] - T[1]).normalized() * rr * 0.8, rr * 2.2, Pal.red(0.16 * a))
+				draw_circle(q2 + (T[0] - T[1]).normalized() * rr * 0.8, rr * 1.4, Pal.red(0.4 * a, 1.6))
+				draw_circle(q2, rr, Pal.red(0.95 * a, 2.4))
 
 
 # Lit windows across a side face (a quad from top-left round to bottom-left).
@@ -914,6 +919,9 @@ func _ring(o: Array) -> void:
 	if o.size() > 7 and o[7]:
 		draw_arc(p, r, 0, TAU, int(o[6]), Pal.red(0.2 * a), 10.0)
 		draw_arc(p, r, 0, TAU, int(o[6]), Pal.red(0.95 * a, 1.9), 3.0)
+		# a beacon's pulse running out from it
+		var pu := fmod(t * 0.7 + float(o[3]) * 0.001, 1.0)
+		draw_arc(p, r * (1.0 + pu * 0.8), 0, TAU, int(o[6]), Pal.red((1.0 - pu) * 0.6 * a, 1.8), 2.0)
 		return
 	draw_arc(p, r, 0, TAU, int(o[6]), Pal.ink(0.12 * a), 6.0)
 	draw_arc(p, r, 0, TAU, int(o[6]), Pal.ink(0.7 * a, 1.25), 1.5)
