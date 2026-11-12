@@ -701,10 +701,24 @@ func _box(o: Array) -> void:
 		var blink := 0.35 + 0.65 * absf(sin(t * 2.4))
 		for q in T:
 			draw_circle(q, 6.0, Pal.red(blink * a, 2.4))
-		for k in range(1, 8):
-			draw_line(T[0].lerp(T[1], k / 8.0), T[3].lerp(T[2], k / 8.0), Pal.ink(0.12 * a), 1.0)
-		for k in range(1, 4):
-			draw_line(T[0].lerp(T[3], k / 4.0), T[1].lerp(T[2], k / 4.0), Pal.ink(0.12 * a), 1.0)
+		var cols := 8 if o[7] != 3 else 12
+		var rows := 4 if o[7] != 3 else 8
+		for k in range(1, cols):
+			draw_line(T[0].lerp(T[1], float(k) / cols), T[3].lerp(T[2], float(k) / cols), Pal.ink(0.16 * a), 1.0)
+		for k in range(1, rows):
+			draw_line(T[0].lerp(T[3], float(k) / rows), T[1].lerp(T[2], float(k) / rows), Pal.ink(0.16 * a), 1.0)
+		if o[7] == 3:
+			# every few panels lit, flickering as a screen does
+			for i in cols:
+				for j in rows:
+					if (i * 7 + j * 3) % 5 != 0:
+						continue
+					var fa := float(i) / cols
+					var fb := float(j) / rows
+					var fa2 := float(i + 1) / cols
+					var fb2 := float(j + 1) / rows
+					var q := PackedVector2Array([T[0].lerp(T[1], fa).lerp(T[3].lerp(T[2], fa), fb), T[0].lerp(T[1], fa2).lerp(T[3].lerp(T[2], fa2), fb), T[0].lerp(T[1], fa2).lerp(T[3].lerp(T[2], fa2), fb2), T[0].lerp(T[1], fa).lerp(T[3].lerp(T[2], fa), fb2)])
+					draw_colored_polygon(q, Pal.ink((0.07 + 0.05 * sin(t * 5.0 + i + j)) * a, 1.2))
 	else:
 		draw_polyline(top, Pal.ink(0.75 * a, 1.5) if glow == 1 else Pal.ink(0.3 * a, 1.0), 1.5)
 	if o[7] == 1:
@@ -733,14 +747,14 @@ func _box(o: Array) -> void:
 		draw_line(T[0].lerp(T[3], 0.5), T[1].lerp(T[2], 0.5), Pal.ink(0.4 * a, 1.3), 1.0)
 		if glow == 2:
 			# a warship: lit ports down both flanks, the drives red at its stern
-			for k in 48:
-				var f2 := (k + 0.5) / 48.0
-				for side in [0.14, 0.86]:
+			for k in 36:
+				var f2 := (k + 0.5) / 36.0
+				for side in [0.62, 0.74, 0.86]:
 					var pp: Vector2 = T[0].lerp(T[1], f2).lerp(T[3].lerp(T[2], f2), side)
-					draw_rect(Rect2(pp - Vector2(4, 2.5), Vector2(8, 5)), Pal.ink(0.85 * a, 1.8))
+					draw_rect(Rect2(pp - Vector2(6, 4), Vector2(12, 8)), Pal.ink(0.9 * a, 1.9))
 			for k in 3:
-				var q2 := T[0].lerp(T[3], 0.25 + k * 0.25)
-				var rr := maxf(10.0, (T[3] - T[0]).length() * 0.1)
+				var q2 := T[0].lerp(T[3], 0.6 + k * 0.14)
+				var rr := maxf(46.0, (T[3] - T[0]).length() * 0.06)
 				draw_circle(q2 + (T[0] - T[1]).normalized() * rr * 0.8, rr * 2.2, Pal.red(0.16 * a))
 				draw_circle(q2 + (T[0] - T[1]).normalized() * rr * 0.8, rr * 1.4, Pal.red(0.4 * a, 1.6))
 				draw_circle(q2, rr, Pal.red(0.95 * a, 2.4))
@@ -1174,6 +1188,12 @@ func _tube(o: Array) -> void:
 	var p := Vector2(c.x, c.y)
 	if r + th < 300.0 or r > 2400.0:
 		return
+	if o.size() > 7 and o[7]:
+		# a red bulkhead: the band itself glows
+		draw_arc(p, r + th * 0.5, 0, TAU, 72, Pal.red(0.22 * a), th)
+		draw_arc(p, r, 0, TAU, 72, Pal.red(a, 2.2), 4.0)
+		draw_arc(p, r + th, 0, TAU, 72, Pal.red(0.7 * a, 1.6), 2.0)
+		return
 	draw_arc(p, r + th * 0.5, 0, TAU, 72, _fill(a, 1.3), th)
 	draw_arc(p, r, 0, TAU, 72, Pal.ink(0.8 * a, 1.35), 2.0)
 	draw_arc(p, r + th, 0, TAU, 72, Pal.ink(0.25 * a), 1.0)
@@ -1269,10 +1289,12 @@ func _heroes(st: int) -> void:
 		2, 6:
 			# a tower whose whole roof is a screen: 100%
 			for b in at:
-				var x: float = ease_way(b) * length - 400.0
-				objs.append([BOX, x, 680.0, x + 2600.0, 1500.0, -D0 - 4400.0, -D0 - 160.0, 3, 2])
-				objs.append([TEXT, x + 160.0, 880.0, -D0 - 160.0, "100%", 190])
-				objs.append([TEXT, x + 1300.0, 880.0, -D0 - 160.0, "100%", 190])
+				var x: float = ease_way(b) * length - 600.0
+				objs.append([BOX, x, -1500.0, x + 3800.0, 1700.0, -D0 - 4400.0, -D0 - 170.0, 3, 2])
+				var tx := x + 120.0
+				while tx < x + 3500.0:
+					objs.append([TEXT, tx, 700.0, -D0 - 170.0, "100%", 180])
+					tx += 760.0
 		3:
 			# the stacks, taller than anything, their crowns alight
 			for b in at:
@@ -1301,7 +1323,7 @@ func _heroes(st: int) -> void:
 			for v in [Vector2(-680, 0), Vector2(680, 0), Vector2(0, -680), Vector2(0, 680)]:
 				objs.append([LINE, PackedVector3Array([Vector3(v.x, v.y, 300.0), Vector3(v.x, v.y, 9000.0)]), 1.8, 4.0, true])
 			for k in 3:
-				objs.append([TUBE, 0.0, 0.0, 760.0, 1700.0 + BEATS[k] * 5200.0, 140.0, ""])
+				objs.append([TUBE, 0.0, 0.0, 760.0, 1700.0 + BEATS[k] * 5200.0, 160.0, "", true])
 		9:
 			# the capital below, its tower a needle of red light up toward you
 			objs.append([CYL, 0.0, 0.0, 420.0, -60.0, 0.0, 4, true])
@@ -1314,8 +1336,8 @@ func _heroes(st: int) -> void:
 		10:
 			# a warship on its slip, the length of a city, going by underneath
 			for b in [0.2, 0.5, 0.8]:
-				var x: float = ease_way(b) * length - 1500.0
-				objs.append([BOX, x, 600.0, x + 6000.0, 980.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
+				var x: float = ease_way(b) * length - 2500.0
+				objs.append([BOX, x, -300.0, x + 7000.0, 1250.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
 
 
 # (rides only: the rooms' and the title's views have no deck)

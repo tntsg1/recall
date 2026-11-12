@@ -65,6 +65,9 @@ func _process(_dt: float) -> bool:
 			check(tr.take(game.chapter), "第 %d 段开始" % leg)
 		90:
 			Cap.save(root, DIR % ("%02d_map" % leg))
+		124:
+			# the map falling away into the deck
+			Cap.save(root, DIR % ("%02d_zoom" % leg))
 		150:
 			check(tr.state == Transit.RIDE, "第 %d 段地图后进入乘坐" % leg)
 			tr.t = 3.0

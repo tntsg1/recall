@@ -65,15 +65,18 @@ func _draw_map() -> void:
 	var s := 1.0 + Pal.ease_in(zoom_u) * 2.2 + (1.0 - Pal.ease_out(clampf(t / 0.35, 0.0, 1.0))) * 0.04
 	draw_rect(Rect2(Vector2.ZERO, Vector2(1920, 1080)), Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, a))
 	var hc := head if tr.view_map() == "ring" else CUT_C + (head - CUT_C) * CUT_K
-	draw_set_transform(hc - hc * s, 0.0, Vector2(s, s))
+	# (where the way ends goes to the middle of the screen as the map grows: the deck is there)
+	var land := hc.lerp(Vector2(960, 540), Pal.ease_io(zoom_u))
+	var off := land - hc
+	draw_set_transform(hc - hc * s + off, 0.0, Vector2(s, s))
 	if tr.view_map() == "ring":
 		_ring_map(a)
 	else:
 		# (the section is drawn half as large again, about the screen's middle)
-		draw_set_transform(hc - hc * s + (CUT_C - CUT_C * CUT_K) * s, 0.0, Vector2(s, s) * CUT_K)
+		draw_set_transform(hc - hc * s + (CUT_C - CUT_C * CUT_K) * s + off, 0.0, Vector2(s, s) * CUT_K)
 		_cut_map(a)
 	if tr.view_map() != "ring":
-		draw_set_transform(hc - hc * s + (CUT_C - CUT_C * CUT_K) * s, 0.0, Vector2(s, s) * CUT_K)
+		draw_set_transform(hc - hc * s + (CUT_C - CUT_C * CUT_K) * s + off, 0.0, Vector2(s, s) * CUT_K)
 	_way(a, clampf((t - 0.3) / 0.8, 0.0, 1.0))
 	_markers(a, tr.view_map() == "ring")
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -305,7 +308,7 @@ func _draw_ride() -> void:
 	# (only behind the words: the deep middle of the view sits up here too)
 	# (the whole width round the progress line goes quiet, so no red of the city reads as it)
 	var c4 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.0)
-	var c5 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.8 * a)
+	var c5 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.97 * a)
 	draw_polygon(PackedVector2Array([Vector2(0, 130), Vector2(1920, 130), Vector2(1920, 190), Vector2(0, 190)]), PackedColorArray([c4, c4, c5, c5]))
 	draw_rect(Rect2(0, 190, 1920, 60), c5)
 	draw_polygon(PackedVector2Array([Vector2(0, 250), Vector2(1920, 250), Vector2(1920, 290), Vector2(0, 290)]), PackedColorArray([c5, c5, c4, c4]))
