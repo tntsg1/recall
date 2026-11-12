@@ -199,12 +199,11 @@ func _markers(a: float, ring: bool) -> void:
 		if here or story != 12:
 			var side := 1.0 if p.x >= (RING_C.x if ring else 960.0) else -1.0
 			var name := Chapters.title_story(story)
-			var size := 22 if here else 13
+			var size := 22 if here else 14
 			var w := (font if here else font_s).get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 			var at := p + Vector2(18.0 if side > 0.0 else -18.0 - w, 7.0)
-			if here:
-				draw_rect(Rect2(at + Vector2(-8, -size - 2.0), Vector2(w + 16, size + 12.0)), Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.88 * a))
-			draw_string(font if here else font_s, at, name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, c if here else Pal.ink(0.25 * a))
+			draw_rect(Rect2(at + Vector2(-6, -size - 1.0), Vector2(w + 12, size + 10.0)), Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, (0.9 if here else 0.7) * a))
+			draw_string(font if here else font_s, at, name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, c if here else Pal.ink(0.45 * a))
 
 
 # The way taken so far (dim) and this ride's leg (drawn on as k goes 0..1).
@@ -219,7 +218,13 @@ func _way(a: float, k: float) -> void:
 	if n >= 2:
 		var shown := pts.slice(0, n)
 		draw_polyline(shown, Pal.red(0.15 * a), 14.0)
-		draw_polyline(shown, Pal.red(0.95 * a, 1.8), 4.0)
+		if tr.view_map() == "ring":
+			draw_polyline(shown, Pal.red(0.95 * a, 1.8), 4.0)
+		else:
+			# under the sea the way goes darker and thinner the deeper it runs
+			for i in range(shown.size() - 1):
+				var deep := clampf((shown[i].y - 640.0) / 260.0, 0.0, 1.0)
+				draw_line(shown[i], shown[i + 1], Pal.red((0.95 - 0.45 * deep) * a, 1.8 - 0.8 * deep), 4.0 - 2.0 * deep)
 		for i in range(0, n, 8):
 			draw_circle(shown[i], 4.0, Pal.red(0.9 * a, 1.4))
 		draw_circle(shown[shown.size() - 1], 8.0, Pal.red(a, 2.2))
@@ -278,7 +283,10 @@ func _draw_ride() -> void:
 	# a dark band down from the top, so the line reads over the city
 	var c0 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.88 * a)
 	var c1 := Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.0)
-	draw_polygon(PackedVector2Array([Vector2(0, 0), Vector2(1920, 0), Vector2(1920, 270), Vector2(0, 270)]), PackedColorArray([c0, c0, c1, c1]))
+	# (only behind the words: the deep middle of the view sits up here too)
+	draw_polygon(PackedVector2Array([Vector2(560, 0), Vector2(1360, 0), Vector2(1360, 250), Vector2(560, 250)]), PackedColorArray([c0, c0, c1, c1]))
+	draw_polygon(PackedVector2Array([Vector2(360, 0), Vector2(560, 0), Vector2(560, 250), Vector2(360, 250)]), PackedColorArray([c1, c0, c1, c1]))
+	draw_polygon(PackedVector2Array([Vector2(1360, 0), Vector2(1560, 0), Vector2(1560, 250), Vector2(1360, 250)]), PackedColorArray([c0, c1, c1, c1]))
 	draw_string(font_s, Vector2(560, 150), line, HORIZONTAL_ALIGNMENT_CENTER, 800, 19, Pal.ink(0.6 * a))
 	draw_string(font, Vector2(460, 192), "→  " + to, HORIZONTAL_ALIGNMENT_CENTER, 1000, 30, Pal.ink(0.95 * a, 1.25))
 	# how far along: a red line, the way on the map

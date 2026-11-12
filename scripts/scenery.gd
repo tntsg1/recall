@@ -182,6 +182,8 @@ func under(story: int) -> void:
 					var x := -3600.0 + rng.randf_range(0, 300)
 					while x < 3600.0:
 						x += _place(style, x, side, r)
+			for k in 3:
+				objs.append([TRAIN, [-900.0, 300.0, 1200.0][k], -D0 - 600.0 - k * 300.0, [-1400.0, 1100.0, -900.0][k], 8, rng.randf_range(-4000, 2000)])
 			if style == "rails":
 				for k in 8:
 					var ry := -1400.0 + k * 400.0
@@ -491,9 +493,9 @@ func _leg_orbit() -> void:
 func _leg_tower_down() -> void:
 	var tiers := [[5200.0, 3400.0, -2600.0], [3500.0, 2300.0, -1700.0]]
 	for tr in tiers:
-		objs.append([BOX, 1500.0 - tr[0], -tr[1], 1500.0 + tr[0], tr[1], tr[2] - 700.0, tr[2], 5, true])
+		objs.append([BOX, 2150.0 - tr[0], -tr[1], 2150.0 + tr[0], tr[1], tr[2] - 700.0, tr[2], 5, true])
 		for s in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
-			objs.append([BEAM, 1500.0 + s.x * tr[0], s.y * tr[1], tr[2], tr[2] + 260.0])
+			objs.append([BEAM, 2150.0 + s.x * tr[0], s.y * tr[1], tr[2], tr[2] + 260.0])
 	for i in 36:
 		var p := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(2000, 5200)
 		objs.append([CLOUD, p.x, p.y, rng.randf_range(700, 1300), rng.randf_range(320, 640), -3400.0 + rng.randf_range(-250, 250)])
@@ -634,9 +636,9 @@ func _box(o: Array) -> void:
 	if a > 0.3:
 		# the sides that face the eye: lit at the top, gone into the dark at the foot
 		var faces := [eye.y < y0, eye.x > x1, eye.y > y1, eye.x < x0]
-		var c_top := _fill(a, 1.0)
+		var c_top := _fill(a, 1.45 if glow == 2 else 1.0)
 		var c_bot := Pal.BG
-		var e_top := Pal.ink((0.9 if glow == 2 else 0.36) * a, 1.6 if glow == 2 else 1.0)
+		var e_top := Pal.ink((0.95 if glow == 2 else 0.22) * a, 1.7 if glow == 2 else 1.0)
 		var e_bot := Pal.ink(0.0)
 		var win: int = o[7] if a > 0.45 else 0
 		for i in 4:
@@ -647,14 +649,20 @@ func _box(o: Array) -> void:
 			draw_polyline_colors(PackedVector2Array([T[i], B[i], B[j], T[j]]), PackedColorArray([e_top, e_bot, e_bot, e_top]), 1.0)
 			if win > 0:
 				_windows(T[i], T[j], B[j], B[i], win, a, x0 + y0 + i)
-	draw_colored_polygon(T, _fill(a, 1.7))
+	draw_colored_polygon(T, _fill(a, 2.4 if glow == 2 else 1.6))
 	var top := T.duplicate()
 	top.append(T[0])
 	if glow == 2:
-		draw_polyline(top, Pal.ink(0.14 * a), 10.0)
-		draw_polyline(top, Pal.ink(a, 1.9), 3.0)
+		# the hero: a halo, a hard bright rim, a red edge and red lights at its corners
+		draw_polyline(top, Pal.ink(0.16 * a), 14.0)
+		draw_polyline(top, Pal.ink(a, 2.0), 3.5)
+		draw_line(T[3], T[2], Pal.red(0.25 * a), 12.0)
+		draw_line(T[3], T[2], Pal.red(a, 2.0), 3.0)
+		var blink := 0.35 + 0.65 * absf(sin(t * 2.4))
+		for q in T:
+			draw_circle(q, 6.0, Pal.red(blink * a, 2.4))
 	else:
-		draw_polyline(top, Pal.ink(0.8 * a, 1.5) if glow == 1 else Pal.ink(0.48 * a, 1.0), 1.5)
+		draw_polyline(top, Pal.ink(0.75 * a, 1.5) if glow == 1 else Pal.ink(0.3 * a, 1.0), 1.5)
 	if o[7] == 1:
 		# a factory roof: saw-tooth ridges across the top
 		for k in range(1, 6):
@@ -712,7 +720,7 @@ func _windows(tl: Vector2, tr: Vector2, br: Vector2, bl: Vector2, kind: int, a: 
 		var l := tl.lerp(bl, fy)
 		var rr := tr.lerp(br, fy)
 		var dx := (rr - l) / cols * 0.28
-		var lit := Pal.ink(0.5 * a * (1.0 - fy * 1.2), 1.35)
+		var lit := Pal.ink(0.34 * a * (1.0 - fy * 1.2), 1.35)
 		for c in cols:
 			if not LIT[(base + r * 37 + c * 11) & 4095]:
 				continue
@@ -762,6 +770,18 @@ func _cyl(o: Array) -> void:
 	draw_circle(tp, tr, _fill(a, 1.25))
 	var rings: int = o[6]
 	var k_top := 1.6 if rings == 4 else 1.0
+	if o.size() > 7 and o[7]:
+		# the hero: halo, a hard rim, scale marks round it, a red ring inside
+		draw_arc(tp, tr, 0, TAU, 72, Pal.ink(0.16 * a), 16.0)
+		draw_arc(tp, tr, 0, TAU, 72, Pal.ink(a, 2.0), 3.5)
+		for k in 48:
+			var v := Vector2.from_angle(TAU * k / 48.0)
+			draw_line(tp + v * tr, tp + v * tr * (0.93 if k % 4 == 0 else 0.965), Pal.ink(0.6 * a, 1.3), 1.5)
+		draw_arc(tp, tr * 0.8, 0, TAU, 64, Pal.red(0.22 * a), 12.0)
+		draw_arc(tp, tr * 0.8, 0, TAU, 64, Pal.red(a, 2.0), 3.0)
+		for k in range(1, 4):
+			draw_arc(tp, tr * (0.8 - k * 0.16), 0, TAU, 48, Pal.ink((0.35 + 0.25 * sin(t * 2.6 + k)) * a, 1.4), 1.5)
+		return
 	draw_arc(tp, tr, 0, TAU, 40, Pal.ink(0.75 * a, k_top), 1.5)
 	if rings >= 3:
 		for k in range(1, 3 if rings == 3 else 4):
@@ -863,7 +883,7 @@ func _text(o: Array) -> void:
 	var a := fade(d)
 	var c := proj(Vector3(o[1], o[2], z))
 	var size := int(float(o[5]) * c.z)
-	if size < 8 or size > 160 or a < 0.05:
+	if size < 8 or size > 420 or a < 0.05:
 		return
 	draw_string(font, Vector2(c.x, c.y), o[4], HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.7 * a, 1.2))
 
@@ -1078,7 +1098,9 @@ func _tube(o: Array) -> void:
 	if label != "":
 		var fs := int(34.0 * s)
 		if fs >= 10 and fs < 160:
-			draw_string(font, p + Vector2(-r - th + 6.0 * s, -10.0 * s), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.75 * a, 1.3))
+			var lp := p + Vector2(-r - th + 6.0 * s, -10.0 * s)
+			if lp.x >= 130.0 and lp.y >= 300.0 and lp.y <= 960.0:
+				draw_string(font, lp, label, HORIZONTAL_ALIGNMENT_LEFT, -1, mini(fs, 34), Pal.ink(0.75 * a, 1.3))
 
 
 # A train on the line beside you: a string of lit cars running its own way
@@ -1145,58 +1167,65 @@ func _heroes(st: int) -> void:
 		for k in 3:
 			var y: float = [-640.0, 640.0, -900.0][k]
 			objs.append([TRAIN, y, -D0 - 520.0, [-2600.0, 1800.0, -3400.0][k], 9, rng.randf_range(2000, 16000)])
+	var at := [0.18, 0.5, 0.82]
 	match st:
 		1:
-			# the white tower, far off across the centre, its spine red
+			# the hatch at street level, lit and striped red
 			var g := 12 * 300.0
-			objs.append([BOX, 1000.0, 500.0, 1500.0, 1000.0, g, g + 300.0, 2, 2])
-			objs.append([LINE, PackedVector3Array([Vector3(1000.0, 750.0, g + 300.0), Vector3(1000.0, 750.0, g)]), 1.8, 3.0, true])
+			objs.append([LINE, PackedVector3Array([Vector3(-900, -640, g + 2.0), Vector3(900, -640, g + 2.0)]), 2.0, 4.0, true])
+			objs.append([LINE, PackedVector3Array([Vector3(-900, 640, g + 2.0), Vector3(900, 640, g + 2.0)]), 2.0, 4.0, true])
 			for k in 6:
 				objs.append([CAR, [-560.0, 560.0][k % 2], [-300.0, 200.0, 0.0][k % 3], 90.0, [-260.0, 220.0][k % 2], k * 600.0])
 		2, 6:
-			# a tower whose whole face is a screen
-			var x: float = ease_way(0.6) * length - 300.0
-			objs.append([BOX, x, 760.0, x + 900.0, 1500.0, -D0 - 4400.0, -D0 - 260.0, 3, 2])
-			objs.append([TEXT, x + 120.0, 1160.0, -D0 - 260.0, "100%", 150])
+			# a tower whose whole roof is a screen: 100%
+			for b in at:
+				var x: float = ease_way(b) * length + 120.0
+				objs.append([BOX, x, -20.0, x + 1100.0, 760.0, -D0 - 4400.0, -D0 - 160.0, 3, 2])
+				objs.append([TEXT, x + 90.0, 470.0, -D0 - 160.0, "100%", 300])
 		3:
-			# the stacks: two chimneys taller than anything, their tops alight
-			var x: float = ease_way(0.6) * length
-			objs.append([CYL, x, -900.0, 200.0, -D0 - 2600.0, -D0 - 150.0, 4])
-			objs.append([CYL, x + 700.0, -1000.0, 170.0, -D0 - 2600.0, -D0 - 260.0, 4])
+			# the stacks, taller than anything, their crowns alight
+			for b in at:
+				var x: float = ease_way(b) * length + 500.0
+				objs.append([CYL, x, 250.0, 300.0, -D0 - 2600.0, -D0 - 120.0, 4, true])
+				objs.append([CYL, x + 900.0, 560.0, 240.0, -D0 - 2600.0, -D0 - 260.0, 4, true])
 		4:
 			# the strategic reserve: a silo the size of a district, named on its roof
-			var x: float = ease_way(0.45) * length
-			objs.append([CYL, x, -1500.0, 950.0, -D0 - 2800.0, -D0 - 420.0, 3])
-			objs.append([TEXT, x - 360.0, -1500.0, -D0 - 420.0, Txt.t("crate_reserve"), 120])
+			for b in at:
+				var x: float = ease_way(b) * length + 900.0
+				objs.append([CYL, x, 420.0, 1000.0, -D0 - 2800.0, -D0 - 320.0, 3, true])
+				objs.append([TEXT, x - 420.0, 480.0, -D0 - 320.0, Txt.t("crate_reserve"), 150])
 		5:
-			# the fusion dome, its rings breathing
-			var x: float = ease_way(0.65) * length
-			objs.append([CYL, x, 1800.0, 1150.0, -D0 - 2600.0, -D0 - 900.0, 4])
+			# the fusion domes, their rings breathing
+			for b in at:
+				var x: float = ease_way(b) * length + 1000.0
+				objs.append([CYL, x, 420.0, 1000.0, -D0 - 2600.0, -D0 - 520.0, 4, true])
 		7:
-			# the archive's vault on the sea floor, coming up to meet you, a red light on its crown
-			objs.append([CYL, 0.0, -400.0, 1500.0, -5200.0 - 400.0, -5200.0 + 900.0, 3])
-			objs.append([RING, 0.0, -400.0, 1150.0, -5200.0 + 900.0, 1.0, 72, true])
+			# the archive's vault on the sea floor, coming up to meet you
+			objs.append([CYL, 0.0, -400.0, 1500.0, -5200.0 - 400.0, -5200.0 + 900.0, 3, true])
 			for k in 3:
 				objs.append([TUBE, 0.0, 0.0, 760.0, -(BEATS[k] * 4800.0) - 200.0, 150.0, ""])
 		8:
 			# the lift's anchor: a foundation ring on the sea floor, the cable lit to the surface
-			objs.append([CYL, 0.0, 0.0, 1300.0, -400.0, 300.0, 3])
+			objs.append([CYL, 0.0, 0.0, 1300.0, -400.0, 300.0, 3, true])
 			objs.append([LINE, PackedVector3Array([Vector3(0, 0, 300.0), Vector3(0, 0, 9000.0)]), 1.8, 4.0, true])
 			for k in 3:
 				objs.append([TUBE, 0.0, 0.0, 760.0, 1700.0 + BEATS[k] * 5200.0, 140.0, ""])
 		9:
-			# the capital below, its tower a needle of light up toward you
-			objs.append([LINE, PackedVector3Array([Vector3(0, 0, 0.0), Vector3(0, 0, 3000.0)]), 2.0, 4.0, true])
+			# the capital below, its tower a needle of red light up toward you
+			objs.append([LINE, PackedVector3Array([Vector3(0, 0, 0.0), Vector3(0, 0, 3000.0)]), 2.0, 5.0, true])
+			objs.append([CYL, 0.0, 0.0, 420.0, -60.0, 0.0, 4, true])
 			for k in 3:
 				objs.append([TUBE, 0.0, 0.0, 760.0, 4800.0 + BEATS[k] * 9600.0, 140.0, ""])
 		10:
 			# a warship on its slip, the length of a city, going by underneath
-			var x: float = ease_way(0.35) * length
-			objs.append([BOX, x, 520.0, x + 9000.0, 1500.0, -D0 - 1600.0, -D0 - 240.0, 4, 2])
-			objs.append([LINE, PackedVector3Array([Vector3(x, 1010.0, -D0 - 240.0), Vector3(x + 9000.0, 1010.0, -D0 - 240.0)]), 1.8, 3.0, true])
+			for b in [0.25, 0.65]:
+				var x: float = ease_way(b) * length
+				objs.append([BOX, x, 60.0, x + 7000.0, 820.0, -D0 - 1600.0, -D0 - 200.0, 4, 2])
 		11:
-			# the white tower itself: you come down beside it to its top, its spine red
-			objs.append([BOX, 560.0, -900.0, 2300.0, 900.0, -12000.0, -320.0, 2, 2])
-			objs.append([LINE, PackedVector3Array([Vector3(560.0, 0, -320.0), Vector3(560.0, 0, -11000.0)]), 2.0, 4.0, true])
+			# the white tower: a wall of it beside you all the way down, red down its
+			# corners, its windows lighting floor by floor as you pass
+			objs.append([BOX, 700.0, -1400.0, 3600.0, 1400.0, -12000.0, -320.0, 2, 2])
+			for y in [-1400.0, 1400.0]:
+				objs.append([LINE, PackedVector3Array([Vector3(700.0, y, -320.0), Vector3(700.0, y, -12000.0)]), 2.2, 4.0, true])
 			for k in 3:
 				objs.append([FRAME, 900.0, 700.0, 6800.0 - BEATS[k] * 6900.0, 120.0, "", false])

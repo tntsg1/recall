@@ -258,7 +258,7 @@ func _process(dt: float) -> void:
 		# slowly; it fades out and back in where the loop closes
 		vista_u = fmod(vista_u + dt / 160.0, 1.0)
 		vista.step(dt, vista_u)
-		vista.modulate.a = 0.16 * clampf(minf(vista_u, 1.0 - vista_u) * 50.0, 0.0, 1.0)
+		vista.modulate.a = 0.13 * clampf(minf(vista_u, 1.0 - vista_u) * 50.0, 0.0, 1.0)
 	page_t += dt
 	val_t += dt
 	glint += dt
@@ -592,6 +592,16 @@ func _page_k(pg: String, i: int) -> Vector2:
 
 func _draw() -> void:
 	var vp := _vp()
+	if vista != null:
+		# the city goes dark round the menu, so its words stand clear of it
+		var pts := PackedVector2Array([Vector2(960, 700)])
+		var cols := PackedColorArray([Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.92)])
+		for k in 41:
+			var v := Vector2.from_angle(TAU * k / 40.0)
+			pts.append(Vector2(960, 700) + Vector2(v.x * 560.0, v.y * 420.0))
+			cols.append(Color(Pal.BG.r, Pal.BG.g, Pal.BG.b, 0.0))
+		for k in 40:
+			draw_polygon(PackedVector2Array([pts[0], pts[k + 1], pts[k + 2]]), PackedColorArray([cols[0], cols[k + 1], cols[k + 2]]))
 	var bm := bg.material as ShaderMaterial
 	bm.set_shader_parameter("cursor", cur_p.x)
 	bm.set_shader_parameter("size", vp)

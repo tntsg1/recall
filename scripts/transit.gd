@@ -289,18 +289,18 @@ func _draw() -> void:
 	var round := deck_kind == "capsule"
 	# hung over the drop: a shadow cast down on what lies below, then the deck's thickness
 	for k in 4:
-		var g := r.grow(10.0 + k * 9.0)
+		var g := r.grow(8.0 + k * 8.0)
 		g.position += Vector2(10, 14)
 		if round:
-			_round_rect(g, 76.0 + k * 9.0, Color(0, 0, 0, 0.16), true)
+			_round_rect(g, 74.0 + k * 8.0, Color(0, 0, 0, 0.22), false, 9.0)
 		else:
-			draw_rect(g, Color(0, 0, 0, 0.16))
-	var side := r.grow(9.0)
+			draw_rect(g, Color(0, 0, 0, 0.22), false, 9.0)
+	var side := r.grow(5.0)
 	side.position += Vector2(4, 7)
 	if round:
-		_round_rect(side, 78.0, Color(0.1, 0.1, 0.11), true)
+		_round_rect(side, 74.0, Color(0.13, 0.13, 0.14), false, 10.0)
 	else:
-		draw_rect(side, Color(0.1, 0.1, 0.11))
+		draw_rect(side, Color(0.13, 0.13, 0.14), false, 10.0)
 	# the floor: dark, but not so dark the drop beneath does not show through
 	if round:
 		_round_rect(r, 70.0, Color(0.035, 0.035, 0.04, 0.8), true)
@@ -363,6 +363,13 @@ func _draw() -> void:
 				draw_arc(p2, 22.0, 0, TAU, 24, rim, 2.0)
 				var blink := 1.0 if fmod(t * 1.6, 1.0) < 0.4 else 0.2
 				draw_circle(q, 5.0, Pal.red(blink, 2.0))
+				var burn := clampf((u - 0.75) / 0.2, 0.0, 1.0)
+				if burn > 0.0:
+					for kk in 3:
+						draw_arc(p2, 22.0 + kk * 10.0 + 6.0 * sin(t * 30.0 + kk), 0, TAU, 24, Pal.ink(burn * (0.6 - kk * 0.18), 2.0), 2.0)
+					for kk in 8:
+						var v := Vector2.from_angle(TAU * kk / 8.0 + t * 4.0)
+						draw_line(p2 + v * 24.0, p2 + v * (40.0 + 14.0 * burn), Pal.ink(0.5 * burn, 1.8), 1.5)
 		_:
 			# a flatcar: slats across, tie-down eyes along the edges
 			var x3 := r.position.x + 60.0
@@ -392,8 +399,9 @@ func _draw() -> void:
 			draw_rect(q2, Pal.WALL)
 			draw_rect(q2, rim, false, 2.0)
 			draw_circle(c2, 3.0, Pal.ink(0.9, 1.8))
-	var label := "FCU-%02d" % (leg * 7 % 97)
-	draw_string(font, r.position + Vector2(44, r.size.y - 40), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 46, Pal.ink(0.07))
+	if deck_kind != "capsule" and deck_kind != "pad":
+		var label := "FCU-%02d" % (leg * 7 % 97)
+		draw_string(font, r.position + Vector2(44, r.size.y - 40), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 46, Pal.ink(0.07))
 	if _has_cable():
 		# the lift's cable runs up through the middle of the deck
 		var cc := CABLE.get_center()

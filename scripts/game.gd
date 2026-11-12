@@ -32,6 +32,7 @@ var nodes: ControlNodes     # the board's control nodes (chapter 12)
 var ending: Ending          # the true ending, after the last boss
 var transit: Transit        # the ride from one chapter's place to the next (full game)
 var vista: Scenery          # what lies under the rooms, seen through grates and windows (full game)
+var vista_t := 0.0
 var rooms: Rooms            # room to room, in the chapters laid out fresh each run
 var run_seed := 0           # the run's rooms come from this (shown on the results)
 var radio_n := 0
@@ -1060,8 +1061,14 @@ func _run_frame(dt: float) -> void:
 		_lap("cam+post+hud+sfx")
 	_update_floor(dt)
 	if vista != null and vista.visible:
-		# what lies deep below shifts a little as you move over it
+		# what lies deep below shifts a little as you move over it; its trains
+		# run on (redrawn twenty times a second, which is enough that deep down)
 		vista.position = vista.position.lerp((player.pos - Cam.CENTER) * 0.07, 1.0 - exp(-6.0 * dt))
+		vista_t += dt
+		if vista_t >= 0.05:
+			vista.t += vista_t
+			vista_t = 0.0
+			vista.queue_redraw()
 	if absf(focus - last_focus_drawn) > 0.004:
 		last_focus_drawn = focus
 		arena.queue_redraw()

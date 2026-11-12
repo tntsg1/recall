@@ -101,6 +101,9 @@ void fragment() {
 			hole = max(hole, (1.0 - pane) * smoothstep(4.0, 10.0, edge) * 0.95);
 			srgb = mix(srgb, vec3(0.2, 0.21, 0.23), pane * 0.9);
 			srgb += vec3(sheen * 0.4);
+			// lit from within: a soft glow toward the middle of the glass
+			vec2 mid = abs(lp / glass.zw - 0.5) * 2.0;
+			srgb += vec3(0.05, 0.055, 0.06) * (1.0 - max(mid.x, mid.y)) * (1.0 - pane);
 		}
 	}
 	// the canvas buffer is linear (HDR 2D); this shader works in sRGB terms

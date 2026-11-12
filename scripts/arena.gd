@@ -193,7 +193,7 @@ func _pick_vista(lay: Dictionary) -> void:
 		if generated and [1, 4].has(int(lay.get("index", -1))):
 			# a strip of glass floor along the left or right wall, where it is clear
 			for side in ([-1.0, 1.0] if rng.randf() < 0.5 else [1.0, -1.0]):
-				var x := ROOM.position.x + 10.0 if side < 0.0 else ROOM.end.x - 170.0
+				var x := ROOM.position.x + 130.0 if side < 0.0 else ROOM.end.x - 290.0
 				var y := ROOM.position.y + 60.0
 				while y + 480.0 < ROOM.end.y - 60.0 and glass.size.x == 0.0:
 					var r := Rect2(x, y, 160.0, 480.0)
@@ -415,8 +415,10 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2(ROOM.end.x, ROOM.position.y), Vector2(big.end.x - ROOM.end.x, ROOM.size.y)), Pal.WALL)
 	draw_rect(ROOM, edge, false, 2.0)
 	if glass.size.x > 0.0:
-		# the glass floor's frame: a lit rim, a mullion cap at every pane
-		draw_rect(glass, Pal.ink(0.55 - 0.2 * f, 1.2), false, 2.0)
+		# the glass floor's frame: light spilling round it, a lit rim, a mullion cap at every pane
+		for k in 5:
+			draw_rect(glass.grow(4.0 + k * 8.0), Pal.ink((0.05 - k * 0.009) * (1.0 - 0.5 * f), 1.2), false, 8.0)
+		draw_rect(glass, Pal.ink(0.65 - 0.2 * f, 1.4), false, 2.5)
 		var gy := glass.position.y + 120.0
 		while gy < glass.end.y - 4.0:
 			draw_line(Vector2(glass.position.x - 4.0, gy), Vector2(glass.end.x + 4.0, gy), Pal.ink(0.4 - 0.15 * f), 3.0)
