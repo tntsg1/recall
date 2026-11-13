@@ -261,4 +261,5 @@
   - 用户在试听页标了 15 个要换（dash、dash_e、focus、expire、windup、slam、brake、core、boss_die、card、reroll、title、p_blast、p_well、p_finish），说主要是“沙沙声难听”
   - Jev C 0.84：先改合成去掉白噪声高频（噪声全压到 1 kHz 以下，亮度改用音调扫频），不满意的再走 AI 生成提示词
   - [x] 15 个重做，4 kHz 以上能量从最高 70% 降到 5% 以内；夺壳 3 个音效补进 make_audio.py；试听页加新旧对比
-  - [ ] 等用户在试听页复听：还不行的写 AI 生成提示词
+  - [x] 用户要 AI 提示词自己生成：15 条中英提示词（含时长、文件名）放进试听页，每条带复制按钮
+  - [ ] 用户把生成的文件放进 tools/sfx_new/（按音效名命名）后：统一响度、裁静音、转 ogg 换进游戏
