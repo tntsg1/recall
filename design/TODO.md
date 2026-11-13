@@ -258,4 +258,7 @@
 ## 音效去 AI 味（2026-11-12）
 - 用户：部分音效有 AI 味，点名 dash；全部 50 个音效都是 tools/make_audio.py 合成的
   - [x] 音效合集视频 tools/sfx_reel/NEONRAID_音效合集.mp4（编号+文件名+用途）已发
-  - [ ] dash 换成 AI 生成或真实录音；等用户听完合集补充其他要换的
+  - 用户在试听页标了 15 个要换（dash、dash_e、focus、expire、windup、slam、brake、core、boss_die、card、reroll、title、p_blast、p_well、p_finish），说主要是“沙沙声难听”
+  - Jev C 0.84：先改合成去掉白噪声高频（噪声全压到 1 kHz 以下，亮度改用音调扫频），不满意的再走 AI 生成提示词
+  - [x] 15 个重做，4 kHz 以上能量从最高 70% 降到 5% 以内；夺壳 3 个音效补进 make_audio.py；试听页加新旧对比
+  - [ ] 等用户在试听页复听：还不行的写 AI 生成提示词

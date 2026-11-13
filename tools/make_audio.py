@@ -83,7 +83,7 @@ def room(x, mix=0.18, size=0.045, fb=0.45):
 
 
 def write(name, a, peak=0.8, tail=0.0):
-    if ONLY and not name.startswith(ONLY):
+    if ONLY and not (name in ONLY.split(',') if ',' in ONLY else name.startswith(ONLY)):
         return
     if tail > 0:
         a = np.concatenate([a, np.zeros((int(SR * tail),) + a.shape[1:])])
@@ -149,14 +149,13 @@ def pierce():
 
 
 def focus():
+    # time slows: a deep drop and a muffled push of air (nothing above ~700 Hz hisses)
     d = 1.1
     t = tv(d)
-    n = noise(len(t))
-    cut = 6000 * np.exp(-t * 3.2) + 200
-    whoosh = lp(n, cut) * env(t, 0.03, 0.35)
-    sub = sweep(95, 48, d, 0.6) * env(t, 0.02, 0.5) * 0.9
-    tone = np.sin(2 * np.pi * 330 * t) * env(t, 0.15, 0.4) * 0.12
-    x = whoosh * 0.7 + sub + tone
+    air = lp(lp(noise(len(t)), 260 + 420 * np.exp(-t * 4.0)), 700) * env(t, 0.04, 0.32)
+    sub = sweep(95, 46, d, 0.6) * env(t, 0.02, 0.5) * 0.95
+    tone = (np.sin(2 * np.pi * 330 * t) + 0.35 * np.sin(2 * np.pi * 495 * t)) * env(t, 0.15, 0.4) * 0.12
+    x = air * 0.9 + sub + tone
     return stereo(room(fade(x, 0.005, 0.2), 0.3, 0.08), 0.6, 14)
 
 
@@ -218,10 +217,14 @@ def empty():
 
 
 def expire():
-    d = 0.5
+    # a round going dead: two soft partials sliding down and closing off
+    d = 0.42
     t = tv(d)
-    x = sweep(700, 240, d, 0.7) * env(t, 0.005, 0.12) * 0.5
-    return stereo(room(fade(x), 0.3), 0.4, 8)
+    f = 620 * np.exp(-t / 0.25) + 180
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    x = (np.sin(ph) + 0.3 * np.sin(2 * ph)) * env(t, 0.004, 0.09) * 0.5
+    x = lp(x, 2200 * np.exp(-t / 0.12) + 300)
+    return stereo(room(fade(x), 0.22), 0.3, 6)
 
 
 def lit():
@@ -232,11 +235,17 @@ def lit():
 
 
 def dash():
-    d = 0.3
+    # a quick pitched zip and a low body push; no broadband air
+    d = 0.26
     t = tv(d)
-    n = noise(len(t))
-    x = lp(hp(n, 400), 3000 + 4000 * np.sin(np.pi * t / d)) * np.sin(np.pi * np.clip(t / d, 0, 1)) ** 2
-    return stereo(fade(x), 0.8, 16)
+    k = np.clip(t / d, 0, 1)
+    f = 260 + 900 * np.sin(np.pi * k) ** 1.5
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    zip_ = (np.sin(ph) + 0.25 * np.sin(2 * ph)) * np.sin(np.pi * k) ** 2 * 0.35
+    body = lp(noise(len(t)), 320) * np.sin(np.pi * k) ** 2 * 1.4
+    thump = np.sin(2 * np.pi * (70 + 60 * np.exp(-t / 0.03)) * t) * env(t, 0.003, 0.06) * 0.5
+    x = lp(zip_, 2500) + body + thump
+    return stereo(fade(x, 0.003, 0.03), 0.7, 14)
 
 
 def arrive():
@@ -299,14 +308,15 @@ def hurt():
 def title():
     d = 1.4
     t = tv(d)
-    n = noise(len(t))
-    sweepn = lp(n, 300 + 5000 * np.sin(np.pi * np.clip(t / 0.6, 0, 1))) * np.sin(np.pi * np.clip(t / 0.6, 0, 1)) ** 2 * 0.5
+    w = np.sin(np.pi * np.clip(t / 0.6, 0, 1)) ** 2
+    swell = lp(noise(len(t)), 180 + 520 * w) * w * 0.9
+    rise = sweep(110, 220, d, 0.5) * env(t, 0.2, 0.6) * 0.18
     tone = (np.sin(2 * np.pi * 220 * t) + 0.5 * np.sin(2 * np.pi * 330 * t)) * env(t, 0.25, 0.5) * 0.25
     tick = np.zeros(len(t))
     st = int(SR * 0.22)
     k = t[st:] - t[st]
     tick[st:] = np.sin(2 * np.pi * 1760 * k) * np.exp(-k / 0.03) * 0.3
-    return stereo(room(fade(sweepn + tone + tick, 0.01, 0.3), 0.3, 0.08), 0.7, 15)
+    return stereo(room(fade(swell + rise + tone + tick, 0.01, 0.3), 0.3, 0.08), 0.7, 15)
 
 
 def stamp():
@@ -330,26 +340,27 @@ def windup():
     d = 0.85
     t = tv(d)
     x = sweep(180, 900, d, 2.2) * (t / d) ** 1.5 * 0.5
-    x += lp(noise(len(t)), 600 + 3000 * (t / d) ** 2) * (t / d) ** 2 * 0.3
+    x += sweep(90, 450, d, 2.2) * (t / d) ** 2 * 0.25
     trem = 1 + 0.4 * np.sin(2 * np.pi * (6 + 24 * t / d) * t)
-    return stereo(fade(x * trem, 0.01, 0.02), 0.4, 6)
+    return stereo(fade(lp(x * trem, 3000), 0.01, 0.02), 0.4, 6)
 
 
 def dash_e():
     d = 0.5
     t = tv(d)
-    n = noise(len(t))
-    x = lp(hp(n, 300), 2500 + 6000 * np.exp(-t / 0.1)) * env(t, 0.005, 0.15)
-    x += np.sin(2 * np.pi * (90 - 40 * t / d) * t) * env(t, 0.005, 0.12) * 0.6
-    return stereo(fade(x), 0.7, 14)
+    push = lp(noise(len(t)), 260 + 500 * np.exp(-t / 0.08)) * env(t, 0.005, 0.15) * 1.3
+    f = 140 * np.exp(-t / 0.18) + 60
+    growl = np.sin(2 * np.pi * np.cumsum(f) / SR) * env(t, 0.005, 0.14) * 0.7
+    x = push + growl
+    return stereo(fade(x), 0.6, 12)
 
 
 def slam():
     d = 0.7
     t = tv(d)
-    x = lp(noise(len(t)), 1500) * env(t, 0.0005, 0.04) * 1.3
-    x += np.sin(2 * np.pi * (40 + 70 * np.exp(-t / 0.02)) * t) * env(t, 0.001, 0.22) * 1.2
-    x += sum(np.sin(2 * np.pi * f * t) * env(t, 0.001, 0.08) for f in (620, 930)) * 0.15
+    x = lp(lp(noise(len(t)), 420), 420) * env(t, 0.0008, 0.05) * 2.2
+    x += np.sin(2 * np.pi * (40 + 70 * np.exp(-t / 0.02)) * t) * env(t, 0.001, 0.22) * 1.3
+    x += sum(np.sin(2 * np.pi * f * t) * env(t, 0.001, 0.08) for f in (620, 930)) * 0.12
     return stereo(room(fade(x), 0.25, 0.06), 0.5, 9)
 
 
@@ -361,13 +372,15 @@ def tick():
 
 
 def card():
+    # the pause / cards: three bright notes on a soft low swell
     d = 0.5
     t = tv(d)
-    n = noise(len(t))
-    x = lp(hp(n, 800), 2000 + 7000 * np.sin(np.pi * np.clip(t / 0.25, 0, 1))) * np.sin(np.pi * np.clip(t / 0.25, 0, 1)) ** 2 * 0.5
-    for k, st in enumerate((0.06, 0.15, 0.24)):
+    w = np.sin(np.pi * np.clip(t / 0.25, 0, 1)) ** 2
+    x = lp(noise(len(t)), 300 + 300 * w) * w * 0.5
+    for k, st in enumerate((0.04, 0.12, 0.2)):
         kk = np.maximum(0, t - st)
-        x += np.sin(2 * np.pi * (880 * 2 ** (k * 4 / 12)) * kk) * np.exp(-kk / 0.06) * (t >= st) * 0.2
+        fr = 880 * 2 ** (k * 4 / 12)
+        x += (np.sin(2 * np.pi * fr * kk) + 0.2 * np.sin(2 * np.pi * fr * 2 * kk)) * np.exp(-kk / 0.07) * (t >= st) * 0.2
     return stereo(room(fade(x), 0.3, 0.05), 0.7, 12)
 
 
@@ -403,15 +416,17 @@ def brake():
     d = 1.3
     t = tv(d)
     f = 2400 - 900 * t / d + 60 * np.sin(2 * np.pi * 13 * t)
-    x = np.sin(2 * np.pi * np.cumsum(f) / SR) * 0.35 + hp(noise(len(t)), 2500) * 0.3
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    x = (np.sin(ph) + 0.3 * np.sin(1.5 * ph)) * 0.3
+    x += lp(noise(len(t)), 220) * 0.9
     x *= np.sin(np.pi * np.clip(t / d, 0, 1)) ** 0.6
-    return stereo(fade(x, 0.02, 0.2), 0.6, 9)
+    return stereo(fade(lp(x, 3500), 0.02, 0.2), 0.6, 9)
 
 
 def core():
     d = 0.45
     t = tv(d)
-    x = lp(noise(len(t)), 900 + 2500 * t / d) * env(t, 0.01, 0.12) * 0.7
+    x = lp(noise(len(t)), 250 + 450 * t / d) * env(t, 0.01, 0.12) * 1.1
     x += np.sin(2 * np.pi * (300 + 500 * t / d) * t) * env(t, 0.01, 0.1) * 0.3
     clank = np.zeros(len(t))
     st = int(SR * 0.3)
@@ -435,7 +450,7 @@ def armor():
 def boss_die():
     d = 4.0
     t = tv(d)
-    x = lp(noise(len(t)), 2000 * np.exp(-t / 0.6) + 120) * env(t, 0.001, 0.9) * 1.6
+    x = lp(lp(noise(len(t)), 500 * np.exp(-t / 0.6) + 90), 600) * env(t, 0.001, 0.9) * 2.4
     x += np.sin(2 * np.pi * (28 + 50 * np.exp(-t / 0.08)) * t) * env(t, 0.002, 1.4) * 1.6
     x += sum(np.sin(2 * np.pi * f * t) * env(t, 0.2, 1.6) * 0.12 for f in (220, 330, 440, 660))
     return stereo(room(fade(x, 0.001, 1.0), 0.4, 0.11), 0.9, 20)
@@ -575,10 +590,11 @@ def mend():
 
 
 def reroll():
+    # cards riffled: a run of soft rising ticks over a low swell
     d = 0.6
     t = tv(d)
     win = np.sin(np.pi * np.clip(t / 0.35, 0, 1))
-    x = lp(hp(noise(len(t)), 900), 3000 + 6000 * win) * win ** 2 * 0.5
+    x = lp(noise(len(t)), 250 + 350 * win) * win ** 2 * 0.5
     for k in range(6):
         st = 0.04 + k * 0.045
         kk = np.maximum(0, t - st)
@@ -639,6 +655,46 @@ def crit():
     return stereo(room(fade(x), 0.3, 0.05), 0.6, 7)
 
 
+# ---------------------------------------------------------------- possession (rebuilt without hiss)
+def p_blast():
+    # the leech shell bursts: a sub punch, a low roar and a ringing crack
+    d = 1.2
+    t = tv(d)
+    x = np.sin(2 * np.pi * (34 + 90 * np.exp(-t / 0.03)) * t) * env(t, 0.001, 0.35) * 1.5
+    x += lp(lp(noise(len(t)), 700 * np.exp(-t / 0.25) + 80), 600) * env(t, 0.001, 0.4) * 2.2
+    x += sum(np.sin(2 * np.pi * f * t) * env(t, 0.001, 0.12) * 0.1 for f in (740, 1110, 1480))
+    return stereo(room(fade(x, 0.001, 0.4), 0.35, 0.09), 0.8, 16)
+
+
+def p_well():
+    # a gravity well opens: a short downward bend into the floor
+    d = 0.18
+    t = tv(d)
+    f = 520 * np.exp(-t / 0.05) + 90
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    x = (np.sin(ph) + 0.4 * np.sin(2 * ph)) * env(t, 0.003, 0.06) * 0.6
+    x += lp(noise(len(t)), 300) * env(t, 0.003, 0.05) * 0.8
+    return stereo(fade(x, 0.002, 0.03), 0.5, 8)
+
+
+def p_finish():
+    # the spiral drill's last turn: a rising whine that ends in one big hit
+    d = 0.9
+    t = tv(d)
+    k = np.clip(t / 0.45, 0, 1)
+    f = 160 + 700 * k ** 2
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    whine = (np.sin(ph) + 0.5 * np.sin(2 * ph) + 0.25 * np.sin(3 * ph)) * (0.3 + 0.7 * k) * (t < 0.45) * 0.25
+    whine = lp(whine, 2800)
+    hit = np.zeros(len(t))
+    st = int(SR * 0.45)
+    kk = t[st:] - t[st]
+    hit[st:] = np.sin(2 * np.pi * (40 + 110 * np.exp(-kk / 0.02)) * kk) * np.exp(-kk / 0.25) * 1.4
+    hit[st:] += lp(noise(len(kk)), 500) * np.exp(-kk / 0.08) * 1.8
+    hit[st:] += (np.sin(2 * np.pi * 660 * kk) + np.sin(2 * np.pi * 990 * kk)) * np.exp(-kk / 0.1) * 0.12
+    return stereo(room(fade(whine + hit, 0.003, 0.2), 0.3, 0.08), 0.7, 12)
+
+
 
 def _chapter(bpm, bars, penta, drone, line, shift, fn):
     # run a stem builder with another chapter's tempo, key and bass line
@@ -696,6 +752,7 @@ SOUNDS = {
     'ch1_base': stem_base, 'ch1_pulse': stem_pulse, 'ch1_glass': stem_glass, 'ch1_boss': stem_boss,
     'crack': crack, 'mend': mend, 'reroll': reroll, 'relic': relic, 'item': item, 'over': over,
     'chapter': chapter, 'cross': cross, 'crit': crit,
+    'p_blast': p_blast, 'p_well': p_well, 'p_finish': p_finish,
     'ch2_base': ch2(stem_base), 'ch2_pulse': ch2(stem_pulse), 'ch2_glass': ch2(stem_glass), 'ch2_boss': ch2(stem_boss),
     'ch3_base': ch3(stem_base), 'ch3_pulse': ch3(stem_pulse), 'ch3_glass': ch3(stem_glass), 'ch3_boss': ch3(stem_boss),
     'ch4_base': ch4(stem_base), 'ch4_pulse': ch4(stem_pulse), 'ch4_glass': ch4(stem_glass), 'ch4_boss': ch4(stem_boss),
@@ -704,6 +761,6 @@ SOUNDS = {
 
 if __name__ == '__main__':
     for k, f in SOUNDS.items():
-        if ONLY and not k.startswith(ONLY):
+        if ONLY and not (k in ONLY.split(',') if ',' in ONLY else k.startswith(ONLY)):
             continue
         write(k, f(), peak=0.55 if k == 'music' or k[:2] == 'ch' and k[3] == '_' else 0.8)
