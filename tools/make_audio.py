@@ -15,6 +15,8 @@ WORK.mkdir(parents=True, exist_ok=True)
 SR = 44100
 ONLY = sys.argv[1] if len(sys.argv) > 1 else ''
 rng = np.random.default_rng(7)
+# Sounds the user generated (2026-11-13, files in assets/audio): never synthesized over.
+FROM_FILES = {'dash', 'dash_e', 'focus', 'expire', 'windup', 'slam', 'brake', 'core', 'boss_die', 'card', 'reroll', 'title', 'p_blast', 'p_well', 'p_finish'}
 
 
 def tv(d):
@@ -84,6 +86,9 @@ def room(x, mix=0.18, size=0.045, fb=0.45):
 
 def write(name, a, peak=0.8, tail=0.0):
     if ONLY and not (name in ONLY.split(',') if ',' in ONLY else name.startswith(ONLY)):
+        return
+    if name in FROM_FILES and '--force' not in sys.argv:
+        print('kept', name, '(from a generated file)')
         return
     if tail > 0:
         a = np.concatenate([a, np.zeros((int(SR * tail),) + a.shape[1:])])

@@ -970,7 +970,23 @@ func _draw_page() -> void:
 		return
 	var font := Fonts.get_font("Regular")
 	var bold := Fonts.get_font("SemiBold")
-	var r := PAGE
+	# each line of the file: a smaller size first, then rows, the page as tall as it needs
+	var lay: Array = []
+	var need := 34.0
+	for j in FILE_N:
+		var full := Txt.t("arc_file_%d" % j)
+		var fnt := bold if j == 0 else font
+		var room := PAGE.size.x - 36.0 - (118.0 if j == FILE_N - 1 else 0.0)
+		var fs := 19 if j == 0 else 16
+		var rows: Array = [full]
+		for size in ([19, 17, 15] if j == 0 else [16, 15, 14, 13]):
+			fs = size
+			rows = Txt.wrap(fnt, full, fs, room)
+			if rows.size() == 1:
+				break
+		lay.append([full, fnt, fs, rows])
+		need += (rows.size() - 1) * (fs + 6.0) + (42.0 if j == 0 else 36.0)
+	var r := Rect2(PAGE.position, Vector2(PAGE.size.x, maxf(PAGE.size.y, need + 46.0)))
 	var show := clampf(file_t / 0.4, 0.0, 1.0) if dead_t < 0.0 else 1.0
 	if show <= 0.0 or dim <= 0.0:
 		return
@@ -982,28 +998,32 @@ func _draw_page() -> void:
 		return
 	var y := r.position.y + 34.0
 	for j in FILE_N:
-		var key := "arc_file_%d" % j
-		var full := Txt.t(key)
+		var full: String = lay[j][0]
+		var fnt: Font = lay[j][1]
+		var fs: int = lay[j][2]
+		var rows: Array = lay[j][3]
 		var typed := clampf((file_t - 0.4 - j * 0.32) / 0.3, 0.0, 1.0) if dead_t < 0.0 else 1.0
 		var n := int(ceil(full.length() * typed))
-		var fs := 19 if j == 0 else 16
-		var fnt := bold if j == 0 else font
 		var c := Pal.ink(0.92 * dim, 1.3) if j > 0 else Pal.ink(0.95 * dim, 1.5)
-		ci.draw_string(fnt, Vector2(r.position.x + 18.0, y), full.substr(0, n), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, c)
-		var tw := fnt.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		if j == FILE_N - 1 and typed >= 1.0:
-			# already blacked out in the original
-			ci.draw_rect(Rect2(r.position.x + 18.0 + tw + 4.0, y - fs + 2.0, 110.0, fs + 2.0), Color(0, 0, 0, 1))
-			tw += 118.0
-		if j >= 1:
-			var k: float = strikes[j]
-			if dead_t >= 0.0:
-				# the bars peel off, top line first
-				k *= 1.0 - Pal.ease_io(clampf((dead_t - 0.8 - (j - 1) * 0.5) / 0.6, 0.0, 1.0))
+		var k: float = strikes[j] if j >= 1 else 0.0
+		if j >= 1 and dead_t >= 0.0:
+			# the bars peel off, top line first
+			k *= 1.0 - Pal.ease_io(clampf((dead_t - 0.8 - (j - 1) * 0.5) / 0.6, 0.0, 1.0))
+		for ri in rows.size():
+			var row: String = rows[ri]
+			ci.draw_string(fnt, Vector2(r.position.x + 18.0, y), row.substr(0, clampi(n, 0, row.length())), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, c)
+			n -= row.length()
+			var tw := fnt.get_string_size(row, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			if j == FILE_N - 1 and ri == rows.size() - 1 and typed >= 1.0:
+				# already blacked out in the original
+				ci.draw_rect(Rect2(r.position.x + 18.0 + tw + 4.0, y - fs + 2.0, 110.0, fs + 2.0), Color(0, 0, 0, 1))
+				tw += 118.0
 			if k > 0.0:
 				var bar := Rect2(r.position.x + 12.0, y - fs - 1.0, (tw + 12.0) * k, fs + 8.0)
 				ci.draw_rect(bar, Color(0.006, 0.006, 0.008, 1.0))
 				ci.draw_line(Vector2(bar.end.x, bar.position.y), Vector2(bar.end.x, bar.end.y), Pal.red(0.8 * dim, 2.0), 2.0)
+			if ri < rows.size() - 1:
+				y += fs + 6.0
 		y += 42.0 if j == 0 else 36.0
 	# the stamp
 	var sk: float = clampf(stamp_t / 0.18, 0.0, 1.0) if stamp_t >= 0.0 else 0.0

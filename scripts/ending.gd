@@ -293,7 +293,13 @@ func _draw_face(a: float) -> void:
 	draw_rect(fr, Pal.ink(0.55 * a), false, 2.0)
 	# the channel's tag in the corner, and its live dot
 	var sf := Fonts.get_font("SemiBold")
-	draw_string(sf, fr.position + Vector2(16, 28), Txt.t("face_tag"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.6 * a))
+	var tag := Txt.t("face_tag")
+	var tfs := 14
+	while tfs > 9 and sf.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, tfs).x > fr.size.x - 56.0:
+		tfs -= 1
+	var trows := Txt.wrap(sf, tag, tfs, fr.size.x - 56.0)
+	for ti in trows.size():
+		draw_string(sf, fr.position + Vector2(16, 28 + ti * (tfs + 5)), trows[ti], HORIZONTAL_ALIGNMENT_LEFT, -1, tfs, Pal.ink(0.6 * a))
 	if int(card_t * 2.0) % 2 == 0 and wipe < 1.0:
 		draw_circle(fr.position + Vector2(fr.size.x - 24.0, 22.0), 5.0, Pal.red(0.9 * a, 2.0))
 	# the face, gone where the ring has passed

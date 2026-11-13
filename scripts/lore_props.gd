@@ -16,6 +16,7 @@ var memory := ""             # a shell's memory, shown beside it
 var memory_t := -1.0
 var mem_rows: Array = []      # the memory broken into lines (measured once per text)
 var mem_rows_of := ""
+var mem_last := Vector2.INF   # where the memory's shell last was (it outlives the shell)
 var memory_at: Node2D = null
 var memory_fixed := Vector2.INF   # a memory pinned where it was found (a fallen inspector)
 var seize_n := 0
@@ -148,6 +149,7 @@ func on_kind_down(kind: int, at: Vector2) -> void:
 		return
 	memory = m.text
 	memory_t = 0.0
+	mem_last = Vector2.INF
 	memory_at = game.possess
 	memory_fixed = at
 	if Lore.find(m.id):
@@ -161,6 +163,7 @@ func on_seize(shell) -> void:
 		return
 	memory = m.text
 	memory_t = 0.0
+	mem_last = Vector2.INF
 	memory_at = game.possess
 	memory_fixed = Vector2.INF
 	if Lore.find(m.id):
@@ -1493,54 +1496,92 @@ func _remnant_stencil(w: Array, shown: String, k: float, dim: float) -> void:
 func _remnant_hand(w: Array, shown: String, k: float, dim: float) -> void:
 	var at: Vector2 = (w[1] as Vector2) + (w[2] as Vector2) * 150.0 + Vector2(0, 54.0)
 	var sf := Fonts.get_font("SemiBold")
-	var total := sf.get_string_size(shown + "  ", HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
-	var x := at.x - total
+	var full: String = w[4] if Txt.zh else w[5]
+	# (a long line breaks into rows, the block kept about where the one row was)
+	var rows := _rows(full, 470.0 * 0.86, 24)
+	var budget := shown.length()
 	var i := 0
-	for ch in shown:
-		var rot := sin(i * 2.7) * 0.12
-		var dy := sin(i * 1.9) * 4.0
-		draw_set_transform(Vector2(x, at.y + dy), rot, Vector2.ONE)
-		draw_string(sf, Vector2.ZERO, ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Pal.ink(0.8 * k * dim, 1.1))
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		x += sf.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x + 2.0
-		i += 1
+	for ri in rows.size():
+		var row: String = rows[ri]
+		var y := at.y + (ri - (rows.size() - 1) * 0.5) * 32.0
+		var total := 0.0
+		for ch in row:
+			total += sf.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x + 2.0
+		var x := at.x - total - sf.get_string_size("  ", HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
+		for ch in row:
+			if budget <= 0:
+				return
+			budget -= 1
+			var rot := sin(i * 2.7) * 0.12
+			var dy := sin(i * 1.9) * 4.0
+			draw_set_transform(Vector2(x, y + dy), rot, Vector2.ONE)
+			draw_string(sf, Vector2.ZERO, ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Pal.ink(0.8 * k * dim, 1.1))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			x += sf.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x + 2.0
+			i += 1
 
 
 # Sprayed along the top wall, in the strip between the wall and the track.
 func _remnant_hand_top(w: Array, shown: String, k: float, dim: float) -> void:
 	var at: Vector2 = (w[1] as Vector2) + Vector2(0, 56.0)
 	var sf := Fonts.get_font("SemiBold")
-	var x := at.x
+	var full: String = w[4] if Txt.zh else w[5]
+	# (the strip above the track holds one row: smaller letters, two rows, only when it must)
+	var room := (Arena.ROOM.end.x - at.x - 60.0) * 0.86
+	var fs := 24
+	var rows := _rows(full, room, fs)
+	if rows.size() > 1:
+		fs = 17
+		rows = _rows(full, room, fs)
+	var step := fs + 4.0
+	var y0 := at.y - (rows.size() - 1) * step * 0.5
+	var budget := shown.length()
 	var i := 0
-	for ch in shown:
-		var rot := sin(i * 2.7) * 0.12
-		var dy := sin(i * 1.9) * 4.0
-		draw_set_transform(Vector2(x, at.y + dy), rot, Vector2.ONE)
-		draw_string(sf, Vector2.ZERO, ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Pal.ink(0.8 * k * dim, 1.1))
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		x += sf.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x + 2.0
-		i += 1
+	for ri in rows.size():
+		var row: String = rows[ri]
+		var x := at.x
+		for ch in row:
+			if budget <= 0:
+				return
+			budget -= 1
+			var rot := sin(i * 2.7) * 0.12
+			var dy := sin(i * 1.9) * fs / 6.0
+			draw_set_transform(Vector2(x, y0 + ri * step + dy), rot, Vector2.ONE)
+			draw_string(sf, Vector2.ZERO, ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.8 * k * dim, 1.1))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			x += sf.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 2.0
+			i += 1
 
 
 # Printed on the notice's own paper, which unfolds to hold it.
 func _remnant_print(w: Array, shown: String, full: String, k: float, dim: float) -> void:
 	var at: Vector2 = w[1]
 	var size := 16
-	var tw := font.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var rows := _rows(full, 380.0, size)
+	var tw := 0.0
+	for row in rows:
+		tw = maxf(tw, font.get_string_size(row, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
 	var wide := 120.0 + (tw + 30.0 - 120.0) * Pal.ease_out(k)
-	var r := Rect2(at.x - 60.0, at.y + 22.0, wide, 72.0)
+	var tall := 72.0 + (rows.size() - 1) * 22.0 * Pal.ease_out(k)
+	var r := Rect2(at.x - 60.0, at.y + 22.0, wide, tall)
 	r.position.x = minf(r.position.x, Arena.ROOM.end.x - r.size.x - 8.0)
 	if (w[2] as Vector2).x < -0.5:
 		# on the right wall the paper unfolds leftward from where it hangs
 		# (clear of the target sheet when it is the sheet's own words)
-		r = Rect2(at.x - (128.0 if w[3] == "sheet" else 24.0) - wide, at.y - 36.0, wide, 72.0)
+		r = Rect2(at.x - (128.0 if w[3] == "sheet" else 24.0) - wide, at.y - 36.0, wide, tall)
 	elif (w[2] as Vector2).y < -0.5:
 		# on the bottom wall it unfolds upward and leftward of its board
-		r = Rect2(minf(at.x - wide * 0.5, at.x + 50.0 - wide), at.y - 150.0, wide, 72.0)
+		r = Rect2(minf(at.x - wide * 0.5, at.x + 50.0 - wide), at.y - 150.0 - (tall - 72.0), wide, tall)
 	draw_rect(r, Color(0.08, 0.08, 0.085, 1.0))
 	draw_rect(r, Pal.ink(0.6 * dim), false, 1.5)
 	draw_string(font, r.position + Vector2(15, 30), Txt.t("notice_head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Pal.ink(0.45 * k * dim))
-	draw_string(font, r.position + Vector2(15, 54), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * dim, 1.2))
+	var budget := shown.length()
+	for ri in rows.size():
+		var row: String = rows[ri]
+		draw_string(font, r.position + Vector2(15, 54 + ri * 22), row.substr(0, clampi(budget, 0, row.length())), HORIZONTAL_ALIGNMENT_LEFT, -1, size, Pal.ink(0.9 * k * dim, 1.2))
+		budget -= row.length()
+		if budget <= 0:
+			break
 	var on_top := (w[2] as Vector2).y > 0.5
 	var sc := Vector2(r.end.x - 24.0, r.position.y + 18.0)
 	var sr := 14.0
@@ -1560,11 +1601,22 @@ func _remnant_plaque(w: Array, shown: String, k: float, dim: float) -> void:
 	var sf := Fonts.get_font("SemiBold")
 	var full: String = w[4] if Txt.zh else w[5]
 	var step := 22.0
-	var x := at.x - full.length() * step / 2.0
-	draw_rect(Rect2(x - 14.0, at.y - 22.0, full.length() * step + 28.0, 32.0), Color(0, 0, 0, 0.55 * k))
-	for ch in shown:
-		draw_string(sf, Vector2(x, at.y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.85 * k * dim, 1.2))
-		x += step
+	# (rows of at most 28 letters, a latin word kept whole)
+	var rows := _rows_n(full, 28)
+	var widest := 0
+	for row in rows:
+		widest = maxi(widest, String(row).length())
+	draw_rect(Rect2(at.x - widest * step / 2.0 - 14.0, at.y - 22.0, widest * step + 28.0, 32.0 + (rows.size() - 1) * 28.0), Color(0, 0, 0, 0.55 * k))
+	var budget := shown.length()
+	for ri in rows.size():
+		var row: String = rows[ri]
+		var x := at.x - row.length() * step / 2.0
+		for ch in row:
+			if budget <= 0:
+				return
+			budget -= 1
+			draw_string(sf, Vector2(x, at.y + ri * 28.0), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.ink(0.85 * k * dim, 1.2))
+			x += step
 
 
 # Painted on the floor by the queue, worn, in big flat letters.
@@ -1573,8 +1625,16 @@ func _remnant_floor(w: Array, shown: String, full: String, k: float, dim: float)
 	var at: Vector2 = (w[1] as Vector2) + Vector2(0, -64.0 if game.arena.generated else -36.0)
 	var sf := Fonts.get_font("SemiBold")
 	var fsz := 22 if game.arena.generated and game.rooms.lay.get("story", 0) >= 11 else 26
-	var tw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz).x
-	draw_string(sf, Vector2(at.x - tw / 2.0, at.y), shown, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, Pal.ink(0.8 * k * dim, 1.2))
+	var rows := _rows(full, 820.0, fsz)
+	var budget := shown.length()
+	for ri in rows.size():
+		var row: String = rows[ri]
+		var tw := sf.get_string_size(row, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz).x
+		var y := at.y - (rows.size() - 1 - ri) * (fsz + 8.0)
+		draw_string(sf, Vector2(at.x - tw / 2.0, y), row.substr(0, clampi(budget, 0, row.length())), HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, Pal.ink(0.8 * k * dim, 1.2))
+		budget -= row.length()
+		if budget <= 0:
+			break
 
 
 # A great registration seal painted on the hall's floor, worn faint.
@@ -1696,15 +1756,18 @@ func _draw_terminal(c: Vector2, dim: float, id: String) -> void:
 		for w in Lore.walls(story):
 			if "w%d_%s" % [story, w[0]] == id:
 				full = w[4] if Txt.zh else w[5]
-		# four rows only fit a little smaller
+		# more rows only fit smaller: the font steps down until they all do
 		var fs := 15
 		var rows := _split_rows(full, scr.size.x - 12.0, fs)
-		if rows.size() > 3:
-			fs = 13
+		var step := 21.0
+		for size in [15, 13, 12, 11, 10]:
+			fs = size
 			rows = _split_rows(full, scr.size.x - 10.0, fs)
-		var step := 21.0 if fs == 15 else 18.0
+			step = fs + 5.0 if fs < 15 else 21.0
+			if fs + 10.0 + (rows.size() - 1) * step <= scr.size.y - 4.0:
+				break
 		var budget := int(ceil(full.length() * clampf(wake * 1.6, 0.0, 1.0)))
-		var yy := scr.position.y + (24.0 if fs == 15 else 19.0)
+		var yy := scr.position.y + fs + 6.0
 		for row in rows:
 			draw_string(font, Vector2(scr.position.x + 6.0, yy), String(row).substr(0, clampi(budget, 0, String(row).length())), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.92 * wake * dim, 1.4))
 			budget -= String(row).length()
@@ -1884,6 +1947,26 @@ func _rows(txt: String, width: float, size: int) -> Array:
 	return out
 
 
+# rows of at most n letters (for evenly spaced lettering), a latin word kept whole
+func _rows_n(txt: String, n: int) -> Array:
+	var out: Array = []
+	var cur := ""
+	for ch in txt:
+		if cur.length() >= n and not "，。：；、！？）」".contains(ch):
+			var cut := cur.length()
+			while cut > 0 and _word_char(cur[cut - 1]) and _word_char(ch):
+				cut -= 1
+			if cut == 0:
+				cut = cur.length()
+			out.append(cur.substr(0, cut).strip_edges())
+			cur = cur.substr(cut) + ch
+		else:
+			cur += ch
+	if cur.strip_edges() != "":
+		out.append(cur.strip_edges())
+	return out
+
+
 # rows broken first at the text's own dots, then by width
 func _split_rows(txt: String, width: float, size: int) -> Array:
 	var out: Array = []
@@ -1898,7 +1981,7 @@ func _split_rows(txt: String, width: float, size: int) -> Array:
 
 
 func _word_char(c: String) -> bool:
-	return (c >= "0" and c <= "9") or (c >= "A" and c <= "Z") or (c >= "a" and c <= "z") or c == "-"
+	return (c >= "0" and c <= "9") or (c >= "A" and c <= "Z") or (c >= "a" and c <= "z") or c == "-" or c == "." or c == "%" or c == ","
 
 
 # Graffiti on the right wall: the Union's mark, crossed out, the paint running.
@@ -2087,14 +2170,20 @@ func _remnant_crate(w: Array, shown: String, full: String, k: float, dim: float)
 	draw_rect(lid, Color(0.05, 0.05, 0.055, k))
 	var sf := Fonts.get_font("SemiBold")
 	var rows: Array = []
-	for part in full.split(" · "):
-		rows.append_array(_rows(part, lid.size.x - 8.0, 13))
+	var fs := 13
+	for size in [13, 12, 11, 10, 9]:
+		fs = size
+		rows = []
+		for part in full.split(" · "):
+			rows.append_array(_rows(part, lid.size.x - 8.0, fs))
+		if rows.size() * (fs + 3.0) <= lid.size.y - 4.0:
+			break
 	var budget := shown.length()
-	var yy := lid.position.y + 16.0
+	var yy := lid.position.y + fs + 3.0
 	for row in rows:
-		draw_string(sf, Vector2(lid.position.x + 4.0, yy), String(row).substr(0, clampi(budget, 0, String(row).length())), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Pal.ink(0.75 * k * dim, 1.1))
+		draw_string(sf, Vector2(lid.position.x + 4.0, yy), String(row).substr(0, clampi(budget, 0, String(row).length())), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.75 * k * dim, 1.1))
 		budget -= String(row).length()
-		yy += 16.0
+		yy += fs + 3.0
 
 
 # A safety board on the bottom wall.
@@ -2181,20 +2270,27 @@ func _draw_lightboards(dim: float, slogan_only := false) -> void:
 	var beat_k := 1.0 - clampf(game.sfx.beat_frac() / 0.3, 0.0, 1.0)
 	# the slogan board; woken by a recall it runs the slogan in full
 	var wake: float = shows.get("w7_slogan", 0.0)
-	var r := Rect2(378, 180, 240, 46 + 26.0 * Pal.ease_out(wake))
+	var full := ""
+	for w in Lore.walls(7):
+		if w[0] == "slogan":
+			var parts: PackedStringArray = String(w[4] if Txt.zh else w[5]).split(" · ")
+			full = parts[1] if parts.size() > 1 else parts[0]
+	var srows := _rows(full, 200.0, 16)
+	var r := Rect2(378, 180, 240, 46 + (srows.size() * 22.0 + 6.0) * Pal.ease_out(wake))
 	draw_rect(r, Color(0.03, 0.03, 0.035))
 	draw_rect(r, Pal.foe(0.5 * dim), false, 1.5)
 	var tx := Txt.t("slogan_happy")
 	var tw := sf.get_string_size(tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
 	draw_string(sf, Vector2(r.get_center().x - tw / 2.0, r.position.y + 31.0), tx, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Pal.foe((0.65 + 0.35 * beat_k) * dim, 1.2 + 0.5 * beat_k))
 	if wake > 0.01:
-		var full := ""
-		for w in Lore.walls(7):
-			if w[0] == "slogan":
-				full = (w[4] if Txt.zh else w[5]).split(" · ")[1]
 		var n := int(ceil(full.length() * clampf(wake * 1.6, 0.0, 1.0)))
-		var fw := sf.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
-		draw_string(sf, Vector2(r.get_center().x - fw / 2.0, r.position.y + 62.0), full.substr(0, n), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Pal.red(0.9 * wake * dim, 1.4))
+		for ri in srows.size():
+			var row: String = srows[ri]
+			var fw := sf.get_string_size(row, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+			draw_string(sf, Vector2(r.get_center().x - fw / 2.0, r.position.y + 64.0 + ri * 22.0), row.substr(0, clampi(n, 0, row.length())), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Pal.red(0.9 * wake * dim, 1.4))
+			n -= row.length()
+			if n <= 0:
+				break
 	if slogan_only:
 		return
 	var fr := Rect2(1450, 80, 290, 46)
@@ -2339,24 +2435,32 @@ func _draw_platform(dim: float) -> void:
 			figs.append_array(PackedVector2Array([c + Vector2(sw, 0), c + Vector2(sw + 8.0, -18)]))
 	draw_multiline(figs, Pal.ink(0.5 * dim), 2.0)
 	# the sign: 本站不停, flashing as it passes; when woken, it runs the rule
-	var sg := Rect2(Vector2(r.end.x - 212.0, r.position.y + 8.0), Vector2(200, 46))
+	var wake: float = shows.get("w5_yellow", 0.0)
+	var yfull := ""
+	for w in Lore.walls(5):
+		if w[0] == "yellow":
+			yfull = w[4] if Txt.zh else w[5]
+	# the rule, whole, a part per line (each wrapping as it must): the last one bites
+	var lines: Array = []
+	var firsts := 0
+	for pi in yfull.split(" · ").size():
+		var got := _rows(yfull.split(" · ")[pi], 206.0, 15)
+		if pi == 0:
+			firsts = got.size()
+		lines.append_array(got)
+	# (it grows upward: below it is the screen's edge)
+	var grow := maxf(0.0, lines.size() * 19.0 + 8.0 - 46.0) * Pal.ease_out(wake)
+	var sg := Rect2(Vector2(r.end.x - 250.0, r.position.y + 8.0 - grow), Vector2(238, 46 + grow))
 	draw_rect(sg, Color(0.02, 0.025, 0.03))
 	draw_rect(sg, Pal.ink(0.55 * dim), false, 1.5)
-	var wake: float = shows.get("w5_yellow", 0.0)
 	if wake > 0.01:
-		var full := ""
-		for w in Lore.walls(5):
-			if w[0] == "yellow":
-				full = w[4] if Txt.zh else w[5]
-		# the rule in two lines, whole: the second is the one that bites
-		var parts := full.split(" · ")
-		var budget := int(ceil(full.length() * clampf(wake * 1.6, 0.0, 1.0)))
-		for li in parts.size():
-			var line: String = parts[li]
+		var budget := int(ceil(yfull.length() * clampf(wake * 1.6, 0.0, 1.0)))
+		for li in lines.size():
+			var line: String = lines[li]
 			var part := line.substr(0, clampi(budget, 0, line.length()))
-			budget -= line.length() + 3
-			var lw := sf.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
-			draw_string(sf, Vector2(sg.get_center().x - lw / 2.0, sg.position.y + 21.0 + li * 21.0), part, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Pal.ink((0.75 if li == 0 else 1.0) * wake * dim, 1.5))
+			budget -= line.length()
+			var lw := sf.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+			draw_string(sf, Vector2(sg.get_center().x - lw / 2.0, sg.position.y + 19.0 + li * 19.0), part, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink((0.75 if li < firsts else 1.0) * wake * dim, 1.5))
 	else:
 		var hot := flinch > 0.0 and fmod(passed * 8.0, 1.0) < 0.5
 		var msg := Txt.t("no_stop")
@@ -2618,12 +2722,15 @@ func _draw_memory() -> void:
 		return
 	var anchor := memory_fixed
 	if anchor == Vector2.INF:
-		if not game.possess.hosting() and memory_t > 0.6:
-			return
 		var sh = game.possess.shell
-		if sh == null:
+		if game.possess.hosting() and sh != null:
+			anchor = sh.pos
+			mem_last = anchor
+		elif mem_last != Vector2.INF:
+			# the shell is gone before the memory is read: it stays where it was
+			anchor = mem_last
+		else:
 			return
-		anchor = sh.pos
 	var a := clampf(memory_t / 0.3, 0.0, 1.0) * (1.0 - clampf((memory_t - mem_hold()) / 0.6, 0.0, 1.0))
 	var size := 18
 	# (long memories wrap onto more lines)
@@ -2669,7 +2776,7 @@ func _draw_memory() -> void:
 
 # How long a memory stays up: longer lines are given time to be read.
 func mem_hold() -> float:
-	return clampf(1.4 + memory.length() * 0.05, 2.8, 7.5)
+	return clampf(1.2 + Txt.read_time(memory), 2.8, 14.0)
 
 
 # ---------------------------------------------------------------- the deep archive

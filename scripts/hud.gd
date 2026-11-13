@@ -809,7 +809,7 @@ func game_over() -> void:
 
 # How long a broadcast stays up: longer ones are given time to be read.
 func radio_hold() -> float:
-	return clampf(2.0 + radio_text.length() * 0.06, 6.2, 9.0)
+	return clampf(2.0 + Txt.read_time(radio_text), 6.2, 16.0)
 
 
 func radio(text: String, who: String = "radio_tag") -> void:
@@ -826,7 +826,7 @@ func lore_found() -> void:
 func _draw_radio(vp: Vector2) -> void:
 	if radio_t >= 0.0:
 		var a := clampf(radio_t / 0.3, 0.0, 1.0) * (1.0 - clampf((radio_t - radio_hold()) / 0.8, 0.0, 1.0))
-		var n := int(radio_text.length() * clampf((radio_t - 0.4) / maxf(2.2, radio_text.length() * 0.03), 0.0, 1.0))
+		var n := int(radio_text.length() * clampf((radio_t - 0.4) / clampf(radio_text.length() * 0.03, 2.2, 4.0), 0.0, 1.0))
 		var x := BAND_EDGE + 56.0
 		var y := 112.0
 		# (long broadcasts wrap onto more lines)
@@ -969,6 +969,12 @@ func _step_cards(dt: float) -> void:
 	if over_t >= 0.0:
 		over_t += dt
 	if intro_t >= 0.0:
+		# the chapter's line goes to the broadcast band (it wraps and stays up as long
+		# as it needs) once the title has formed, so it never covers the fight
+		if intro_t < 0.9 and intro_t + dt >= 0.9 and game.tutorial == null:
+			var sub := Chapters.sub(game.chapter)
+			if sub != "":
+				radio(sub, Chapters.label(game.chapter))
 		intro_t += dt
 		if intro_t > 2.8:
 			intro_t = -1.0
@@ -1195,10 +1201,27 @@ func _card_face(c: Dictionary, r: Rect2, a: float, hov: float, idx: int) -> void
 		_:
 			_item_glyph(Vector2(0, -80), 38.0, ic, 2.5)
 	_text_c(font_xl, title, Vector2(0, 22), 28, Pal.ink(a))
+	# a long description starts higher and steps its size down until it clears the number
 	var y := 88.0
-	for ln in _wrap(desc, 17, CARD.x - 56.0):
-		_text_c(font_s, ln, Vector2(0, y), 17, Pal.ink(0.82 * a))
-		y += 25.0
+	var dsz := 17
+	var lines: Array = _wrap(desc, dsz, CARD.x - 56.0)
+	var fitted := false
+	for y0 in [88.0, 62.0]:
+		for sz in [17, 15, 14, 13, 12]:
+			lines = _wrap(desc, sz, CARD.x - (56.0 if sz >= 15 else 44.0))
+			if lines.size() * (sz + 7.0) <= 168.0 - y0:
+				y = y0
+				dsz = sz
+				fitted = true
+				break
+		if fitted:
+			break
+	if not fitted:
+		y = 62.0
+		dsz = 12
+	for ln in lines:
+		_text_c(font_s, ln, Vector2(0, y), dsz, Pal.ink(0.82 * a))
+		y += dsz + 7.0
 	if c.get("full", false) or (c.type == "relic" and not c.has("star") and game.relics.size() >= Cards.RELIC_SLOTS):
 		_text_c(font_s, Txt.t("card_full_school" if c.type == "school" else "card_full"), Vector2(0, r.position.y + 56.0), 13, Pal.ink(0.5 * a))
 	_text_c(font_b, str(idx + 1), Vector2(0, CARD.y / 2.0 - 22.0), 18, Pal.ink((0.35 + 0.4 * hov) * a))
@@ -1713,10 +1736,7 @@ func _draw_intro(vp: Vector2) -> void:
 	var gx := Picks.glitch_shift(gs, 60)
 	Picks.glitch(view, font_xl, Chapters.title(game.chapter), Vector2(vp.x / 2.0 + gx, cy + 10.0), 60, a, gs)
 	_text_stagger(font_xl, Chapters.title(game.chapter), Vector2(vp.x / 2.0 + gx, cy + 10.0), 60, Pal.ink(1.0, 1.15), t - 0.15, t - 2.15, 0.05)
-	if extras:
-		Picks.scramble(view, font_s, Chapters.sub(game.chapter), Vector2(vp.x / 2.0, cy + 74.0), 20, Pal.ink(0.8 * a), t - 0.5)
-	else:
-		_text_c(font_s, Chapters.sub(game.chapter), Vector2(vp.x / 2.0, cy + 74.0), 20, Pal.ink(0.8 * a * clampf((t - 0.5) / 0.4, 0.0, 1.0)))
+	# (the chapter's line is spoken in the broadcast band: see the intro timer)
 
 
 func _draw_over(vp: Vector2) -> void:

@@ -362,7 +362,7 @@ func _breaking(dt: float) -> void:
 		game.fx.flash(wreck, 160.0, 0.35, Pal.ink(0.8, 2.2))
 		game.fx.ring(wreck, 10.0, 420.0, 0.6, Pal.ink(0.9, 2.0), 3.0)
 		game.hud.boss_phase()
-		game.hud.flash_text(Txt.t("chair_hint"))
+		game.hud.radio(Txt.t("chair_hint"), "hint_tag")
 		for k in 4:
 			_spawn_vessel(k * 0.15)
 		mode = OUT

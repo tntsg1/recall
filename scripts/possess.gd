@@ -189,7 +189,7 @@ func mark(e) -> void:
 		game.fx.ring(e.pos, e.r, e.r + 22.0, 0.3, cyan(0.9, 2.0), 2.0)
 		if not hinted and game.bot == null:
 			hinted = true
-			game.hud.flash_text(Txt.t("possess_hint"))
+			game.hud.radio(Txt.t("possess_hint"), "hint_tag")
 
 
 # A recall that would finish a seizable enemy leaves it on 1 HP and reeling,

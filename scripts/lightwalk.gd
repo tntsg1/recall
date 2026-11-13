@@ -168,7 +168,7 @@ func step(sdt: float) -> void:
 		tip_t = -1.0
 	if tip_t >= 0.0:
 		tip_t += sdt if not game.focusing else sdt * 3.0
-		if tip_t > 3.2:
+		if tip_t > tip_hold():
 			tip_t = -1.0
 	if not on:
 		queue_redraw()
@@ -311,14 +311,18 @@ func _draw() -> void:
 		var ck := chain_t / CHAIN_WINDOW
 		draw_arc(game.player.pos, 26.0, -PI * 0.5, -PI * 0.5 + TAU * ck, 32, Pal.you(0.9, 2.4), 2.0)
 	if tip_t >= 0.0:
-		var ta := clampf(tip_t / 0.25, 0.0, 1.0) * clampf((3.2 - tip_t) / 0.4, 0.0, 1.0)
+		var ta := clampf(tip_t / 0.25, 0.0, 1.0) * clampf((tip_hold() - tip_t) / 0.4, 0.0, 1.0)
 		var font := Fonts.get_font("SemiBold")
-		var txt := Txt.t("lightwalk_tip")
-		var tw := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
-		var at: Vector2 = game.player.pos + Vector2(-tw / 2.0, -58.0)
-		draw_rect(Rect2(at + Vector2(-12, -26), Vector2(tw + 24, 36)), Color(0, 0, 0, 0.8 * ta))
-		draw_rect(Rect2(at + Vector2(-12, -26), Vector2(tw + 24, 36)), Pal.you(0.6 * ta, 1.6), false, 1.5)
-		draw_string(font, at, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.you(ta, 1.6))
+		var rows := Txt.wrap(font, Txt.t("lightwalk_tip"), 20, 560.0)
+		var tw := 0.0
+		for row in rows:
+			tw = maxf(tw, font.get_string_size(row, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x)
+		var hgt := 36.0 + (rows.size() - 1) * 26.0
+		var at: Vector2 = game.player.pos + Vector2(-tw / 2.0, -58.0 - (rows.size() - 1) * 26.0)
+		draw_rect(Rect2(at + Vector2(-12, -26), Vector2(tw + 24, hgt)), Color(0, 0, 0, 0.8 * ta))
+		draw_rect(Rect2(at + Vector2(-12, -26), Vector2(tw + 24, hgt)), Pal.you(0.6 * ta, 1.6), false, 1.5)
+		for ri in rows.size():
+			draw_string(font, at + Vector2(0, ri * 26.0), rows[ri], HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Pal.you(ta, 1.6))
 	# holding recall: the line a dodge would take now stands out, an arrow at its way in
 	if aim_b != null and not on:
 		var pts := PackedVector2Array()
@@ -343,3 +347,7 @@ func _draw() -> void:
 	for j in steps + 1:
 		ahead.append(b.sample(lerpf(s, to, float(j) / steps)))
 	Fx.tube(self, ahead, Pal.you(0.55, 2.0), 2.0, 12.0, 0.1)
+
+# How long the one-time tip stays: long enough to read.
+func tip_hold() -> float:
+	return maxf(3.2, 1.0 + Txt.read_time(Txt.t("lightwalk_tip")))
