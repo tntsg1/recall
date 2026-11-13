@@ -13,6 +13,7 @@ const D0 := 1000.0          # the deck's depth below the eye
 const C0 := Vector2(960, 540)
 var C := C0                 # where straight down falls on screen (above the deck on a ride)
 const NEAR := 140.0         # nothing closer than this to the eye is drawn
+const WALL := 2000.0        # how far down a wall is drawn below its roof (it has faded out by then)
 const SCREEN := Rect2(-80, -80, 2080, 1240)
 const DECK := Transit.DECK
 
@@ -99,6 +100,7 @@ func begin(from_story: int) -> void:
 					dense.append(a0.lerp(a1, k / 12.0))
 				o[1] = dense
 	objs.sort_custom(func(a, b): return _top(a) < _top(b))
+	_index_buildings()
 	star_pts.clear()
 	for i in 160:
 		star_pts.append([Vector2(rng.randf_range(0, 1920), rng.randf_range(0, 1080)), rng.randf_range(0.2, 1.0), rng.randf() * TAU])
@@ -129,6 +131,8 @@ const UNDER := {1: "dorms", 2: "corp", 3: "industry", 4: "silos", 5: "rails", 6:
 
 func under(story: int) -> void:
 	C = C0
+	level = false
+	bld.clear()
 	objs.clear()
 	path.clear()
 	dust.clear()
@@ -585,6 +589,16 @@ func _fill(a: float, lift := 1.0) -> Color:
 	return Pal.BG.lerp(Color(c.r, c.g, c.b), a)
 
 
+var bld: Array[int] = []    # (level legs) the buildings on screen this frame, in drawing order
+var bkey := PackedFloat32Array()
+var ball: Array[int] = []   # every building, with the stretch of the way it is on screen for
+var blo := PackedFloat32Array()
+var bhi := PackedFloat32Array()
+# Plain buildings go into one triangle list, drawn in one call (in order, so
+# what is nearer still covers what is farther): fills, edges and lit windows.
+var bp := PackedVector2Array()
+var bcol := PackedColorArray()
+var bix := PackedInt32Array()
 var draw_us := 0.0           # (profiling) how long the last _draw took
 var drawn := 0
 
@@ -600,7 +614,28 @@ func _draw() -> void:
 			draw_rect(Rect2(s[0], Vector2(2, 2)), Pal.ink(0.5 * s[1] * tw * sk, 1.2))
 	if planet:
 		_draw_planet()
-	for o: Array in objs:
+	# (level legs: the buildings on screen go in one pass, farthest from the
+	# eye's axis first, after what lies deep below them and before the rest)
+	var radial := level and not ball.is_empty()
+	var done_bld := false
+	if radial:
+		_visible_buildings()
+	for oi in objs.size():
+		var o: Array = objs[oi]
+		if radial:
+			var kind := int(o[0])
+			if kind == BOX or kind == CYL:
+				continue
+			if not done_bld and _top(o) >= -D0 - 3000.0:
+				done_bld = true
+				for bi in bld:
+					if int(objs[bi][0]) == BOX:
+						_box(objs[bi])
+					else:
+						_cyl(objs[bi])
+				_flush()
+		if int(o[0]) != BOX and int(o[0]) != CYL:
+			_flush()
 		match int(o[0]):
 			BOX: _box(o)
 			CYL: _cyl(o)
@@ -616,6 +651,7 @@ func _draw() -> void:
 			TRAIN: _train(o)
 			CAR: _car(o)
 			SHIP: _ship(o)
+	_flush()
 	_dust()
 	draw_us = Time.get_ticks_usec() - t0
 
@@ -663,45 +699,42 @@ func _box(o: Array) -> void:
 	var bx := C.x + (x1 - eye.x) * s1
 	var ay := C.y + (y0 - eye.y) * s1
 	var by := C.y + (y1 - eye.y) * s1
-	# a roof gone off the screen takes its walls with it gradually: they fade
-	# over the next 600 px it moves away, so nothing blinks out at the edge
-	var off := maxf(maxf(-80.0 - bx, ax - 2000.0), maxf(-80.0 - by, ay - 1160.0))
-	if off > 600.0:
-		return
-	var zb := maxf(z0, eye.z - D0 - fog * 1.4)
+	# (where the eye keeps its height a dim building stays dim: its roof is all it needs)
+	var walls_k := 0.0 if level and a < 0.3 else smoothstep(0.04, 0.3, a)
+	# a wall is drawn only so deep below its roof, gone into the dark by then
+	var zb := maxf(z0, maxf(z1 - WALL, eye.z - D0 - fog * 1.4))
 	var s0 := F / (eye.z - zb)
 	var cx := C.x - eye.x * s0
 	var cy := C.y - eye.y * s0
-	# off the screen only when roof and the still-visible part of its walls are:
-	# a wall leans in from a roof past the edge toward the middle, fading as it
-	# goes, and must not blink out with its roof; past where it has faded to
-	# nothing it does not count
-	var fv := clampf(1.0 - 0.05 / maxf(a, 0.001), 0.0, 1.0)
-	var vx0 := lerpf(ax, cx + x0 * s0, fv)
-	var vx1 := lerpf(bx, cx + x1 * s0, fv)
-	var vy0 := lerpf(ay, cy + y0 * s0, fv)
-	var vy1 := lerpf(by, cy + y1 * s0, fv)
-	if maxf(bx, vx1) < -80.0 or minf(ax, vx0) > 2000.0 or maxf(by, vy1) < -80.0 or minf(ay, vy0) > 1160.0:
+	var fx0 := cx + x0 * s0
+	var fx1 := cx + x1 * s0
+	var fy0 := cy + y0 * s0
+	var fy1 := cy + y1 * s0
+	# off the screen only when all of it is: roof, and (if it has them) its walls
+	if walls_k > 0.0:
+		if maxf(bx, fx1) < -80.0 or minf(ax, fx0) > 2000.0 or maxf(by, fy1) < -80.0 or minf(ay, fy0) > 1160.0:
+			return
+	elif bx < -80.0 or ax > 2000.0 or by < -80.0 or ay > 1160.0:
 		return
 	var T := PackedVector2Array([Vector2(ax, ay), Vector2(bx, ay), Vector2(bx, by), Vector2(ax, by)])
-	var B := PackedVector2Array([Vector2(cx + x0 * s0, cy + y0 * s0), Vector2(cx + x1 * s0, cy + y0 * s0), Vector2(cx + x1 * s0, cy + y1 * s0), Vector2(cx + x0 * s0, cy + y1 * s0)])
+	var B := PackedVector2Array([Vector2(fx0, fy0), Vector2(fx1, fy0), Vector2(fx1, fy1), Vector2(fx0, fy1)])
 	var hull := Rect2(T[0], T[2] - T[0]).merge(Rect2(B[0], B[2] - B[0]))
 	if DECK.grow(-4).encloses(hull):
 		return
 	var glow: int = int(o[8])     # 0 plain, 1 lit, 2 the leg's hero
 	var faint := Pal.ink(0.22 * a, 1.0)
-	# (where the eye keeps its height a dim building stays dim: its roof is all it needs)
-	var walls_k := 0.0 if level and a < 0.3 else smoothstep(0.04, 0.3, a)
 	if bx < -80.0 or ax > 2000.0 or by < -80.0 or ay > 1160.0:
-		if walls_k <= 0.0:
-			return
-		# its roof is off the screen: only the walls leaning in show, nothing else to draw
-		var c_t := _fill(a * walls_k * (1.0 - clampf(off / 600.0, 0.0, 1.0)), 1.0)
+		# its roof is off the screen: the walls leaning in are all there is to draw
+		var c_t := _fill(a * walls_k, 1.0)
+		var e_t := Pal.ink(0.3 * a * walls_k)
+		var e0 := Pal.ink(0.0)
 		var walls := [eye.y < y0, eye.x > x1, eye.y > y1, eye.x < x0]
 		for i in 4:
 			if walls[i]:
 				var j := (i + 1) % 4
-				draw_polygon(PackedVector2Array([T[i], T[j], B[j], B[i]]), PackedColorArray([c_t, c_t, Pal.BG, Pal.BG]))
+				_q(T[i], T[j], B[j], B[i], c_t, c_t, Pal.BG, Pal.BG)
+				_seg(T[i], B[i], 1.0, e_t, e0)
+				_seg(T[j], B[j], 1.0, e_t, e0)
 		return
 	if walls_k > 0.0:
 		# the sides that face the eye: lit at the top, gone into the dark at the foot
@@ -717,12 +750,16 @@ func _box(o: Array) -> void:
 			if not faces[i]:
 				continue
 			var j := (i + 1) % 4
-			draw_polygon(PackedVector2Array([T[i], T[j], B[j], B[i]]), PackedColorArray([c_top, c_top, c_bot, c_bot]))
+			_q(T[i], T[j], B[j], B[i], c_top, c_top, c_bot, c_bot)
 			if a > 0.2:
-				draw_polyline_colors(PackedVector2Array([T[i], B[i], B[j], T[j]]), PackedColorArray([e_top, e_bot, e_bot, e_top]), 1.0)
+				_seg(T[i], B[i], 1.0, e_top, e_bot)
+				_seg(T[j], B[j], 1.0, e_top, e_bot)
 			if win > 0:
 				_windows(T[i], T[j], B[j], B[i], win, wa, x0 + y0 + i)
-	draw_colored_polygon(T, _fill(a, (1.1 if o[7] == 4 else 2.4) if glow == 2 else 1.6))
+	var cr := _fill(a, (1.1 if o[7] == 4 else 2.4) if glow == 2 else 1.6)
+	_q(T[0], T[1], T[2], T[3], cr, cr, cr, cr)
+	if glow == 2 or o[7] == 5 or o[7] == 4:
+		_flush()
 	var top := T.duplicate()
 	top.append(T[0])
 	if glow == 2:
@@ -762,12 +799,14 @@ func _box(o: Array) -> void:
 					var q := PackedVector2Array([T[0].lerp(T[1], fa).lerp(T[3].lerp(T[2], fa), fb), T[0].lerp(T[1], fa2).lerp(T[3].lerp(T[2], fa2), fb), T[0].lerp(T[1], fa2).lerp(T[3].lerp(T[2], fa2), fb2), T[0].lerp(T[1], fa).lerp(T[3].lerp(T[2], fa), fb2)])
 					draw_colored_polygon(q, Pal.ink((0.07 + 0.05 * sin(t * 5.0 + i + j)) * a, 1.2))
 	else:
-		draw_polyline(top, Pal.ink(0.75 * a, 1.5) if glow == 1 else Pal.ink(0.3 * a, 1.0), 1.5)
+		var ce := Pal.ink(0.75 * a, 1.5) if glow == 1 else Pal.ink(0.3 * a, 1.0)
+		for i in 4:
+			_seg(T[i], T[(i + 1) % 4], 1.5, ce, ce)
 	if o[7] == 1:
 		# a factory roof: saw-tooth ridges across the top
 		for k in range(1, 6):
 			var f := k / 6.0
-			draw_line(T[0].lerp(T[1], f), T[3].lerp(T[2], f), faint, 1.0)
+			_seg(T[0].lerp(T[1], f), T[3].lerp(T[2], f), 1.0, faint, faint)
 	elif o[7] == 5:
 		# a tier of the tower's crown: its roof ruled toward the middle, lit along the rim
 		for k in range(1, 4):
@@ -815,6 +854,7 @@ func _windows(tl: Vector2, tr: Vector2, br: Vector2, bl: Vector2, kind: int, a: 
 	if h < 24.0 or w < 10.0:
 		return
 	if kind == 3:
+		_flush()
 		# a screen as big as the building's face: a slogan you cannot read from here
 		var q := PackedVector2Array([tl.lerp(bl, 0.08).lerp(tr.lerp(br, 0.08), 0.1), tl.lerp(bl, 0.08).lerp(tr.lerp(br, 0.08), 0.9), tl.lerp(bl, 0.42).lerp(tr.lerp(br, 0.42), 0.9), tl.lerp(bl, 0.42).lerp(tr.lerp(br, 0.42), 0.1)])
 		var flick := 0.75 + 0.25 * sin(t * 9.0 + seed)
@@ -832,8 +872,6 @@ func _windows(tl: Vector2, tr: Vector2, br: Vector2, bl: Vector2, kind: int, a: 
 	var rows := clampi(int(h * 0.6 / 26.0), 1, 10)
 	var cols := clampi(int(w / 22.0), 1, 8)
 	var base := int(absf(seed) * 7.0) & 4095
-	var pts := PackedVector2Array()
-	var cs := PackedColorArray()
 	for r in rows:
 		var fy := (r + 0.5) / rows * 0.6
 		var l := tl.lerp(bl, fy)
@@ -844,11 +882,7 @@ func _windows(tl: Vector2, tr: Vector2, br: Vector2, bl: Vector2, kind: int, a: 
 			if not LIT[(base + r * 37 + c * 11) & 4095]:
 				continue
 			var p := l.lerp(rr, (c + 0.5) / cols)
-			pts.append(p - dx)
-			pts.append(p + dx)
-			cs.append(lit)
-	if pts.size() >= 2:
-		draw_multiline_colors(pts, cs, 1.5)
+			_seg(p - dx, p + dx, 1.5, lit, lit)
 
 
 func _cyl(o: Array) -> void:
@@ -868,14 +902,12 @@ func _cyl(o: Array) -> void:
 	var ty := C.y + (cy - eye.y) * s1
 	var rr := r * s1
 	var tc := Vector3(tx, ty, s1)
-	# (as a building's: a top gone off the screen fades its side out over 600 px)
-	var off := maxf(maxf(-60.0 - (tx + rr), (tx - rr) - 1980.0), maxf(-60.0 - (ty + rr), (ty - rr) - 1140.0))
-	if off > 600.0:
-		return
-	if off > 0.0:
-		a *= 1.0 - off / 600.0
-	var zb := maxf(z0, eye.z - D0 - fog * 1.4)
+	var zb := maxf(z0, maxf(z1 - WALL, eye.z - D0 - fog * 1.4))
 	var bc := proj(Vector3(cx, cy, zb))
+	# (off the screen only when its top and its side both are)
+	var brr := r * bc.z
+	if maxf(tx + rr, bc.x + brr) < -60.0 or minf(tx - rr, bc.x - brr) > 1980.0 or maxf(ty + rr, bc.y + brr) < -60.0 or minf(ty - rr, bc.y - brr) > 1140.0:
+		return
 	var tr := r * tc.z
 	var br := r * bc.z
 	var tp := Vector2(tc.x, tc.y)
@@ -886,14 +918,17 @@ func _cyl(o: Array) -> void:
 	# the side: the band between the two circles, bounded by its tangents
 	var dir := (tp - bp)
 	var n := Vector2(-dir.y, dir.x).normalized() if dir.length() > 0.5 else Vector2.RIGHT
-	draw_colored_polygon(PackedVector2Array([tp + n * tr, tp - n * tr, bp - n * br, bp + n * br]), _fill(a, 0.85))
-	draw_circle(bp, br, _fill(a, 0.85))
-	draw_line(tp + n * tr, bp + n * br, Pal.ink(0.4 * a), 1.0)
-	draw_line(tp - n * tr, bp - n * br, Pal.ink(0.4 * a), 1.0)
-	draw_circle(tp, tr, _fill(a, 1.25))
+	var cf := _fill(a, 0.85)
+	_q(tp + n * tr, tp - n * tr, bp - n * br, bp + n * br, cf, cf, cf, cf)
+	_fan(bp, br, cf, 24)
+	var ce := Pal.ink(0.4 * a)
+	_seg(tp + n * tr, bp + n * br, 1.0, ce, ce)
+	_seg(tp - n * tr, bp - n * br, 1.0, ce, ce)
+	_fan(tp, tr, _fill(a, 1.25), 32)
 	var rings: int = o[6]
 	var k_top := 1.6 if rings == 4 else 1.0
 	if o.size() > 7 and o[7]:
+		_flush()
 		# the hero: halo, a hard rim, scale marks round it, a red ring inside
 		draw_arc(tp, tr, 0, TAU, 72, Pal.ink(0.16 * a), 16.0)
 		draw_arc(tp, tr, 0, TAU, 72, Pal.ink(a, 2.0), 3.5)
@@ -905,11 +940,12 @@ func _cyl(o: Array) -> void:
 		for k in range(1, 4):
 			draw_arc(tp, tr * (0.8 - k * 0.16), 0, TAU, 48, Pal.ink((0.35 + 0.25 * sin(t * 2.6 + k)) * a, 1.4), 1.5)
 		return
-	draw_arc(tp, tr, 0, TAU, 40, Pal.ink(0.75 * a, k_top), 1.5)
+	_ringq(tp, tr, 1.5, Pal.ink(0.75 * a, k_top), 40)
 	if rings >= 3:
 		for k in range(1, 3 if rings == 3 else 4):
-			draw_arc(tp, tr * (1.0 - k * 0.22), 0, TAU, 32, Pal.ink((0.35 if rings == 3 else 0.5 + 0.3 * sin(t * 3.0 + k)) * a, 1.3 if rings == 4 else 1.0), 1.0)
+			_ringq(tp, tr * (1.0 - k * 0.22), 1.0, Pal.ink((0.35 if rings == 3 else 0.5 + 0.3 * sin(t * 3.0 + k)) * a, 1.3 if rings == 4 else 1.0), 32)
 	elif rings == 1:
+		_flush()
 		draw_arc(tp, tr * 0.6, 0, TAU, 20, Pal.ink(0.5 * a, 1.6), 1.0)
 
 
@@ -1438,3 +1474,156 @@ func _ship(o: Array) -> void:
 		draw_circle(q, r * 2.2, Pal.red(0.16 * a))
 		draw_circle(q, r * 1.4, Pal.red(0.4 * a, 1.6))
 		draw_circle(q, r, Pal.red(0.95 * a, 2.4))
+
+
+# (level legs) Each building is on screen for one stretch of the way, the eye
+# moving along x at a fixed height: work that stretch out once, then a frame
+# only has to ask whether the eye is in it. The test is the drawing's own:
+# roof, and walls down to their foot where it has any.
+func _index_buildings() -> void:
+	ball.clear()
+	blo.resize(0)
+	bhi.resize(0)
+	bld.clear()
+	if not level:
+		return
+	var e0 := _eye_at(0.0)
+	for i in objs.size():
+		var o: Array = objs[i]
+		var k := int(o[0])
+		if k != BOX and k != CYL:
+			continue
+		var z0: float = o[5] if k == BOX else o[4]
+		var z1: float = o[6] if k == BOX else o[5]
+		var d1 := e0.z - z1
+		if d1 < NEAR:
+			continue
+		var a := fade(d1)
+		if a < 0.02:
+			continue
+		var s1 := F / d1
+		var zb := maxf(z0, maxf(z1 - WALL, e0.z - D0 - fog * 1.4))
+		var s0 := F / (e0.z - zb)
+		var walls := k == CYL or a >= 0.3
+		var smin := s0 if walls else s1
+		var xa: float
+		var xb: float
+		var ya: float
+		var yb: float
+		if k == BOX:
+			xa = o[1]
+			ya = o[2]
+			xb = o[3]
+			yb = o[4]
+		else:
+			xa = float(o[1]) - float(o[3])
+			xb = float(o[1]) + float(o[3])
+			ya = float(o[2]) - float(o[3])
+			yb = float(o[2]) + float(o[3])
+		# (the height never changes: off the screen up or down, never on it)
+		var ylo := minf(C.y + (ya - e0.y) * s1, C.y + (ya - e0.y) * smin)
+		var yhi := maxf(C.y + (yb - e0.y) * s1, C.y + (yb - e0.y) * smin)
+		if yhi < -80.0 or ylo > 1160.0:
+			continue
+		ball.append(i)
+		blo.append(xa - (2000.0 - C.x) / smin - 40.0)
+		bhi.append(xb + (C.x + 80.0) / smin + 40.0)
+
+
+# The buildings on screen now, farthest from the eye's axis first.
+func _visible_buildings() -> void:
+	bld.clear()
+	for k in ball.size():
+		if eye.x >= blo[k] and eye.x <= bhi[k]:
+			bld.append(ball[k])
+	bkey.resize(bld.size())
+	_radial_order()
+
+
+# How far a building's footprint is from the eye's axis (squared).
+func _rkey(o: Array) -> float:
+	if int(o[0]) == BOX:
+		var dx := maxf(maxf(float(o[1]) - eye.x, eye.x - float(o[3])), 0.0)
+		var dy := maxf(maxf(float(o[2]) - eye.y, eye.y - float(o[4])), 0.0)
+		return dx * dx + dy * dy
+	var dd := maxf(Vector2(float(o[1]) - eye.x, float(o[2]) - eye.y).length() - float(o[3]), 0.0)
+	return dd * dd
+
+
+# Insertion sort, farthest first: the order changes little from frame to frame.
+func _radial_order() -> void:
+	var n := bld.size()
+	for i in n:
+		bkey[i] = _rkey(objs[bld[i]])
+	for i in range(1, n):
+		var kv := bkey[i]
+		var bv := bld[i]
+		var j := i - 1
+		while j >= 0 and bkey[j] < kv:
+			bkey[j + 1] = bkey[j]
+			bld[j + 1] = bld[j]
+			j -= 1
+		bkey[j + 1] = kv
+		bld[j + 1] = bv
+
+
+
+func _q(a: Vector2, b: Vector2, c: Vector2, d: Vector2, ca: Color, cb: Color, cc: Color, cd: Color) -> void:
+	var n := bp.size()
+	bp.append(a)
+	bp.append(b)
+	bp.append(c)
+	bp.append(d)
+	bcol.append(ca)
+	bcol.append(cb)
+	bcol.append(cc)
+	bcol.append(cd)
+	bix.append(n)
+	bix.append(n + 1)
+	bix.append(n + 2)
+	bix.append(n)
+	bix.append(n + 2)
+	bix.append(n + 3)
+
+
+# A line w wide from p to q, its colour running c0 to c1, as a quad in the batch.
+func _seg(p: Vector2, q: Vector2, w: float, c0: Color, c1: Color) -> void:
+	var dv := q - p
+	var l := dv.length()
+	if l < 0.01:
+		return
+	var nn := Vector2(-dv.y, dv.x) * (w * 0.5 / l)
+	_q(p + nn, q + nn, q - nn, p - nn, c0, c1, c1, c0)
+
+
+func _flush() -> void:
+	if bix.is_empty():
+		return
+	RenderingServer.canvas_item_add_triangle_array(get_canvas_item(), bix, bp, bcol)
+	bp.resize(0)
+	bcol.resize(0)
+	bix.resize(0)
+
+
+
+# A filled disc into the batch (a fan of n triangles).
+func _fan(c: Vector2, r: float, col: Color, n: int) -> void:
+	var b0 := bp.size()
+	bp.append(c)
+	bcol.append(col)
+	for k in n:
+		bp.append(c + Vector2.from_angle(TAU * k / n) * r)
+		bcol.append(col)
+	for k in n:
+		bix.append(b0)
+		bix.append(b0 + 1 + k)
+		bix.append(b0 + 1 + (k + 1) % n)
+
+
+# A ring line w wide into the batch.
+func _ringq(c: Vector2, r: float, w: float, col: Color, n: int) -> void:
+	var prev := c + Vector2(r, 0)
+	for k in range(1, n + 1):
+		var p := c + Vector2.from_angle(TAU * k / n) * r
+		_seg(prev, p, w, col, col)
+		prev = p
