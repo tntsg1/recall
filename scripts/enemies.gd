@@ -6,7 +6,8 @@ extends Node2D
 
 enum { WARN, SPAWN, ALIVE, DEAD, HOST }   # HOST: seized by you (Possess drives it)
 enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO, INSPECTOR, PROOFREADER, ESCORT, PHASE,
-	COUPLER, SIGNAL, QUEUE, QSEG, REGISTRAR, TURNSTILE, HOUND, DUD, BYSTANDER }
+	COUPLER, SIGNAL, QUEUE, QSEG, REGISTRAR, TURNSTILE, HOUND, DUD, BYSTANDER,
+	HOPPER, CAN, FORKLIFT, SLED, CONSIST, CAR, PANTO, SURGE, CABLER }
 enum { APPROACH, WINDUP, DASH, STUN, RECOVER }
 
 const SPEC := {
@@ -33,13 +34,31 @@ const SPEC := {
 	HOUND: {"hp": 55.0, "r": 19.0, "sides": 6, "speed": 210.0},
 	DUD: {"hp": 35.0, "r": 20.0, "sides": 5, "speed": 70.0},
 	BYSTANDER: {"hp": 1.0, "r": 11.0, "sides": 12, "speed": 80.0},
+	# chapter 4, the production union: the hopper and its cans, the forklift
+	HOPPER: {"hp": 90.0, "r": 24.0, "sides": 6, "speed": 0.0},
+	CAN: {"hp": 15.0, "r": 9.0, "sides": 4, "speed": 250.0},
+	FORKLIFT: {"hp": 90.0, "r": 20.0, "sides": 4, "speed": 150.0},
+	# chapter 5, the superconducting line: the sled, the consist, the pantograph
+	SLED: {"hp": 60.0, "r": 15.0, "sides": 4, "speed": 700.0},
+	CONSIST: {"hp": 40.0, "r": 15.0, "sides": 5, "speed": 320.0},
+	CAR: {"hp": 40.0, "r": 15.0, "sides": 4, "speed": 320.0},
+	PANTO: {"hp": 60.0, "r": 17.0, "sides": 3, "speed": 0.0},
+	# chapter 6, the energy bureau: the surge, the cabler
+	SURGE: {"hp": 45.0, "r": 16.0, "sides": 6, "speed": 190.0},
+	CABLER: {"hp": 40.0, "r": 14.0, "sides": 4, "speed": 170.0},
 }
 # each chapter's own enemies wear that chapter's colour (red stays for danger alone)
 const RUST := Color(1.0, 0.52, 0.2)      # chapter 1, the yard
 const FILE_BLUE := Color(0.36, 0.62, 1.0)  # chapter 2, the registration hall
 const STERILE := Color(0.3, 1.0, 0.62)     # chapter 3, the institute
+const CAN_YELLOW := Color(1.0, 0.82, 0.25)   # chapter 4, the production union
+const RAIL_VIOLET := Color(0.68, 0.5, 1.0)   # chapter 5, the superconducting line
+const VOLT_PINK := Color(1.0, 0.4, 0.85)     # chapter 6, the energy bureau
 const ACCENT := {COUPLER: RUST, SIGNAL: RUST, QUEUE: FILE_BLUE, QSEG: FILE_BLUE, REGISTRAR: FILE_BLUE, TURNSTILE: FILE_BLUE,
-	HOUND: STERILE, DUD: STERILE, BYSTANDER: STERILE}
+	HOUND: STERILE, DUD: STERILE, BYSTANDER: STERILE,
+	HOPPER: CAN_YELLOW, CAN: CAN_YELLOW, FORKLIFT: CAN_YELLOW,
+	SLED: RAIL_VIOLET, CONSIST: RAIL_VIOLET, CAR: RAIL_VIOLET, PANTO: RAIL_VIOLET,
+	SURGE: VOLT_PINK, CABLER: VOLT_PINK}
 const CHAIN_MIN := 140.0      # a coupled pair's chain goes taut between these
 const CHAIN_MAX := 290.0
 const CHAIN_WARN := 0.5
@@ -104,7 +123,12 @@ class E:
 	var rush := 0.0             # a signalman's "away!": faster for a while
 	var shunt := false          # chapter 1's chargers: twin-rail lane, a slide after the dash
 	var aim_at := Vector2.ZERO  # where a hound will land; where a bystander is walking to
-	var leap_from := Vector2.ZERO
+	var leap_from := Vector2.ZERO  # (a sled's or pantograph's rail runs leap_from -> aim_at)
+	var crate := 0.0            # a forklift's load: it takes your outbound rounds from the front
+	var charge := 0             # a surge's meals of current
+	var rail := -1              # which rail group powers it (-1: its own cycle)
+	var cable := PackedVector2Array()       # a cabler's line, oldest first
+	var cable_age := PackedFloat32Array()
 
 var list: Array[E] = []
 var game
@@ -113,6 +137,7 @@ var next_id := 1
 var fixes: Array = []        # a proofreader's corrections: [round, from, to, t]
 var zones: Array = []        # ground danger: {c, size, t, warn, ink, hit, by}
 var misfired_wave := -1      # (the broadcast about hitting a passer-by: once a wave)
+var quench := {}             # a surge has eaten the current of these rounds: instance id -> seconds
 
 
 func _ready() -> void:
@@ -164,6 +189,22 @@ func spawn(kind: int, pos: Vector2, delay: float = 0.0) -> E:
 		e.aim_at = Arena.ROOM.get_center() * 2.0 - pos
 	if kind == SIGNAL or kind == REGISTRAR:
 		e.cool = randf_range(2.0, 3.0)
+	match kind:
+		HOPPER:
+			_to_wall(e)
+			e.cool = randf_range(1.5, 2.5)
+		FORKLIFT:
+			e.crate = 40.0
+			e.dash_dir = _axis(game.player.pos - pos)
+			e.rot = e.dash_dir.angle()
+		SLED:
+			_pick_rail(e, false)
+			e.mode = 1
+		PANTO:
+			_pick_rail(e, true)
+			e.cool = 1.0
+		CONSIST:
+			_next_corner(e)
 	for k in e.sides:
 		e.offs.append([Vector2.from_angle(randf() * TAU) * randf_range(50, 90), randf_range(-2.5, 2.5)])
 	list.append(e)
@@ -347,6 +388,20 @@ func _hit(e: E, dmg: float, dir: Vector2, at: Vector2, ret: bool) -> void:
 	if e.kind == BYSTANDER:
 		_misfire(e)
 		return
+	if e.kind == FORKLIFT and e.crate > 0.0 and not ret and dir.dot(Vector2.from_angle(e.rot)) < -0.35:
+		# an outbound round into its face: the load takes it
+		e.crate -= dmg
+		e.shield_flash = 1.0
+		game.fx.sparks(at, -dir, 5, acc(FORKLIFT, 1.0, 1.6), 300.0, 0.2, 0.9)
+		game.sfx.play("shield", 1.2, -8.0)
+		if e.crate <= 0.0:
+			# the load bursts: its cans scatter
+			for k in 4:
+				var o := Vector2.from_angle(e.rot + randf_range(-1.2, 1.2))
+				game.fx.shard(e.pos + o * e.r, o.orthogonal() * 5.0, -o.orthogonal() * 5.0, o * randf_range(200, 320), randf_range(-8, 8), 0.6, acc(FORKLIFT, 1.0, 1.4), 2.0)
+			game.sfx.play("p_slam", 1.4, -8.0)
+		return
+	dmg *= _armor(e)
 	var before := _edges_left(e)
 	e.hp -= dmg
 	var after := _edges_left(e)
@@ -426,6 +481,7 @@ func blast_hit(e: E, dir: Vector2, dmg: float, show_number: bool = true) -> void
 		return
 	if e.kind == PHASE and phased(e):
 		return
+	dmg *= _armor(e)
 	e.hp -= dmg
 	e.flash = 1.0
 	e.knock += dir * 220.0
@@ -520,6 +576,10 @@ func _die(e: E, dir: Vector2) -> void:
 
 func step(dt: float) -> void:
 	var pl: Vector2 = game.player.pos
+	for qk in quench.keys():
+		quench[qk] -= dt
+		if quench[qk] <= 0.0:
+			quench.erase(qk)
 	_step_fixes(dt)
 	_step_zones(dt, pl)
 	var i := 0
@@ -623,7 +683,25 @@ func step(dt: float) -> void:
 							continue
 					BYSTANDER:
 						_bystander(e, dt)
-				if e.kind != QSEG and e.kind != BYSTANDER and not (e.kind == HOUND and e.mode == 2):
+					HOPPER:
+						_hopper(e, dt)
+					CAN:
+						_chaser(e, pl, dt)
+					FORKLIFT:
+						_forklift(e, pl, dt)
+					SLED:
+						_sled(e, dt)
+					CONSIST:
+						_consist(e, dt)
+					CAR:
+						_queue_seg(e, dt)
+					PANTO:
+						_panto(e, pl, dt)
+					SURGE:
+						_surge(e, pl, dt)
+					CABLER:
+						_cabler(e, pl, dt)
+				if not (e.kind in [QSEG, BYSTANDER, SLED, CAR, HOPPER, PANTO]) and not (e.kind == HOUND and e.mode == 2):
 					_separate(e, dt)
 				if game.focusing and game.has("gravity"):
 					_gravity(e, dt)
@@ -653,6 +731,8 @@ func step(dt: float) -> void:
 							continue
 				if e.kind == CHARGER and e.mode == DASH and e.pos.distance_to(intended) > 2.0:
 					_slam(e)
+				if ((e.kind == FORKLIFT and e.mode == 2) or (e.kind == CONSIST and e.mode == 3)) and e.pos.distance_to(intended) > 2.0:
+					_jam(e)
 				_contact(e, pl)
 		i += 1
 	queue_redraw()
@@ -708,6 +788,9 @@ func _pulse(e: E, pl: Vector2, dt: float) -> void:
 # Leeches swim to the nearest round in a wall and carry up to four away.
 func _leech(e: E, pl: Vector2, dt: float) -> void:
 	var held: int = game.bullets.held_by(e.grip).size()
+	if held >= 2 and game.arms.active() and Chapters.story(game.chapter) == 4:
+		_stockpile(e, dt)
+		return
 	var target = null
 	var td := 1200.0
 	if held < 4:
@@ -1247,6 +1330,33 @@ func _poly(e: E) -> Array[Vector2]:
 			var crouch := 1.0 + (0.25 if e.mode == 1 else 0.0)
 			for v in [Vector2(1.6, 0), Vector2(0.9, -0.45), Vector2(-0.6, -0.55), Vector2(-1.35, 0), Vector2(-0.6, 0.55), Vector2(0.9, 0.45)]:
 				pts.append(Vector2(v.x * crouch, v.y / crouch) * e.r)
+		HOPPER:
+			# squat, its outlet facing into the room
+			for v in [Vector2(0.75, -0.5), Vector2(0.75, 0.5), Vector2(0.35, 1.0), Vector2(-0.75, 1.0), Vector2(-0.75, -1.0), Vector2(0.35, -1.0)]:
+				pts.append(v * e.r)
+		CAN, CABLER:
+			for v in [Vector2(0.8, -0.75), Vector2(0.8, 0.75), Vector2(-0.8, 0.75), Vector2(-0.8, -0.75)]:
+				pts.append(v * e.r)
+		FORKLIFT:
+			for v in [Vector2(0.7, -0.78), Vector2(0.7, 0.78), Vector2(-0.95, 0.78), Vector2(-0.95, -0.78)]:
+				pts.append(v * e.r)
+		SLED:
+			# longer than anything else in the game
+			for v in [Vector2(1.7, -0.5), Vector2(1.7, 0.5), Vector2(-1.7, 0.5), Vector2(-1.7, -0.5)]:
+				pts.append(v * e.r)
+		CONSIST:
+			for v in [Vector2(1.6, 0), Vector2(1.1, 0.62), Vector2(-1.2, 0.62), Vector2(-1.2, -0.62), Vector2(1.1, -0.62)]:
+				pts.append(v * e.r)
+		CAR:
+			for v in [Vector2(1.2, -0.62), Vector2(1.2, 0.62), Vector2(-1.2, 0.62), Vector2(-1.2, -0.62)]:
+				pts.append(v * e.r)
+		PANTO:
+			for v in [Vector2(0.9, 0), Vector2(-0.75, 0.95), Vector2(-0.75, -0.95)]:
+				pts.append(v * e.r)
+		SURGE:
+			# a hexagon with a ragged edge, swelling as it feeds
+			for k in 6:
+				pts.append(Vector2.from_angle(TAU * k / 6.0 + (0.12 if k % 2 == 0 else -0.12)) * e.r * (1.0 if k % 2 == 0 else 0.8))
 		DUD:
 			# a shell case: long, a blunt nose
 			pts = [Vector2(e.r * 1.4, 0), Vector2(e.r * 0.7, -e.r * 0.55), Vector2(-e.r * 1.1, -e.r * 0.55), Vector2(-e.r * 1.1, e.r * 0.55), Vector2(e.r * 0.7, e.r * 0.55)]
@@ -1899,6 +2009,20 @@ func _died(e: E) -> void:
 		COUPLER:
 			if e.link != null and e.link.link == e:
 				e.link.link = null
+		CONSIST, CAR:
+			for o in list:
+				if o.state == ALIVE and o.link == e and o.kind == CAR:
+					o.link = e.link
+					if e.kind == CONSIST:
+						# the next car jumps the rails: straight on until a wall stops it
+						o.kind = CONSIST
+						o.sides = 5
+						o.link = null
+						o.mode = 3
+						o.mode_t = 0.0
+						o.dash_dir = Vector2.from_angle(o.rot)
+						o.orbit_a = e.orbit_a
+						game.fx.ring(o.pos, o.r, o.r * 2.2, 0.3, acc(CAR, 0.8, 1.6), 1.5)
 
 
 # ---- drawing the chapters' own
@@ -1960,6 +2084,12 @@ func _draw_extra(e: E, tr: Transform2D, dim: float) -> void:
 			if e.mode == 1:
 				var k := clampf(e.mode_t / FUSE, 0.0, 1.0)
 				draw_arc(e.pos, lerpf(FUSE_R, e.r, k), 0.0, TAU, 40, Pal.red((0.5 + 0.5 * sin(e.t * (10.0 + 30.0 * k))) * dim, 2.0), 2.0)
+		HOPPER, CAN, FORKLIFT:
+			_draw_union(e, tr, dim)
+		SLED, CONSIST, CAR, PANTO:
+			_draw_line5(e, tr, dim)
+		SURGE, CABLER:
+			_draw_bureau(e, tr, dim)
 		BYSTANDER:
 			# a head, a case in one hand; faint, and nothing red about it
 			var pc := acc(BYSTANDER, 0.5 * dim, 1.0)
@@ -2179,3 +2309,631 @@ func _draw_zones(dim: float) -> void:
 			var left := 1.0 - clampf((z.t - z.warn) / z.ink, 0.0, 1.0)
 			draw_rect(r, Pal.red(0.05 * left * dim, 1.0))
 			draw_rect(r, Pal.red(0.5 * left * dim, 1.6), false, 1.5)
+
+
+
+# ================================================================ chapters 4-6
+func _armor(e: E) -> float:
+	match e.kind:
+		PANTO:
+			# powered, its shell is shut
+			return 0.2 if e.mode != 0 else 1.0
+		SLED:
+			# stopped on a dead rail it is soft
+			return 1.5 if e.mode == 1 else 1.0
+	return 1.0
+
+
+func _axis(v: Vector2) -> Vector2:
+	if absf(v.x) >= absf(v.y):
+		return Vector2(signf(v.x) if v.x != 0.0 else 1.0, 0.0)
+	return Vector2(0.0, signf(v.y))
+
+
+# A hopper stands against the nearest wall, its outlet facing in.
+func _to_wall(e: E) -> void:
+	var room := Arena.ROOM
+	var d := [e.pos.x - room.position.x, room.end.x - e.pos.x, e.pos.y - room.position.y, room.end.y - e.pos.y]
+	var k := 0
+	for j in 4:
+		if d[j] < d[k]:
+			k = j
+	var inset := e.r + 6.0
+	match k:
+		0:
+			e.pos.x = room.position.x + inset
+			e.rot = 0.0
+		1:
+			e.pos.x = room.end.x - inset
+			e.rot = PI
+		2:
+			e.pos.y = room.position.y + inset
+			e.rot = PI * 0.5
+		_:
+			e.pos.y = room.end.y - inset
+			e.rot = -PI * 0.5
+	e.face = Vector2.from_angle(e.rot)
+
+
+# A sled rides the nearest rail; a pantograph stands beside it. With no rails in
+# the room, a line across it at their height, on a cycle of their own.
+func _pick_rail(e: E, beside: bool) -> void:
+	var best := -1
+	var bd := 1e9
+	if game.maglev.active():
+		for i in game.maglev.rails.size():
+			var r: Array = game.maglev.rails[i]
+			var q := Geometry2D.get_closest_point_to_segment(e.pos, r[0], r[1])
+			if q.distance_to(e.pos) < bd:
+				bd = q.distance_to(e.pos)
+				best = i
+	if best >= 0:
+		var r: Array = game.maglev.rails[best]
+		e.leap_from = r[0]
+		e.aim_at = r[1]
+		e.rail = int(r[2])
+	else:
+		var y := clampf(e.pos.y, Arena.ROOM.position.y + 120.0, Arena.ROOM.end.y - 120.0)
+		e.leap_from = Vector2(Arena.ROOM.position.x + 80.0, y)
+		e.aim_at = Vector2(Arena.ROOM.end.x - 80.0, y)
+		e.rail = -1
+	var n := (e.aim_at - e.leap_from).normalized()
+	var q := Geometry2D.get_closest_point_to_segment(e.pos, e.leap_from, e.aim_at)
+	if beside:
+		var side := n.orthogonal()
+		if (e.pos - q).dot(side) < 0.0:
+			side = -side
+		e.pos = q + side * (Maglev.HALF_W + e.r + 10.0)
+		e.rot = (-side).angle()
+	else:
+		e.pos = q
+		e.dash_dir = n if randf() < 0.5 else -n
+		e.rot = e.dash_dir.angle()
+	e.face = Vector2.from_angle(e.rot)
+
+
+func _rail_on(e: E) -> bool:
+	if e.rail >= 0 and game.maglev.active():
+		return game.maglev.live[e.rail]
+	return fmod(e.t + e.seed, 8.0) < 4.0
+
+
+func _rail_warn(e: E) -> float:
+	if e.rail >= 0 and game.maglev.active():
+		return game.maglev.warn[e.rail]
+	var ph := fmod(e.t + e.seed, 8.0)
+	return clampf((ph - 7.2) / 0.8, 0.0, 1.0)
+
+
+# ---- chapter 4: the hopper. Bolted to a wall; every few seconds its outlet
+# glows red and two cans come out of it in a line. It never runs dry.
+const HOP_EVERY := 6.0
+const HOP_WARN := 0.7
+const HOP_MAX := 6
+
+
+func _hopper(e: E, dt: float) -> void:
+	e.vel = Vector2.ZERO
+	e.knock = Vector2.ZERO
+	match e.mode:
+		0:
+			e.cool -= dt
+			if e.cool <= 0.0:
+				var mine := 0
+				for o in list:
+					if o.kind == CAN and o.anchor == e and o.state != DEAD:
+						mine += 1
+				if mine <= HOP_MAX - 2:
+					e.mode = 1
+					e.mode_t = 0.0
+					game.sfx.play("windup", 1.3, -8.0)
+				else:
+					e.cool = 1.0
+		1:
+			e.mode_t += dt
+			if e.mode_t >= HOP_WARN:
+				var out := Vector2.from_angle(e.rot)
+				for k in 2:
+					var c := spawn(CAN, e.pos + out * (e.r + 14.0 + 24.0 * k), 0.0)
+					c.state = ALIVE
+					c.t = 0.0
+					c.anchor = e
+					c.rot = out.angle()
+					c.knock = out * (420.0 - 120.0 * k)
+				game.fx.ring(e.pos + out * e.r, 6.0, 44.0, 0.3, acc(HOPPER, 0.8, 1.6), 2.0)
+				game.sfx.play("p_hit", 0.8, -6.0)
+				e.mode = 0
+				e.cool = HOP_EVERY
+
+
+# ---- chapter 4: the forklift. Drives in straight legs and turns square; when
+# you stand in its lane its forks go red and it runs you through. Into a wall,
+# the forks stick a moment. The load on its front takes your outbound rounds.
+const FORK_WARN := 0.6
+const FORK_SPEED := 600.0
+
+
+func _forklift(e: E, pl: Vector2, dt: float) -> void:
+	e.mode_t += dt
+	var to := pl - e.pos
+	match e.mode:
+		0:
+			e.cool -= dt
+			var aligned := minf(absf(to.x), absf(to.y)) < 45.0
+			if aligned and e.cool <= 0.0 and to.length() < 760.0 and not game.arena.raycast(e.pos, pl):
+				e.mode = 1
+				e.mode_t = 0.0
+				e.dash_dir = _axis(to)
+				game.sfx.play("windup", 0.8, -6.0)
+			elif e.mode_t > e.lag or e.vel.length() < 20.0 and e.mode_t > 0.3:
+				# the next leg: whichever way brings your lane nearer
+				e.mode_t = 0.0
+				e.lag = randf_range(0.7, 1.3)
+				var leg := Vector2(signf(to.x), 0.0) if absf(to.x) < absf(to.y) else Vector2(0.0, signf(to.y))
+				if aligned:
+					leg = leg.orthogonal() * (1.0 if randf() < 0.5 else -1.0)
+				if leg == Vector2.ZERO:
+					leg = Vector2.RIGHT
+				e.dash_dir = leg
+			e.vel = Pal.damp2(e.vel, e.dash_dir * e.speed, 6.0, dt)
+		1:
+			e.vel = Pal.damp2(e.vel, Vector2.ZERO, 10.0, dt)
+			if e.mode_t >= FORK_WARN:
+				e.mode = 2
+				e.mode_t = 0.0
+				game.sfx.play("dash_e", 0.85, -4.0)
+		2:
+			e.vel = e.dash_dir * FORK_SPEED
+			if int(e.mode_t * 60.0) % 3 == 0:
+				e.ghosts.append([e.pos, 0.0, e.rot])
+			if e.mode_t > 1.6:
+				e.mode = 4
+				e.mode_t = 0.0
+		3:
+			# forks stuck in the wall
+			e.vel = Vector2.ZERO
+			if e.mode_t > 1.2:
+				e.mode = 4
+				e.mode_t = 0.0
+		_:
+			e.vel = Pal.damp2(e.vel, Vector2.ZERO, 6.0, dt)
+			if e.mode_t > 0.5:
+				e.mode = 0
+				e.mode_t = 0.0
+				e.cool = randf_range(1.2, 2.0)
+	e.rot = lerp_angle(e.rot, e.dash_dir.angle(), 1.0 - exp(-14.0 * dt))
+
+
+func _jam(e: E) -> void:
+	e.squash = 1.0
+	e.squash_dir = e.dash_dir
+	var at := e.pos + e.dash_dir * e.r * 1.6
+	game.fx.sparks(at, -e.dash_dir, 12, acc(e.kind, 1.0, 1.8), 480.0, 0.3, 1.2)
+	game.sfx.play("slam", randf_range(0.9, 1.0), -5.0)
+	game.cam.add_trauma(0.14)
+	e.vel = Vector2.ZERO
+	e.mode_t = 0.0
+	if e.kind == FORKLIFT:
+		e.mode = 3
+	else:
+		e.mode = 0
+		_next_corner(e)
+
+
+# The reserve leech (chapter 4): with two or more of your rounds it walks them
+# to the reserve crate and puts them in its wall. Kill it on the way and they
+# drop where it falls.
+func _stockpile(e: E, dt: float) -> void:
+	var c: Rect2 = game.arms.crate_r
+	var to := c.get_center()
+	var want := (to - e.pos).normalized()
+	e.vel = Pal.damp2(e.vel, _steer(e, _route(e, to)) * e.speed * 0.8, 3.0, dt)
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-6.0 * dt))
+	if c.grow(e.r + 24.0).has_point(e.pos) or e.pos.distance_to(to) < 90.0:
+		for b in game.bullets.held_by(e.grip):
+			b.pos = Vector2(randf_range(c.position.x + 14.0, c.end.x - 14.0), c.position.y - 1.0)
+			game.bullets.drop(b)
+			b.dir = Vector2.DOWN
+			game.arms.crate.append(b)
+		game.arms.crate_flash = 1.0
+		game.fx.ring(c.get_center(), 10.0, 60.0, 0.3, acc(HOPPER, 0.8, 1.6), 2.0)
+		game.sfx.play("embed", 0.85, -8.0)
+	if want == Vector2.ZERO:
+		pass
+
+
+# ---- chapter 5: the sled. Shuttles along its rail while it is powered, fast;
+# when the rail dies it coasts to a stop and is soft; when the rail comes back
+# it waits half a second, nose red, and goes.
+const SLED_SPEED := 700.0
+
+
+func _sled(e: E, dt: float) -> void:
+	var a: Vector2 = e.leap_from
+	var b: Vector2 = e.aim_at
+	var n := (b - a).normalized()
+	var span := a.distance_to(b)
+	var live := _rail_on(e)
+	e.mode_t += dt
+	match e.mode:
+		0:
+			var s := (e.pos - a).dot(n)
+			if s > span - e.r * 1.7 and e.dash_dir.dot(n) > 0.0:
+				e.dash_dir = -n
+			elif s < e.r * 1.7 and e.dash_dir.dot(n) < 0.0:
+				e.dash_dir = n
+			e.vel = e.dash_dir * SLED_SPEED
+			if int(e.t * 60.0) % 3 == 0:
+				e.ghosts.append([e.pos, 0.0, e.rot])
+			if not live:
+				e.mode = 1
+				e.mode_t = 0.0
+		1:
+			e.vel = Pal.damp2(e.vel, Vector2.ZERO, 2.5, dt)
+			if live:
+				e.mode = 2
+				e.mode_t = 0.0
+				game.sfx.play("windup", 1.5, -10.0)
+		_:
+			e.vel = Vector2.ZERO
+			if e.mode_t > 0.5:
+				e.mode = 0
+				e.mode_t = 0.0
+				game.sfx.play("dash_e", 1.3, -8.0)
+	# held on the rail
+	e.pos = Geometry2D.get_closest_point_to_segment(e.pos, a, b)
+	e.knock = e.knock.project(n)
+	if e.dash_dir != Vector2.ZERO:
+		e.rot = e.dash_dir.angle()
+
+
+# ---- chapter 5: the consist. A locomotive and its cars, running the long
+# loop round the room; the cars swing wide at each corner. Lose the engine and
+# the next car jumps the rails and runs straight on until a wall stops it.
+func _consist_box() -> Array:
+	var box := Arena.ROOM.grow(-130.0)
+	return [box.position, Vector2(box.end.x, box.position.y), box.end, Vector2(box.position.x, box.end.y)]
+
+
+func _next_corner(e: E) -> void:
+	var cs := _consist_box()
+	if e.orbit_a == 0.0:
+		e.orbit_a = 1.0 if randf() < 0.5 else -1.0
+	var best := 0
+	for k in 4:
+		if (cs[k] as Vector2).distance_to(e.pos) < (cs[best] as Vector2).distance_to(e.pos):
+			best = k
+	e.pass_hits = best
+
+
+func _consist(e: E, dt: float) -> void:
+	e.mode_t += dt
+	if e.mode == 3:
+		e.vel = e.dash_dir * 560.0
+		e.rot = e.dash_dir.angle()
+		return
+	var cs := _consist_box()
+	var tgt: Vector2 = cs[e.pass_hits]
+	if e.pos.distance_to(tgt) < 28.0:
+		e.pass_hits = posmod(e.pass_hits + int(e.orbit_a), 4)
+		tgt = cs[e.pass_hits]
+	var dir := (tgt - e.pos).normalized()
+	e.vel = Pal.damp2(e.vel, dir * e.speed, 5.0, dt)
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-8.0 * dt))
+
+
+# ---- chapter 5: the pantograph. Stands by its rail. Powered, its arm is up on
+# the rail and its shell shut; every few seconds the whole rail flickers red,
+# then lightning runs its length. Unpowered, the arm drops and the shell opens.
+const PANTO_EVERY := 2.4
+const PANTO_WARN := 0.5
+
+
+func _panto(e: E, pl: Vector2, dt: float) -> void:
+	e.vel = Vector2.ZERO
+	e.knock = Vector2.ZERO
+	var live := _rail_on(e)
+	if not live:
+		e.mode = 0
+		e.mode_t = 0.0
+		e.cool = 1.0
+		return
+	if e.mode == 0:
+		e.mode = 1
+	e.cool -= dt
+	if e.mode == 1 and e.cool <= 0.0:
+		e.mode = 2
+		e.mode_t = 0.0
+		game.sfx.play("windup", 1.6, -9.0)
+	elif e.mode == 2:
+		e.mode_t += dt
+		if e.mode_t >= PANTO_WARN:
+			e.mode = 1
+			e.cool = PANTO_EVERY
+			e.shield_flash = 1.0
+			game.sfx.play("p_slam", 1.6, -8.0)
+			var q := Geometry2D.get_closest_point_to_segment(pl, e.leap_from, e.aim_at)
+			if q.distance_to(pl) < Maglev.HALF_W + Player.R and game.player.dash_t <= 0.0:
+				game.on_player_hit((pl - q).normalized() if pl.distance_to(q) > 0.5 else Vector2.UP, e)
+
+
+# ---- chapter 6: the surge. Goes for the nearest arc between your rounds and
+# eats it: the arc goes out, it swells and speeds up. Arcs do not hurt it.
+# Three meals and it overloads: a red ring, then sparks all round.
+const SURGE_BURST := 150.0
+const SURGE_WARN := 0.7
+
+
+func _surge(e: E, pl: Vector2, dt: float) -> void:
+	e.mode_t += dt
+	if e.mode == 1:
+		e.vel = Pal.damp2(e.vel, Vector2.ZERO, 8.0, dt)
+		if e.mode_t >= SURGE_WARN:
+			e.mode = 0
+			e.mode_t = 0.0
+			e.charge = 0
+			e.r = SPEC[SURGE].r
+			e.speed = SPEC[SURGE].speed
+			e.shield_flash = 1.0
+			game.sfx.play("p_slam", 1.3, -5.0)
+			game.cam.add_trauma(0.2)
+			for k in 8:
+				var d := Vector2.from_angle(TAU * k / 8.0 + e.seed)
+				game.fx.spark(e.pos, d * 900.0, 0.18, acc(SURGE, 1.0, 2.2), 2.0, 24.0)
+			if pl.distance_to(e.pos) < SURGE_BURST + Player.R and game.player.dash_t <= 0.0:
+				game.on_player_hit((pl - e.pos).normalized(), e)
+		return
+	var want := (pl - e.pos).normalized() * 0.6
+	if game.arcs.active() and not game.arcs.arcs.is_empty():
+		var bd := 1e9
+		var bq := Vector2.ZERO
+		var ba: Array = []
+		for a in game.arcs.arcs:
+			var q := Geometry2D.get_closest_point_to_segment(e.pos, a[0], a[1])
+			if q.distance_to(e.pos) < bd:
+				bd = q.distance_to(e.pos)
+				bq = q
+				ba = a
+		want = (bq - e.pos).normalized()
+		if bd < e.r + 8.0:
+			for b in game.bullets.list:
+				if b.state == Bullets.EMBED and (b.pos.distance_to(ba[0]) < 1.0 or b.pos.distance_to(ba[1]) < 1.0):
+					quench[b.get_instance_id()] = 4.0
+			game.arcs.rebuild = 0.0
+			e.charge += 1
+			e.r += 2.5
+			e.speed *= 1.2
+			e.flash = 1.0
+			game.fx.ring(e.pos, e.r, e.r * 2.4, 0.3, acc(SURGE, 0.9, 2.0), 2.0)
+			game.sfx.play("lit", 1.4, -6.0)
+			if e.charge >= 3:
+				e.mode = 1
+				e.mode_t = 0.0
+				game.sfx.play("windup", 1.2, -5.0)
+	e.vel = Pal.damp2(e.vel, _steer(e, _seek(e, pl, want)) * e.speed, 3.0, dt)
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-6.0 * dt))
+
+
+# ---- chapter 6: the cabler. Comes at you in curves, paying out cable behind
+# it. A fresh length is dashed and harmless; after a second it goes live and
+# cuts. Five seconds on, the oldest length is reeled away. Kill it and all of
+# its cable goes dead.
+const CABLE_LIFE := 5.0
+const CABLE_ARM := 1.0
+
+
+func _cabler(e: E, pl: Vector2, dt: float) -> void:
+	var to := (pl - e.pos).normalized()
+	var weave := to.orthogonal() * sin(e.t * 1.4 + e.seed) * 0.9
+	e.vel = Pal.damp2(e.vel, _steer(e, _seek(e, pl, (to + weave).normalized())) * e.speed, 2.5, dt)
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-8.0 * dt))
+	var tail := e.pos - Vector2.from_angle(e.rot) * e.r
+	if e.cable.is_empty() or e.cable[e.cable.size() - 1].distance_to(tail) > 14.0:
+		e.cable.append(tail)
+		e.cable_age.append(0.0)
+	for k in e.cable_age.size():
+		e.cable_age[k] += dt
+	while e.cable_age.size() > 0 and e.cable_age[0] > CABLE_LIFE:
+		e.cable.remove_at(0)
+		e.cable_age.remove_at(0)
+	if game.player.dash_t > 0.0:
+		return
+	for k in e.cable.size() - 1:
+		if e.cable_age[k + 1] < CABLE_ARM:
+			break
+		var q := Geometry2D.get_closest_point_to_segment(pl, e.cable[k], e.cable[k + 1])
+		if q.distance_to(pl) < Player.R + 3.0:
+			game.on_player_hit((pl - q).normalized() if pl.distance_to(q) > 0.5 else Vector2.UP, e)
+			break
+
+
+# ---- drawing chapters 4-6
+# The production union: tank bands, gear teeth, a funnel; the forklift's forks
+# and its load.
+func _draw_union(e: E, tr: Transform2D, dim: float) -> void:
+	var r := e.r
+	var ac := acc(e.kind, dim, 1.3)
+	var hi := Pal.ink(0.85 * dim, 1.3)
+	match e.kind:
+		HOPPER:
+			# the funnel on its back, the stock in it rising and falling
+			var lvl := 0.5 + 0.25 * sin(e.t * 1.3 + e.seed)
+			draw_colored_polygon(PackedVector2Array([tr * Vector2(-0.6 * r, -0.75 * r), tr * Vector2(-0.6 * r, 0.75 * r), tr * Vector2(0.15 * r, 0.0)]), Color(0.03, 0.03, 0.035, dim))
+			draw_polyline(PackedVector2Array([tr * Vector2(-0.6 * r, -0.75 * r), tr * Vector2(0.15 * r, 0.0), tr * Vector2(-0.6 * r, 0.75 * r)]), hi, 1.8)
+			var w := 0.75 * (1.0 - lvl)
+			draw_line(tr * Vector2(-0.6 * r + lvl * 0.75 * r * 0.0, -w * r), tr * Vector2(-0.6 * r, w * r), ac, 2.0)
+			draw_line(tr * Vector2(-0.6 * r + 0.75 * r * lvl * 0.5, -w * r * 0.9), tr * Vector2(-0.6 * r + 0.75 * r * lvl * 0.5, w * r * 0.9), ac, 2.0)
+			# a gear turning on its flank
+			var gp := tr * Vector2(0.25 * r, -0.62 * r)
+			draw_circle(gp, 0.22 * r, ac)
+			for k in 6:
+				var ga := e.t * 2.0 + TAU * k / 6.0
+				draw_line(gp + Vector2.from_angle(ga) * 0.2 * r, gp + Vector2.from_angle(ga) * 0.33 * r, hi, 2.0)
+			# the outlet: a slot that glows red before it gives
+			var o0 := tr * Vector2(0.75 * r, -0.32 * r)
+			var o1 := tr * Vector2(0.75 * r, 0.32 * r)
+			if e.mode == 1:
+				var k2 := clampf(e.mode_t / HOP_WARN, 0.0, 1.0)
+				draw_line(o0, o1, Pal.red(0.95 * dim, 2.2), 4.0)
+				draw_arc(tr * Vector2(0.75 * r, 0), lerpf(44.0, 10.0, k2), 0.0, TAU, 24, Pal.red(0.8 * dim, 1.8), 2.0)
+			else:
+				draw_line(o0, o1, hi, 3.0)
+		CAN:
+			for x: float in [-0.35, 0.35]:
+				draw_line(tr * Vector2(x * r, -0.75 * r), tr * Vector2(x * r, 0.75 * r), hi, 1.6)
+		FORKLIFT:
+			var red := e.mode == 1 or e.mode == 2
+			var fc := Pal.red(0.95 * dim, 2.0) if red else Pal.ink(0.9 * dim, 1.4)
+			var reach := 1.9 if e.mode != 3 else 2.1
+			for sg: float in [-1.0, 1.0]:
+				draw_line(tr * Vector2(0.7 * r, sg * 0.42 * r), tr * Vector2(reach * r, sg * 0.42 * r), fc, 3.5)
+			# the mast
+			draw_line(tr * Vector2(0.62 * r, -0.7 * r), tr * Vector2(0.62 * r, 0.7 * r), hi, 2.5)
+			# wheels
+			for v in [Vector2(0.45, -0.95), Vector2(0.45, 0.95), Vector2(-0.7, -0.95), Vector2(-0.7, 0.95)]:
+				draw_colored_polygon(_rect_pts(tr, (v.x - 0.18) * r, (v.y - 0.1) * r, (v.x + 0.18) * r, (v.y + 0.1) * r), hi)
+			# the load, until your rounds break it
+			if e.crate > 0.0:
+				var lc := ac.lerp(Pal.ink(dim, 2.4), e.shield_flash)
+				draw_colored_polygon(_rect_pts(tr, -0.1 * r, -0.62 * r, 0.52 * r, 0.62 * r), Color(lc.r * 0.35, lc.g * 0.35, lc.b * 0.35, dim))
+				draw_polyline(_rect_pts(tr, -0.1 * r, -0.62 * r, 0.52 * r, 0.62 * r), lc, 2.0)
+				draw_line(tr * Vector2(-0.1 * r, -0.62 * r), tr * Vector2(0.52 * r, 0.62 * r), lc, 1.4)
+				draw_line(tr * Vector2(-0.1 * r, 0.62 * r), tr * Vector2(0.52 * r, -0.62 * r), lc, 1.4)
+			# the beacon on the cab
+			if int(e.t * 3.0) % 2 == 0:
+				draw_circle(tr * Vector2(-0.6 * r, 0.0), 3.5, ac)
+			if e.mode == 1:
+				# its lane, ahead of it
+				var k3 := clampf(e.mode_t / FORK_WARN, 0.0, 1.0)
+				var from := e.pos + e.dash_dir * e.r * 2.0
+				var segs := PackedVector2Array()
+				var s0 := 0.0
+				while s0 < 520.0 * k3:
+					segs.append(from + e.dash_dir * s0)
+					segs.append(from + e.dash_dir * (s0 + 14.0))
+					s0 += 26.0
+				if segs.size() > 1:
+					draw_multiline(segs, Pal.red(0.7 * dim, 1.8), 2.0)
+
+
+# The superconducting line: window lines, couplings, magnet pads, the
+# pantograph's folding arm and the lightning it sends along the rail.
+func _draw_line5(e: E, tr: Transform2D, dim: float) -> void:
+	var r := e.r
+	var ac := acc(e.kind, dim, 1.3)
+	var hi := Pal.ink(0.85 * dim, 1.3)
+	match e.kind:
+		SLED:
+			var live := e.mode != 1
+			for k in 4:
+				var x := lerpf(-1.2, 0.9, k / 3.0) * r
+				draw_line(tr * Vector2(x, -0.3 * r), tr * Vector2(x + 0.35 * r, -0.3 * r), hi, 1.5)
+				draw_line(tr * Vector2(x, 0.3 * r), tr * Vector2(x + 0.35 * r, 0.3 * r), hi, 1.5)
+			# its magnet pads glow while the rail carries it
+			var pa := (0.4 + 0.4 * sin(e.t * 18.0)) if live else 0.12
+			for sg: float in [-1.0, 1.0]:
+				draw_line(tr * Vector2(-1.5 * r, sg * 0.62 * r), tr * Vector2(1.5 * r, sg * 0.62 * r), acc(SLED, pa * dim, 1.8), 2.0)
+			# the red slit at its nose
+			var nose_c := Pal.red(0.95 * dim, 2.2) if e.mode != 1 else Pal.red(0.35 * dim, 1.2)
+			if e.mode == 2 and int(e.mode_t * 16.0) % 2 == 0:
+				nose_c = Pal.ink(dim, 2.4)
+			var nose := 1.7 * r if e.dash_dir.dot(Vector2.from_angle(e.rot)) >= 0.0 else -1.7 * r
+			draw_line(tr * Vector2(nose, -0.38 * r), tr * Vector2(nose, 0.38 * r), nose_c, 3.0)
+		CONSIST, CAR:
+			for sg: float in [-1.0, 1.0]:
+				for k in 3:
+					var x := lerpf(-0.75, 0.55, k / 2.0) * r
+					draw_line(tr * Vector2(x, sg * 0.4 * r), tr * Vector2(x + 0.28 * r, sg * 0.4 * r), hi, 1.5)
+			# the coupling at the back
+			draw_circle(tr * Vector2(-1.35 * r, 0.0), 3.0, ac)
+			if e.kind == CONSIST:
+				draw_circle(tr * Vector2(1.25 * r, 0.0), 3.0, Pal.red(0.95 * dim, 2.0))
+				# where it is going: red chevrons a second ahead
+				var fwd := Vector2.from_angle(e.rot)
+				for k in 4:
+					var c := e.pos + fwd * (e.r * 2.2 + 34.0 * k + fmod(e.t * 60.0, 34.0))
+					var a := 0.6 * (1.0 - k / 4.0) * dim
+					draw_polyline(PackedVector2Array([c - fwd * 7.0 + fwd.orthogonal() * 7.0, c, c - fwd * 7.0 - fwd.orthogonal() * 7.0]), Pal.red(a, 1.6), 2.0)
+		PANTO:
+			var up := e.mode != 0
+			var fwd := Vector2.from_angle(e.rot)
+			var base := e.pos + fwd * r * 0.2
+			var reach_d := (Maglev.HALF_W + e.r + 10.0) - r * 0.2 if up else r * 0.5
+			var top := base + fwd * reach_d
+			var mid := (base + top) * 0.5
+			var side := fwd.orthogonal() * (0.9 * r if up else 1.3 * r)
+			draw_polyline(PackedVector2Array([base, mid + side, top, mid - side, base]), Pal.ink(dim, 1.5), 2.2)
+			draw_line(top - fwd.orthogonal() * 0.7 * r, top + fwd.orthogonal() * 0.7 * r, ac, 3.0)
+			if up and int(e.t * 20.0) % 3 == 0:
+				game.fx.sparks(top, -fwd, 1, acc(PANTO, 1.0, 2.0), 140.0, 0.12, 0.8)
+			# its shell: shut while powered
+			if up:
+				draw_arc(e.pos, r + 5.0, 0.0, TAU, 20, acc(PANTO, 0.6 * dim, 1.4), 2.0)
+			var a: Vector2 = e.leap_from
+			var b: Vector2 = e.aim_at
+			if e.mode == 2:
+				# the whole rail flickers red before the lightning
+				if int(e.mode_t * 20.0) % 2 == 0:
+					draw_line(a, b, Pal.red(0.6 * dim, 1.8), 4.0)
+			if e.shield_flash > 0.0:
+				var zz := PackedVector2Array()
+				var n := (b - a).orthogonal().normalized()
+				for k in 25:
+					var u := k / 24.0
+					zz.append(a.lerp(b, u) + n * (sin(k * 2.7 + e.t * 60.0) * 9.0 if k > 0 and k < 24 else 0.0))
+				draw_polyline(zz, acc(PANTO, e.shield_flash * dim, 3.0), 3.0)
+				draw_polyline(zz, Pal.ink(e.shield_flash * dim, 2.6), 1.2)
+
+
+# The energy bureau: the surge's lightning core and its meals; the cabler's
+# reel and the cable it pays out.
+func _draw_bureau(e: E, tr: Transform2D, dim: float) -> void:
+	var r := e.r
+	var ac := acc(e.kind, dim, 1.3)
+	var hi := Pal.ink(0.85 * dim, 1.3)
+	match e.kind:
+		SURGE:
+			var zz := PackedVector2Array()
+			for k in 5:
+				var x := lerpf(-0.6, 0.6, k / 4.0) * r
+				zz.append(tr * Vector2(x, (0.3 if k % 2 == 0 else -0.3) * r * (1.0 + 0.3 * sin(e.t * 20.0 + k))))
+			draw_polyline(zz, Pal.ink(dim, 2.0), 2.2)
+			for k in 3:
+				var p := e.pos + Vector2.from_angle(-PI * 0.5 + (k - 1) * 0.5) * (r + 9.0)
+				if k < e.charge:
+					draw_circle(p, 3.2, ac)
+				else:
+					draw_arc(p, 3.2, 0.0, TAU, 10, acc(SURGE, 0.5 * dim, 1.0), 1.2)
+			if e.mode == 1:
+				var k2 := clampf(e.mode_t / SURGE_WARN, 0.0, 1.0)
+				draw_arc(e.pos, lerpf(e.r + 6.0, SURGE_BURST, k2), 0.0, TAU, 40, Pal.red(0.9 * dim, 2.0), 2.0)
+				draw_arc(e.pos, SURGE_BURST, 0.0, TAU, 40, Pal.red(0.3 * dim, 1.4), 1.0)
+		CABLER:
+			# the cable: dashed while fresh, live and bright once armed
+			var live_pts := PackedVector2Array()
+			var fresh := PackedVector2Array()
+			for k in e.cable.size() - 1:
+				var p0: Vector2 = e.cable[k]
+				var p1: Vector2 = e.cable[k + 1]
+				if e.cable_age[k + 1] >= CABLE_ARM:
+					live_pts.append(p0)
+					live_pts.append(p1)
+				elif k % 2 == 0:
+					fresh.append(p0)
+					fresh.append(p1)
+			if live_pts.size() > 0:
+				draw_multiline(live_pts, acc(CABLER, 0.22 * dim, 1.2), 8.0)
+				draw_multiline(live_pts, acc(CABLER, dim, 1.8), 2.4)
+			if fresh.size() > 0:
+				draw_multiline(fresh, acc(CABLER, 0.45 * dim, 1.0), 1.5)
+			# the reel on its back, turning as it pays out
+			var rp := tr * Vector2(-0.95 * r, 0.0)
+			draw_circle(rp, 0.55 * r, Color(0.03, 0.03, 0.035, dim))
+			draw_arc(rp, 0.55 * r, 0.0, TAU, 16, ac, 2.0)
+			for k in 3:
+				var a := e.t * 6.0 + TAU * k / 3.0
+				draw_line(rp, rp + Vector2.from_angle(a) * 0.5 * r, hi, 1.4)

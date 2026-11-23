@@ -25,12 +25,19 @@ const T := Enemies.TURNSTILE
 const D := Enemies.HOUND
 const B := Enemies.DUD
 const Y := Enemies.BYSTANDER
+const A := Enemies.HOPPER
+const J := Enemies.FORKLIFT
+const M := Enemies.SLED
+const V := Enemies.CONSIST
+const Z := Enemies.PANTO
+const S := Enemies.SURGE
+const O := Enemies.CABLER
 const COUNT := 7
 const BOSS := 6
-const COST := {C: 1, G: 5, H: 4, P: 3, L: 3, U: 4, E: 3, I: 3, W: 3, X: 2, F: 3, K: 4, N: 3, Q: 5, R: 4, T: 5, D: 4, B: 3, Y: 0}
+const COST := {C: 1, G: 5, H: 4, P: 3, L: 3, U: 4, E: 3, I: 3, W: 3, X: 2, F: 3, K: 4, N: 3, Q: 5, R: 4, T: 5, D: 4, B: 3, Y: 0, A: 6, J: 5, M: 5, V: 7, Z: 4, S: 4, O: 3}
 const BUDGET := [16, 22, 28, 32, 40, 48]
 # the waves' own notes, by enemy pool (the boss wave's note comes from Chapters)
-const NOTES := [{2: "note_guard", 3: "note_charger", 4: "note_coupler", 5: "note_signal"}, {0: "note_mirror", 1: "note_queue", 2: "note_turnstile", 3: "note_registrar", 4: "note_prism"}, {0: "note_arms", 1: "note_leech"}, {0: "note_rings", 1: "note_pulse"}, {0: "note_nodes"}, {0: "note_rails"}, {0: "note_lasers", 1: "note_echo", 2: "note_hound", 3: "note_dud", 4: "note_bystander"}, {0: "note_arcs", 1: "note_inspector"}, {0: "note_shelves", 1: "note_proofreader"}, {0: "note_vents"}, {0: "note_plates", 1: "note_escort"}, {0: "note_stasis", 1: "note_phase"}]
+const NOTES := [{2: "note_guard", 3: "note_charger", 4: "note_coupler", 5: "note_signal"}, {0: "note_mirror", 1: "note_queue", 2: "note_turnstile", 3: "note_registrar", 4: "note_prism"}, {0: "note_arms", 1: "note_leech", 2: "note_hopper", 3: "note_forklift"}, {0: "note_rings", 1: "note_pulse"}, {0: "note_nodes"}, {0: "note_rails", 1: "note_sled", 2: "note_consist", 3: "note_panto"}, {0: "note_lasers", 1: "note_echo", 2: "note_hound", 3: "note_dud", 4: "note_bystander"}, {0: "note_arcs", 1: "note_inspector", 2: "note_surge", 3: "note_cabler"}, {0: "note_shelves", 1: "note_proofreader"}, {0: "note_vents"}, {0: "note_plates", 1: "note_escort"}, {0: "note_stasis", 1: "note_phase"}]
 const SIDES := ["T", "B", "L", "R"]
 
 var game
@@ -83,7 +90,7 @@ func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
 	match i:
 		0:
 			pass
-		1 when pool == 0 or pool == 5 or pool == 4:
+		1 when pool == 0 or pool == 4:
 			pass
 		1 when pool == 1:
 			# the hall: the queue first
@@ -156,6 +163,44 @@ func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
 			for k in 3:
 				kinds.append(F)
 			left -= COST[F] * 3
+		2 when pool == 2:
+			# the union: the hopper first, so you learn to go for the source
+			kinds.append(A)
+			left -= COST[A]
+		3 when pool == 2:
+			kinds.append(J)
+			kinds.append(J)
+			left -= COST[J] * 2
+		4 when pool == 2:
+			kinds.append(A)
+			kinds.append(J)
+			kinds.append(L)
+			left -= COST[A] + COST[J] + COST[L]
+		1 when pool == 5:
+			kinds.append(M)
+			kinds.append(M)
+			left -= COST[M] * 2
+		2 when pool == 5:
+			kinds.append(V)
+			left -= COST[V]
+		3 when pool == 5:
+			kinds.append(Z)
+			kinds.append(Z)
+			kinds.append(M)
+			left -= COST[Z] * 2 + COST[M]
+		2 when pool == 7:
+			kinds.append(S)
+			kinds.append(S)
+			left -= COST[S] * 2
+		3 when pool == 7:
+			for k in 3:
+				kinds.append(O)
+			left -= COST[O] * 3
+		4 when pool == 7:
+			kinds.append(S)
+			kinds.append(O)
+			kinds.append(I)
+			left -= COST[S] + COST[O] + COST[I]
 		1:
 			pass
 		2 when pool == 0:
@@ -171,15 +216,15 @@ func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
 			if pool == 1:
 				mix = [G, H, P, Q, R, T]
 			elif pool == 2:
-				mix = [G, H, P, L, L]
+				mix = [G, H, L, L, A, J, J]
 			elif pool == 5:
-				mix = [G, H, H, P, L]
+				mix = [G, H, P, M, M, V, Z]
 			elif pool == 3:
 				mix = [G, H, L, U, U]
 			elif pool == 6:
 				mix = [G, H, P, E, D, D, B]
 			elif pool == 7:
-				mix = [G, H, P, L, I, I]
+				mix = [G, H, L, I, S, S, O, O]
 			elif pool == 8:
 				mix = [G, H, P, L, E, W, W]
 			elif pool == 9:
@@ -410,3 +455,11 @@ func _spawn_group(kind: int, count: int, side: String, elite := false) -> void:
 				var sg = game.enemies.spawn(Enemies.QSEG, (p + back * (26.0 + 22.0 * j)).clamp(room.position, room.end), i * 0.07 + 0.05 * (j + 1))
 				sg.link = ahead
 				ahead = sg
+		elif kind == V:
+			# the consist: three cars behind the engine
+			var back2: Vector2 = (p - pl).normalized()
+			var ahead2 = e
+			for j in 3:
+				var car = game.enemies.spawn(Enemies.CAR, (p + back2 * (40.0 + 36.0 * j)).clamp(room.position, room.end), i * 0.07 + 0.05 * (j + 1))
+				car.link = ahead2
+				ahead2 = car

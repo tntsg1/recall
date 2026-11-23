@@ -18,6 +18,9 @@ const KINDS := [
 	["COUPLER", 90, Vector2(0, 0)], ["SIGNAL", 70, Vector2(300, 0)], ["QUEUE", 70, Vector2(300, 0)],
 	["REGISTRAR", 100, Vector2(150, 0)], ["TURNSTILE", 50, Vector2(250, 0)], ["HOUND", 110, Vector2(250, 0)],
 	["DUD", 60, Vector2(70, 0)], ["BYSTANDER", 30, Vector2(300, 0)],
+	["HOPPER", 150, Vector2(300, 0)], ["FORKLIFT", 60, Vector2(0, 260)], ["SLED", 90, Vector2(0, 300)],
+	["CONSIST", 60, Vector2(300, 300)], ["PANTO", 150, Vector2(0, 300)], ["SURGE", 60, Vector2(300, 0)],
+	["CABLER", 120, Vector2(300, 0)],
 ]
 
 
@@ -92,6 +95,13 @@ func _run() -> void:
 			b.link = e
 			b.seed = e.seed + 1.0
 			extra.append(b)
+		elif kind == Enemies.CONSIST:
+			var ahead2 = e
+			for j in 3:
+				var car = put(Enemies.CAR, c + Vector2(-40 - 36 * j, 0))
+				car.link = ahead2
+				ahead2 = car
+				extra.append(car)
 		elif kind == Enemies.QUEUE:
 			var ahead = e
 			for j in 4:

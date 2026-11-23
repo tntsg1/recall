@@ -65,7 +65,7 @@ func _link() -> void:
 	arcs.clear()
 	var pts: Array = []
 	for b in game.bullets.list:
-		if b.state == Bullets.EMBED and not b.foe and not b.child and b.dark_by == 0:
+		if b.state == Bullets.EMBED and not b.foe and not b.child and b.dark_by == 0 and not game.enemies.quench.has(b.get_instance_id()):
 			pts.append(b.pos)
 			if pts.size() >= 40:
 				break
@@ -99,7 +99,7 @@ func _cut() -> void:
 			if game.on_player_hit(n, null):
 				game.fx.sparks(q, n, 8, Pal.ink(1.0, 2.6), 380.0, 0.2, 1.0)
 		for e in game.enemies.list:
-			if e.state != Enemies.ALIVE or enemy_cd.has(e.id):
+			if e.state != Enemies.ALIVE or enemy_cd.has(e.id) or e.kind == Enemies.SURGE:
 				continue
 			var qe := Geometry2D.get_closest_point_to_segment(e.pos, a[0], a[1])
 			if qe.distance_to(e.pos) < e.r + 4.0:

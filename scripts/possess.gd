@@ -20,10 +20,13 @@ const DAZE_TIME := 1.4          # how long a spared enemy reels
 const SPARE_GAP := 6.0          # seconds before another can be spared
 const PX := 2.0                 # one effect pixel = two world units
 const KINDS := [Enemies.CHASER, Enemies.LEECH, Enemies.GUARD, Enemies.CHARGER, Enemies.PRISM, Enemies.PULSE, Enemies.ECHO,
-	Enemies.COUPLER, Enemies.SIGNAL, Enemies.QUEUE, Enemies.REGISTRAR, Enemies.TURNSTILE, Enemies.HOUND, Enemies.DUD]
+	Enemies.COUPLER, Enemies.SIGNAL, Enemies.QUEUE, Enemies.REGISTRAR, Enemies.TURNSTILE, Enemies.HOUND, Enemies.DUD,
+	Enemies.HOPPER, Enemies.FORKLIFT, Enemies.SLED, Enemies.CONSIST, Enemies.PANTO, Enemies.SURGE, Enemies.CABLER]
 # chapters 1-3's own shells borrow the pixel body of the old shell nearest their shape
 const ART := {Enemies.COUPLER: "chaser", Enemies.SIGNAL: "guard", Enemies.QUEUE: "leech", Enemies.REGISTRAR: "pulse",
-	Enemies.TURNSTILE: "pulse", Enemies.HOUND: "charger", Enemies.DUD: "leech"}
+	Enemies.TURNSTILE: "pulse", Enemies.HOUND: "charger", Enemies.DUD: "leech",
+	Enemies.HOPPER: "guard", Enemies.FORKLIFT: "charger", Enemies.SLED: "charger", Enemies.CONSIST: "leech",
+	Enemies.PANTO: "pulse", Enemies.SURGE: "pulse", Enemies.CABLER: "chaser"}
 const NAMES := {Enemies.CHASER: "chaser", Enemies.LEECH: "leech", Enemies.GUARD: "guard", Enemies.CHARGER: "charger",
 	Enemies.PRISM: "prism", Enemies.PULSE: "pulse", Enemies.ECHO: "echo"}
 const BLAST_R := 120.0
@@ -504,7 +507,7 @@ func host_step(sdt: float, dt: float, move: Vector2, aim_at: Vector2, fire_held:
 		queued = false
 	# guard, prism and echo take the remembered click once they are ready again
 	var pressed := queued and recover <= 0.0 and dash_t <= 0.0 and spin_t < 0.0 and rush_t <= 0.0 and leap_t < 0.0
-	if pressed and shell.kind in [Enemies.GUARD, Enemies.PRISM, Enemies.ECHO, Enemies.PULSE, Enemies.COUPLER, Enemies.SIGNAL, Enemies.QUEUE, Enemies.REGISTRAR, Enemies.TURNSTILE, Enemies.HOUND, Enemies.DUD]:
+	if pressed and (shell.kind in [Enemies.GUARD, Enemies.PRISM, Enemies.ECHO, Enemies.PULSE] or ART.has(shell.kind)):
 		queued = false
 	var r: float = shell.r * 1.3
 	var before: Vector2 = shell.pos
@@ -539,6 +542,20 @@ func host_step(sdt: float, dt: float, move: Vector2, aim_at: Vector2, fire_held:
 			_s_dud(sdt, pressed, move)
 			if state != HOST:
 				return
+		Enemies.HOPPER:
+			_s_hopper(sdt, pressed, move)
+		Enemies.FORKLIFT:
+			_s_forklift(sdt, pressed, move)
+		Enemies.SLED:
+			_s_sled(sdt, pressed, move)
+		Enemies.CONSIST:
+			_s_consist(sdt, pressed, move)
+		Enemies.PANTO:
+			_s_panto(sdt, pressed, move)
+		Enemies.SURGE:
+			_s_surge(sdt, pressed, move)
+		Enemies.CABLER:
+			_s_cabler(sdt, pressed, move)
 	var free_pos: Vector2 = shell.pos
 	shell.pos = game.arena.push_circle(shell.pos, r)
 	shell.pos = shell.pos.clamp(Arena.ROOM.position + Vector2(r, r), Arena.ROOM.end - Vector2(r, r))
@@ -1765,3 +1782,133 @@ func _s_dud(sdt: float, pressed: bool, move: Vector2) -> void:
 		2, 3:
 			_land(shell.pos, 200.0, 110.0, true)
 			end(false)
+
+
+
+# ================================================================ chapters 4-6's own shells
+func _ring_hit(at: Vector2, radius: float, dmg: float) -> void:
+	for e in game.enemies.list:
+		var d: Vector2 = e.pos - at
+		if e.state == Enemies.ALIVE and d.length() < radius + e.r:
+			_deal(e, dmg, d.normalized() if d.length() > 1.0 else Vector2.UP, true)
+	_boss_area(at, radius, dmg)
+	bursts.append([at, radius, 0.0])
+
+
+# The hopper: three cans out ahead, each a small blast; the third click tips the
+# whole load out in a fan.
+func _s_hopper(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 220.0, 10.0)
+	match _staged(pressed):
+		1, 2:
+			for k in 3:
+				_land(shell.pos + aim.rotated((k - 1) * 0.25) * (130.0 + 60.0 * k), 50.0, 30.0, false)
+		3:
+			_cone(aim, 0.55, 280.0, 45.0, 520.0)
+			_finisher(shell.pos + aim * 140.0, 160.0)
+			stage = 0
+
+
+# The forklift: two thrusts of the forks; the third lifts what is in front and
+# throws it.
+func _s_forklift(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 300.0, 12.0)
+	match _staged(pressed):
+		1, 2:
+			_cone(aim, 0.35, 130.0, 35.0, 700.0)
+			game.sfx.play("p_hit", 0.9, -3.0)
+		3:
+			var to: Vector2 = shell.pos + aim * 300.0
+			to = to.clamp(Arena.ROOM.position + Vector2(30, 30), Arena.ROOM.end - Vector2(30, 30))
+			afterlines.append([shell.pos, to, 0.0])
+			for e in game.enemies.list:
+				if e.state == Enemies.ALIVE and e.pos.distance_to(to) < 110.0 + e.r:
+					e.dazed = 0.8
+			_land(to, 110.0, 60.0, true)
+			stage = 0
+
+
+# The sled: two runs down a line, cutting all on it; the third pulls everything
+# near onto you.
+func _s_sled(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 360.0, 12.0)
+	match _staged(pressed):
+		1, 2:
+			_beam(aim, 50.0)
+			var to: Vector2 = (shell.pos + aim * 240.0).clamp(Arena.ROOM.position + Vector2(30, 30), Arena.ROOM.end - Vector2(30, 30))
+			afterlines.append([shell.pos, to, 0.0])
+			shell.pos = game.arena.push_circle(to, shell.r * 1.3)
+			game.sfx.play("dash", 1.2, -5.0)
+		3:
+			for e in game.enemies.list:
+				var d: Vector2 = shell.pos - e.pos
+				if e.state == Enemies.ALIVE and d.length() < 500.0:
+					e.knock += d.normalized() * 700.0
+					_deal(e, 25.0, d.normalized(), false)
+			_finisher(shell.pos, 200.0)
+			stage = 0
+
+
+# The consist: the train swung like a whip; the third click sends the last car
+# off down the line.
+func _s_consist(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 340.0, 12.0)
+	match _staged(pressed):
+		1, 2:
+			_cone(aim, 1.4, 220.0, 30.0, 420.0, true)
+			game.sfx.play("horn", 1.2, -8.0)
+		3:
+			_beam(aim, 70.0)
+			_finisher(shell.pos, 150.0)
+			stage = 0
+
+
+# The pantograph: lightning down the line you aim; the third sends it four ways.
+func _s_panto(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 240.0, 10.0)
+	match _staged(pressed):
+		1, 2:
+			_beam(aim, 45.0)
+		3:
+			for k in 4:
+				_beam(aim.rotated(TAU * k / 4.0), 45.0)
+			_finisher(shell.pos, 150.0)
+			stage = 0
+
+
+# The surge: a burst of current about you as you run; the third overloads.
+func _s_surge(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 300.0 * (1.6 if boost_t > 0.0 else 1.0), 12.0)
+	match _staged(pressed):
+		1, 2:
+			boost_t = 0.8
+			_ring_hit(shell.pos, 130.0, 30.0)
+			game.sfx.play("lit", 1.3, -5.0)
+		3:
+			_land(shell.pos, 170.0, 70.0, true)
+			stage = 0
+
+
+# The cabler: the cable whipped round you; the third draws it tight as a noose
+# on everything within it.
+func _s_cabler(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 340.0, 12.0)
+	match _staged(pressed):
+		1, 2:
+			_ring_hit(shell.pos, 150.0, 30.0)
+			game.sfx.play("p_hit", 1.25, -4.0)
+		3:
+			for e in game.enemies.list:
+				var d: Vector2 = shell.pos - e.pos
+				if e.state == Enemies.ALIVE and d.length() < 360.0:
+					e.knock += d.normalized() * 600.0
+					_deal(e, 50.0, d.normalized(), true)
+			_finisher(shell.pos, 220.0)
+			stage = 0
