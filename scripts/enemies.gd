@@ -5,7 +5,8 @@ extends Node2D
 # its armour goes; it shatters into those edges when it dies.
 
 enum { WARN, SPAWN, ALIVE, DEAD, HOST }   # HOST: seized by you (Possess drives it)
-enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO, INSPECTOR, PROOFREADER, ESCORT, PHASE }
+enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO, INSPECTOR, PROOFREADER, ESCORT, PHASE,
+	COUPLER, SIGNAL, QUEUE, QSEG, REGISTRAR, TURNSTILE, HOUND, DUD, BYSTANDER }
 enum { APPROACH, WINDUP, DASH, STUN, RECOVER }
 
 const SPEC := {
@@ -20,7 +21,32 @@ const SPEC := {
 	PROOFREADER: {"hp": 50.0, "r": 27.0, "sides": 5, "speed": 125.0},
 	ESCORT: {"hp": 26.0, "r": 12.0, "sides": 3, "speed": 520.0},
 	PHASE: {"hp": 48.0, "r": 21.0, "sides": 6, "speed": 150.0},
+	# chapter 1, the yard: chained pairs and the signalman
+	COUPLER: {"hp": 28.0, "r": 13.0, "sides": 3, "speed": 235.0},
+	SIGNAL: {"hp": 40.0, "r": 10.0, "sides": 4, "speed": 90.0},
+	# chapter 2, the registration hall: the queue, the registrar, the turnstile
+	QUEUE: {"hp": 40.0, "r": 15.0, "sides": 5, "speed": 190.0},
+	QSEG: {"hp": 20.0, "r": 10.0, "sides": 4, "speed": 190.0},
+	REGISTRAR: {"hp": 70.0, "r": 20.0, "sides": 6, "speed": 90.0},
+	TURNSTILE: {"hp": 80.0, "r": 16.0, "sides": 6, "speed": 60.0},
+	# chapter 3, the ordnance institute: the hound, the dud, the passers-by
+	HOUND: {"hp": 55.0, "r": 16.0, "sides": 4, "speed": 210.0},
+	DUD: {"hp": 35.0, "r": 17.0, "sides": 5, "speed": 70.0},
+	BYSTANDER: {"hp": 1.0, "r": 11.0, "sides": 12, "speed": 80.0},
 }
+const CHAIN_MIN := 140.0      # a coupled pair's chain goes taut between these
+const CHAIN_MAX := 290.0
+const CHAIN_WARN := 0.5
+const SIGNAL_R := 360.0       # the signalman's "away!" reaches this far
+const STAMP := Vector2(140, 140)
+const STAMP_WARN := 0.9
+const INK_TIME := 4.0
+const ARM := 46.0             # a turnstile's arms, beyond its hub
+const LEAP := 340.0           # a hound's leap
+const LEAP_T := 0.35
+const FUSE := 1.8
+const FUSE_R := 140.0
+const BLAST_DUD := 60.0
 const WARN_TIME := 0.55
 const SPAWN_TIME := 0.6
 const SHIELD_R := 36.0
@@ -67,12 +93,20 @@ class E:
 	var pinned := 0.0           # rammed into a wall by a seized guard: recalls cut it twice as hard
 	var elite := false          # the harder way's: more of it, ringed red
 	var seen_at := -1.0         # when it last had you in sight (generated rooms)
+	var link = null             # a coupled pair's other half; a queue piece's one ahead
+	var cut := false            # a pair's chain cut by a recall; a dud that has gone off
+	var rush := 0.0             # a signalman's "away!": faster for a while
+	var shunt := false          # chapter 1's chargers: twin-rail lane, a slide after the dash
+	var aim_at := Vector2.ZERO  # where a hound will land; where a bystander is walking to
+	var leap_from := Vector2.ZERO
 
 var list: Array[E] = []
 var game
 var halo_tex: Texture2D
 var next_id := 1
 var fixes: Array = []        # a proofreader's corrections: [round, from, to, t]
+var zones: Array = []        # ground danger: {c, size, t, warn, ink, hit, by}
+var misfired_wave := -1      # (the broadcast about hitting a passer-by: once a wave)
 
 
 func _ready() -> void:
@@ -86,7 +120,7 @@ func _ready() -> void:
 func remaining() -> int:
 	var n := 0
 	for e in list:
-		if e.state != DEAD and e.state != HOST:
+		if e.state != DEAD and e.state != HOST and e.kind != BYSTANDER:
 			n += 1
 	return n
 
@@ -117,6 +151,13 @@ func spawn(kind: int, pos: Vector2, delay: float = 0.0) -> E:
 		e.grip = Grip.new(e)
 	if kind == ECHO:
 		e.lag = randf_range(1.6, 3.4)
+	if kind == CHARGER and Chapters.story(game.chapter) == 1:
+		e.shunt = true
+	if kind == BYSTANDER:
+		# they walk across, to the far side of the room from where they came in
+		e.aim_at = Arena.ROOM.get_center() * 2.0 - pos
+	if kind == SIGNAL or kind == REGISTRAR:
+		e.cool = randf_range(2.0, 3.0)
 	for k in e.sides:
 		e.offs.append([Vector2.from_angle(randf() * TAU) * randf_range(50, 90), randf_range(-2.5, 2.5)])
 	list.append(e)
@@ -213,8 +254,12 @@ func on_shield(e: E, at: Vector2, dir: Vector2, ret: bool) -> void:
 
 
 func sweep(a: Vector2, b: Vector2, bullet, ret: bool) -> void:
+	if ret:
+		_cut_chains(a, b)
 	for e in list:
 		if e.state != ALIVE or bullet.hit.has(e.id):
+			continue
+		if e.kind == HOUND and e.mode == 2:
 			continue
 		if e.kind == PHASE and phased(e):
 			# it passes through: a glint where it crossed
@@ -293,6 +338,9 @@ func _edges_left(e: E) -> int:
 
 
 func _hit(e: E, dmg: float, dir: Vector2, at: Vector2, ret: bool) -> void:
+	if e.kind == BYSTANDER:
+		_misfire(e)
+		return
 	var before := _edges_left(e)
 	e.hp -= dmg
 	var after := _edges_left(e)
@@ -368,6 +416,8 @@ func _chain(from: E, dmg: float) -> void:
 
 # Blast school / Echo / Singularity damage: plain, no chain of its own.
 func blast_hit(e: E, dir: Vector2, dmg: float, show_number: bool = true) -> void:
+	if e.kind == BYSTANDER:
+		return
 	if e.kind == PHASE and phased(e):
 		return
 	e.hp -= dmg
@@ -381,6 +431,8 @@ func blast_hit(e: E, dir: Vector2, dmg: float, show_number: bool = true) -> void
 
 # A light scar's burn: hurts in place, no shove.
 func burn_hit(e: E, dir: Vector2, dmg: float) -> void:
+	if e.kind == BYSTANDER:
+		return
 	if e.kind == PHASE and phased(e):
 		return
 	e.hp -= dmg
@@ -392,6 +444,8 @@ func burn_hit(e: E, dir: Vector2, dmg: float) -> void:
 
 # Aftershock damage: no recall bonus and no chain of its own.
 func aftershock_hit(e: E, dir: Vector2) -> void:
+	if e.kind == BYSTANDER:
+		return
 	var dmg: float = game.sv("aftershock")
 	e.hp -= dmg
 	e.flash = 1.0
@@ -403,6 +457,7 @@ func aftershock_hit(e: E, dir: Vector2) -> void:
 
 func _die(e: E, dir: Vector2) -> void:
 	e.state = DEAD
+	_died(e)
 	if e.kind == INSPECTOR:
 		var n := 0
 		for b in game.bullets.list:
@@ -460,6 +515,7 @@ func _die(e: E, dir: Vector2) -> void:
 func step(dt: float) -> void:
 	var pl: Vector2 = game.player.pos
 	_step_fixes(dt)
+	_step_zones(dt, pl)
 	var i := 0
 	while i < list.size():
 		var e := list[i]
@@ -477,6 +533,7 @@ func step(dt: float) -> void:
 		e.squash = maxf(0.0, e.squash - dt / 0.22)
 		e.red = maxf(0.0, e.red - dt / 1.2)
 		e.pinned = maxf(0.0, e.pinned - dt)
+		e.rush = maxf(0.0, e.rush - dt)
 		e.shield_flash = maxf(0.0, e.shield_flash - dt / 0.2)
 		var j := 0
 		while j < e.ghosts.size():
@@ -539,12 +596,38 @@ func step(dt: float) -> void:
 						_guard(e, pl, dt)
 					CHARGER:
 						_charger(e, pl, dt)
-				_separate(e, dt)
+					COUPLER:
+						_coupler(e, pl, dt)
+					SIGNAL:
+						_signal(e, pl, dt)
+					QUEUE:
+						_queue_head(e, pl, dt)
+					QSEG:
+						_queue_seg(e, dt)
+					REGISTRAR:
+						_registrar(e, pl, dt)
+					TURNSTILE:
+						_turnstile(e, pl, dt)
+					HOUND:
+						_hound(e, pl, dt)
+					DUD:
+						_dud(e, pl, dt)
+						if e.state == DEAD:
+							i += 1
+							continue
+					BYSTANDER:
+						_bystander(e, dt)
+				if e.kind != QSEG and e.kind != BYSTANDER and not (e.kind == HOUND and e.mode == 2):
+					_separate(e, dt)
 				if game.focusing and game.has("gravity"):
 					_gravity(e, dt)
 				if game.lv.magnet > 0:
 					_magnet(e, dt)
 				var spd: float = game.enemy_speed() * game.stasis.slow_at(e.pos)
+				if e.rush > 0.0:
+					spd *= 1.35
+				if e.kind == HOUND and e.mode == 2:
+					spd = 1.0
 				if game.has("magnetic_tip") and _near_round(e.pos, 120.0):
 					spd *= 1.0 - game.sv("magnetic_tip") / 100.0
 				var intended: Vector2 = e.pos + (e.vel * spd + e.knock) * dt
@@ -992,7 +1075,7 @@ func _charger(e: E, pl: Vector2, dt: float) -> void:
 			e.vel = Pal.damp2(e.vel, _steer(e, _seek(e, pl, (radial + orbit).normalized())) * e.speed, 2.5, dt)
 			e.face = e.face.slerp(to.normalized(), 1.0 - exp(-6.0 * dt))
 			e.rot = e.face.angle()
-			e.cool -= dt
+			e.cool -= dt * (2.0 if e.rush > 0.0 else 1.0)
 			if e.cool <= 0.0 and d < 640.0 and not game.arena.raycast(e.pos, pl):
 				e.mode = WINDUP
 				e.mode_t = 0.0
@@ -1024,7 +1107,11 @@ func _charger(e: E, pl: Vector2, dt: float) -> void:
 				e.mode = RECOVER
 				e.mode_t = 0.0
 		RECOVER:
-			e.vel = Pal.damp2(e.vel, Vector2.ZERO, 6.0, dt)
+			if e.shunt and e.mode_t < 0.5:
+				# a shunter rolls on along its rails a moment, unable to turn
+				e.vel = Pal.damp2(e.vel, e.dash_dir * 260.0, 2.0, dt)
+			else:
+				e.vel = Pal.damp2(e.vel, Vector2.ZERO, 6.0, dt)
 			if e.mode_t > 0.55:
 				e.mode = APPROACH
 				e.mode_t = 0.0
@@ -1060,6 +1147,17 @@ func _separate(e: E, dt: float) -> void:
 func _contact(e: E, pl: Vector2) -> void:
 	if e.kind == PHASE and phased(e):
 		return
+	if e.kind == BYSTANDER or (e.kind == HOUND and e.mode == 2):
+		return
+	if e.kind == TURNSTILE:
+		for k in 3:
+			var tip := e.pos + Vector2.from_angle(e.rot + TAU * k / 3.0) * (e.r + ARM)
+			if Geometry2D.get_closest_point_to_segment(pl, e.pos, tip).distance_to(pl) < Player.R + 3.0:
+				game.on_player_hit((pl - e.pos).normalized(), e)
+				break
+	if e.kind == COUPLER and _chain_live(e) and e.id < e.link.id:
+		if Geometry2D.get_closest_point_to_segment(pl, e.pos, e.link.pos).distance_to(pl) < Player.R + 3.0:
+			game.on_player_hit((pl - e.pos).normalized().orthogonal(), e)
 	var d := pl - e.pos
 	if d.length() < e.r + Player.R - 3.0:
 		if game.on_player_hit(d.normalized() if d.length() > 0.1 else Vector2.RIGHT, e):
@@ -1108,6 +1206,27 @@ func _poly(e: E) -> Array[Vector2]:
 		PROOFREADER:
 			# a pen nib, pointing the way it walks
 			pts = [Vector2(e.r * 1.35, 0), Vector2(e.r * 0.15, e.r * 0.72), Vector2(-e.r * 0.95, e.r * 0.55), Vector2(-e.r * 0.95, -e.r * 0.55), Vector2(e.r * 0.15, -e.r * 0.72)]
+		COUPLER:
+			pts = [Vector2(e.r * 1.3, 0), Vector2(-e.r * 0.9, -e.r * 0.9), Vector2(-e.r * 0.9, e.r * 0.9)]
+		SIGNAL:
+			# a post, three times as tall as it is wide (it does not turn)
+			pts = [Vector2(e.r * 0.55, -e.r * 1.6), Vector2(e.r * 0.55, e.r * 1.6), Vector2(-e.r * 0.55, e.r * 1.6), Vector2(-e.r * 0.55, -e.r * 1.6)]
+		QUEUE:
+			for k in 5:
+				pts.append(Vector2.from_angle(TAU * k / 5.0) * e.r)
+		QSEG, BYSTANDER:
+			for k in e.sides:
+				pts.append(Vector2.from_angle(PI / 4.0 + TAU * k / e.sides) * e.r)
+		REGISTRAR, TURNSTILE:
+			for k in 6:
+				pts.append(Vector2.from_angle(TAU * k / 6.0) * e.r)
+		HOUND:
+			# a long low body, longer still as it crouches
+			var crouch := 1.0 + (0.25 if e.mode == 1 else 0.0)
+			pts = [Vector2(e.r * 1.5 * crouch, 0), Vector2(0, -e.r * 0.55 / crouch), Vector2(-e.r * 1.3 * crouch, 0), Vector2(0, e.r * 0.55 / crouch)]
+		DUD:
+			# a shell case: long, a blunt nose
+			pts = [Vector2(e.r * 1.4, 0), Vector2(e.r * 0.7, -e.r * 0.55), Vector2(-e.r * 1.1, -e.r * 0.55), Vector2(-e.r * 1.1, e.r * 0.55), Vector2(e.r * 0.7, e.r * 0.55)]
 	pts.append(pts[0])
 	return pts
 
@@ -1278,6 +1397,7 @@ func _draw() -> void:
 					sl.append(q + Vector2(-12.0 + j * 2.4, sin(j * 2.1 + e.t * 20.0) * 5.0))
 				draw_polyline(sl, Pal.red(0.9 * dim, 2.0), 1.5)
 				draw_line(tip, q, Pal.red(0.25 * dim, 1.4), 1.0)
+		_draw_extra(e, tr, dim)
 		if e.kind == CHARGER and e.mode == STUN:
 			for k in 3:
 				var a3 := e.t * 5.0 + TAU * k / 3.0
@@ -1289,6 +1409,7 @@ func _draw() -> void:
 			draw_colored_polygon(poly, Pal.foe(0.7 * e.flash, 1.15))
 	if not fixes.is_empty() or game.shelves.active():
 		_draw_fixes(dim)
+	_draw_zones(dim)
 
 
 func _draw_fixes(dim: float) -> void:
@@ -1391,6 +1512,15 @@ func _draw_telegraph(e: E, k: float, dim: float) -> void:
 		segs.append(e.pos + e.dash_dir * minf(at + seg, reach))
 		at += period
 	if segs.size() > 0:
+		if e.shunt:
+			# the yard's shunters run on rails: two lines, not one
+			var off2 := e.dash_dir.orthogonal() * 5.0
+			var s2 := PackedVector2Array()
+			for p in segs:
+				s2.append(p + off2)
+			for j in segs.size():
+				segs[j] -= off2
+			draw_multiline(s2, Pal.foe(a, 1.4 if locked else 1.0), 1.5)
 		draw_multiline(segs, Pal.foe(a, 1.4 if locked else 1.0), 2.0 if locked else 1.2)
 	if locked:
 		var side := e.dash_dir.orthogonal() * (e.r + 4.0)
@@ -1408,3 +1538,435 @@ func _draw_warn(e: E) -> void:
 	for j in 4:
 		var d := Vector2.from_angle(TAU * j / 4.0 + k * 1.2)
 		draw_line(e.pos + d * (r + 3.0), e.pos + d * (r + 9.0), Pal.foe(0.7 * k), 1.5)
+
+
+# ================================================================ chapters 1-3: their own
+# (design/敌人重设计_Sonnet.md) Each chapter's enemies belong to its place.
+
+# ---- chapter 1: the coupled pair. Two halves on a chain that come at you from
+# either side; held between CHAIN_MIN and CHAIN_MAX the chain goes taut and red,
+# and swept across you it hurts. A recall through the chain cuts it.
+func _coupler(e: E, pl: Vector2, dt: float) -> void:
+	var side := 1.0 if fmod(e.seed, 2.0) < 1.0 else -1.0
+	var to := pl - e.pos
+	var want_p := pl
+	if e.link != null and not e.cut and e.link.state == ALIVE:
+		# each half aims a little to its side of you, so the chain closes across you
+		want_p = pl + to.normalized().orthogonal() * 120.0 * side
+		var span := e.pos.distance_to(e.link.pos)
+		if span > CHAIN_MIN and span < CHAIN_MAX:
+			e.mode_t += dt
+		else:
+			e.mode_t = 0.0
+		if span > CHAIN_MAX:
+			# the chain pulls the halves together
+			want_p = want_p.lerp(e.link.pos, 0.6)
+	var want := _steer(e, _route(e, want_p))
+	var sp := e.speed * (1.0 + 0.12 * sin(e.t * 3.0 + e.seed))
+	e.vel = Pal.damp2(e.vel, want * sp, 3.2, dt)
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-10.0 * dt))
+
+
+func _chain_live(e: E) -> bool:
+	return e.link != null and not e.cut and e.link.state == ALIVE and e.mode_t >= CHAIN_WARN
+
+
+func _cut_chains(a: Vector2, b: Vector2) -> void:
+	for e in list:
+		if e.kind != COUPLER or e.state != ALIVE or e.cut or e.link == null or e.link.state != ALIVE or e.id > e.link.id:
+			continue
+		var x = Geometry2D.segment_intersects_segment(a, b, e.pos, e.link.pos)
+		if x != null:
+			e.cut = true
+			e.link.cut = true
+			game.fx.sparks(x, (b - a).normalized(), 10, Pal.red(1.0, 2.4), 420.0, 0.25, 1.2)
+			game.fx.ring(x, 4.0, 30.0, 0.25, Pal.red(0.9, 2.2), 2.0)
+			game.sfx.play("crack", 1.3, -8.0)
+
+
+# ---- chapter 1: the signalman. Keeps well back; every few seconds its lamp
+# goes red and every enemy near it is sent off faster. Kill it and that stops.
+func _signal(e: E, pl: Vector2, dt: float) -> void:
+	var away := e.pos - pl
+	var want := Vector2.ZERO
+	if away.length() < 420.0:
+		want = away.normalized()
+	else:
+		want = Vector2.from_angle(sin(e.t * 0.5 + e.seed) * 3.0) * 0.4
+	e.vel = Pal.damp2(e.vel, _steer(e, want) * e.speed, 3.0, dt)
+	e.rot = 0.0
+	match e.mode:
+		0:
+			e.cool -= dt
+			if e.cool <= 0.0:
+				e.mode = 1
+				e.mode_t = 0.0
+				game.sfx.play("windup", 1.5, -10.0)
+		1:
+			e.mode_t += dt
+			if e.mode_t >= 0.6:
+				e.mode = 0
+				e.cool = 4.0
+				for o in list:
+					if o != e and o.state == ALIVE and o.kind != BYSTANDER and o.pos.distance_to(e.pos) < SIGNAL_R:
+						o.rush = 3.0
+				game.fx.ring(e.pos, 10.0, SIGNAL_R, 0.45, Pal.red(0.7, 1.8), 2.0)
+				game.sfx.play("horn", 1.6, -12.0)
+
+
+# ---- chapter 2: the queue. A head with a smile and four followers that walk where
+# it walked; any of them hurts. One recall along the queue pierces them all.
+func _queue_head(e: E, pl: Vector2, dt: float) -> void:
+	var to := (pl - e.pos).normalized()
+	var weave := to.orthogonal() * sin(e.t * 1.7 + e.seed) * 1.3
+	var want := _steer(e, _seek(e, pl, (to + weave).normalized()))
+	e.vel = Pal.damp2(e.vel, want * e.speed, 2.5, dt)
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-8.0 * dt))
+
+
+func _queue_seg(e: E, dt: float) -> void:
+	if e.link == null or e.link.state != ALIVE:
+		e.vel = Pal.damp2(e.vel, Vector2.ZERO, 4.0, dt)
+		return
+	var ahead: E = e.link
+	var gap := ahead.r + e.r + 4.0
+	var d := e.pos - ahead.pos
+	var want := ahead.pos + (d.normalized() if d.length() > 0.1 else Vector2.LEFT) * gap
+	e.vel = (want - e.pos) / maxf(dt, 0.001)
+	e.vel = e.vel.limit_length(900.0)
+	if d.length() > 0.1:
+		e.rot = (-d).angle()
+
+
+# ---- chapter 2: the registrar. Keeps its distance; every few seconds it stands
+# still and stamps the ground where you are going. The stamp leaves red ink.
+func _registrar(e: E, pl: Vector2, dt: float) -> void:
+	match e.mode:
+		0:
+			var away := e.pos - pl
+			var want := (away.normalized() if away.length() < 280.0 else (-away.normalized() if away.length() > 420.0 else away.normalized().orthogonal()))
+			e.vel = Pal.damp2(e.vel, _steer(e, _seek(e, pl, want)) * e.speed, 3.0, dt)
+			e.cool -= dt
+			if e.cool <= 0.0:
+				e.mode = 1
+				e.mode_t = 0.0
+				var at: Vector2 = pl + game.player.vel * 0.35
+				at = at.clamp(Arena.ROOM.position + STAMP * 0.5, Arena.ROOM.end - STAMP * 0.5)
+				e.aim_at = at
+				zones.append({"c": at, "sz": STAMP, "t": 0.0, "warn": STAMP_WARN, "ink": INK_TIME, "hit": false, "by": e.id})
+				game.sfx.play("windup", 0.8, -9.0)
+		1:
+			# it does not move while it stamps
+			e.vel = Pal.damp2(e.vel, Vector2.ZERO, 10.0, dt)
+			e.mode_t += dt
+			if e.mode_t >= STAMP_WARN:
+				e.mode = 0
+				e.cool = 5.0
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, 0.0, 1.0 - exp(-4.0 * dt))
+
+
+func _step_zones(dt: float, pl: Vector2) -> void:
+	var i := 0
+	while i < zones.size():
+		var z: Dictionary = zones[i]
+		z.t += dt
+		var r := Rect2(z.c - z.sz * 0.5, z.sz)
+		if not z.hit and z.t >= z.warn:
+			z.hit = true
+			game.fx.ring(z.c, 10.0, z.sz.x * 0.75, 0.3, Pal.red(1.0, 2.4), 3.0)
+			game.fx.flash(z.c, z.sz.x * 0.6, 0.12, Pal.red(0.4, 2.0))
+			game.cam.add_trauma(0.12)
+			game.sfx.play("stamp", 1.3, -6.0)
+			if r.grow(Player.R * 0.5).has_point(pl):
+				game.on_player_hit((pl - z.c).normalized() if pl.distance_to(z.c) > 1.0 else Vector2.DOWN, null)
+		elif z.hit and r.has_point(pl):
+			# the ink: standing in it hurts (the hit's own grace keeps it from every frame)
+			game.on_player_hit((pl - z.c).normalized() if pl.distance_to(z.c) > 1.0 else Vector2.DOWN, null)
+		if z.t >= z.warn + z.ink:
+			zones.remove_at(i)
+		else:
+			i += 1
+
+
+# ---- chapter 2: the turnstile. A hub with three long arms, turning; the arms hurt
+# you and turn your rounds away like a mirror, only the hub can be hurt.
+func _turnstile(e: E, pl: Vector2, dt: float) -> void:
+	e.rot += PI * 0.5 * dt
+	var want := _steer(e, _route(e, pl))
+	e.vel = Pal.damp2(e.vel, want * e.speed, 2.0, dt)
+
+
+# An outbound round meeting a turnstile's arm: it glances off as off a mirror.
+func arm_hit(a: Vector2, b: Vector2) -> Dictionary:
+	var best := {}
+	var bd := INF
+	for e in list:
+		if e.kind != TURNSTILE or e.state != ALIVE:
+			continue
+		if e.pos.distance_to(a) > e.r + ARM + a.distance_to(b) + 4.0:
+			continue
+		for k in 3:
+			var dir := Vector2.from_angle(e.rot + TAU * k / 3.0)
+			var p1 := e.pos + dir * e.r
+			var p2 := e.pos + dir * (e.r + ARM)
+			var x = Geometry2D.segment_intersects_segment(a, b, p1, p2)
+			if x != null:
+				var l: float = a.distance_to(x)
+				if l < bd and l > 0.5:
+					bd = l
+					var n := dir.orthogonal()
+					if n.dot(b - a) > 0.0:
+						n = -n
+					best = {"point": x, "normal": n, "e": e}
+	return best
+
+
+func on_arm(e: E, at: Vector2) -> void:
+	e.shield_flash = 1.0
+	game.fx.sparks(at, Vector2.from_angle(e.rot), 5, Pal.foe(1.0, 2.0), 360.0, 0.2, PI)
+	game.sfx.play("shield", randf_range(1.3, 1.5), -9.0)
+
+
+# ---- chapter 3: the hound. Circles you, crouches with your landing spot marked
+# in red, leaps; in the air nothing reaches it, landed it stands a moment.
+func _hound(e: E, pl: Vector2, dt: float) -> void:
+	e.mode_t += dt
+	match e.mode:
+		0:
+			var to := pl - e.pos
+			var d := to.length()
+			var radial := to / maxf(d, 1.0) * clampf((d - 260.0) / 80.0, -1.0, 1.0)
+			var orbit := to.orthogonal().normalized() * (0.9 if fmod(e.seed, 2.0) < 1.0 else -0.9)
+			e.vel = Pal.damp2(e.vel, _steer(e, _seek(e, pl, (radial + orbit).normalized())) * e.speed, 3.0, dt)
+			e.rot = lerp_angle(e.rot, to.angle(), 1.0 - exp(-8.0 * dt))
+			if e.mode_t >= (0.7 if e.rush > 0.0 else 1.2) and d < LEAP + 120.0 and not game.arena.raycast(e.pos, pl):
+				e.mode = 1
+				e.mode_t = 0.0
+				var at: Vector2 = pl + game.player.vel * 0.45
+				var off := at - e.pos
+				if off.length() > LEAP:
+					at = e.pos + off.normalized() * LEAP
+				e.aim_at = at.clamp(Arena.ROOM.position + Vector2(e.r, e.r), Arena.ROOM.end - Vector2(e.r, e.r))
+				game.sfx.play("windup", 1.2, -8.0)
+		1:
+			# crouched, the landing marked
+			e.vel = Pal.damp2(e.vel, Vector2.ZERO, 10.0, dt)
+			e.rot = (e.aim_at - e.pos).angle()
+			if e.mode_t >= 0.5:
+				e.mode = 2
+				e.mode_t = 0.0
+				e.leap_from = e.pos
+				game.sfx.play("dash_e", 1.25, -6.0)
+		2:
+			# in the air: straight to the mark, over everything
+			var k := clampf(e.mode_t / LEAP_T, 0.0, 1.0)
+			var want_p := e.leap_from.lerp(e.aim_at, k)
+			e.vel = (want_p - e.pos) / maxf(dt, 0.001)
+			e.knock = Vector2.ZERO
+			if k >= 1.0:
+				e.mode = 3
+				e.mode_t = 0.0
+				e.vel = Vector2.ZERO
+				game.fx.ring(e.pos, 8.0, 52.0, 0.3, Pal.foe(0.9, 1.6), 2.0)
+				game.sfx.play("slam", 1.3, -8.0)
+				game.cam.add_trauma(0.08)
+				if e.pos.distance_to(pl) < e.r + Player.R + 18.0:
+					game.on_player_hit((pl - e.pos).normalized(), e)
+		3:
+			# landed: a moment standing, the best time to recall through it
+			e.vel = Pal.damp2(e.vel, Vector2.ZERO, 10.0, dt)
+			if e.mode_t >= 0.6:
+				e.mode = 0
+				e.mode_t = randf_range(-0.6, 0.0)
+
+
+# ---- chapter 3: the dud. Drifts at you; close, its fuse starts and it goes off.
+# Killed anywhere, it goes off at once: blow it up among the others.
+func _dud(e: E, pl: Vector2, dt: float) -> void:
+	var to := pl - e.pos
+	match e.mode:
+		0:
+			e.vel = Pal.damp2(e.vel, _steer(e, _route(e, pl)) * e.speed, 2.0, dt)
+			if e.vel.length() > 5.0:
+				e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-4.0 * dt))
+			if to.length() < 220.0:
+				e.mode = 1
+				e.mode_t = 0.0
+				game.sfx.play("windup", 1.8, -8.0)
+		1:
+			e.mode_t += dt
+			e.vel = Pal.damp2(e.vel, Vector2.ZERO, 3.0, dt)
+			if e.mode_t >= FUSE:
+				_die(e, Vector2.UP)
+
+
+func _boom(e: E) -> void:
+	if e.cut:
+		return
+	e.cut = true
+	game.fx.ring(e.pos, 10.0, FUSE_R, 0.4, Pal.red(1.0, 2.6), 3.0)
+	game.fx.ring(e.pos, 6.0, FUSE_R * 0.6, 0.3, Pal.foe(0.8, 1.6), 1.5)
+	game.fx.flash(e.pos, FUSE_R, 0.2, Pal.red(0.5, 2.2))
+	game.fx.sparks(e.pos, Vector2.UP, 24, Pal.red(1.0, 2.4), 760.0, 0.4, PI)
+	game.cam.add_trauma(0.3)
+	game.sfx.play("p_blast", 1.1, -3.0)
+	var pl: Vector2 = game.player.pos
+	if pl.distance_to(e.pos) < FUSE_R:
+		game.on_player_hit((pl - e.pos).normalized(), null)
+	for o in list:
+		if o != e and o.state == ALIVE and o.kind != BYSTANDER and o.pos.distance_to(e.pos) < FUSE_R + o.r:
+			blast_hit(o, (o.pos - e.pos).normalized(), BLAST_DUD)
+
+
+# ---- chapter 3: the passers-by. They walk across and harm no one. A round or a
+# recall through one is a misfire: time added to the wave, and the city says so.
+func _bystander(e: E, dt: float) -> void:
+	var to := e.aim_at - e.pos
+	if to.length() < 30.0:
+		e.state = DEAD
+		return
+	e.vel = Pal.damp2(e.vel, _steer(e, _route(e, e.aim_at)) * e.speed, 3.0, dt)
+	e.rot = 0.0
+
+
+func _misfire(e: E) -> void:
+	e.state = DEAD
+	game.fx.ring(e.pos, 4.0, 40.0, 0.4, Pal.ink(0.9, 1.6), 1.5)
+	game.fx.flash(e.pos, 30.0, 0.15, Pal.ink(0.6, 1.4))
+	game.sfx.play("hurt", 1.4, -10.0)
+	game.wave_ctl.add_penalty(5.0)
+	game.hud.flash_text(Txt.t("misfire_tag"), e.pos)
+	if misfired_wave != game.wave_ctl.index:
+		misfired_wave = game.wave_ctl.index
+		game.hud.radio(Txt.t("misfire_radio"))
+
+
+# What a death leaves behind, by kind.
+func _died(e: E) -> void:
+	match e.kind:
+		DUD:
+			_boom(e)
+		SIGNAL:
+			for o in list:
+				o.rush = 0.0
+		QUEUE, QSEG:
+			# the one behind takes this one's place; behind the head, it becomes the head
+			for o in list:
+				if o.state == ALIVE and o.link == e and (o.kind == QSEG or o.kind == QUEUE):
+					o.link = e.link
+					if e.kind == QUEUE:
+						o.kind = QUEUE
+						o.sides = 5
+						o.link = null
+						game.fx.ring(o.pos, o.r, o.r * 2.2, 0.3, Pal.foe(0.8, 1.6), 1.5)
+		COUPLER:
+			if e.link != null and e.link.link == e:
+				e.link.link = null
+
+
+# ---- drawing the chapters' own
+func _draw_extra(e: E, tr: Transform2D, dim: float) -> void:
+	match e.kind:
+		COUPLER:
+			if e.link != null and e.link.state == ALIVE and not e.cut and e.id < e.link.id:
+				var live := _chain_live(e)
+				var warm := clampf(e.mode_t / CHAIN_WARN, 0.0, 1.0)
+				var a: Vector2 = e.pos
+				var b: Vector2 = e.link.pos
+				if live:
+					draw_line(a, b, Pal.red(0.25 * dim, 2.0), 6.0)
+					draw_line(a, b, Pal.red(0.95 * dim, 2.2), 2.0)
+				else:
+					var segs := PackedVector2Array()
+					var l := a.distance_to(b)
+					var n := (b - a) / maxf(l, 0.001)
+					var s0 := 0.0
+					while s0 < l:
+						segs.append(a + n * s0)
+						segs.append(a + n * minf(s0 + 7.0, l))
+						s0 += 13.0
+					if segs.size() > 1:
+						draw_multiline(segs, Pal.foe(0.5 * dim).lerp(Pal.red(0.9 * dim, 2.0), warm), 1.5)
+				# the hook in the middle
+				draw_circle((a + b) * 0.5, 3.5, Pal.red(0.95 * dim, 2.0))
+			# the rivets of the yard
+			draw_circle(tr * Vector2(-e.r * 0.3, 0), 1.6, Pal.foe(0.7 * dim))
+		SIGNAL:
+			var lamp: Vector2 = e.pos + Vector2(0, -e.r * 1.6 - 6.0)
+			var on: bool = e.mode == 1 or int(e.t * 2.0) % 2 == 0
+			var lc := Pal.red(0.95 * dim, 2.2) if e.mode == 1 else Pal.foe(0.9 * dim, 1.3)
+			if on:
+				draw_circle(lamp, 5.0, lc)
+			else:
+				draw_arc(lamp, 5.0, 0.0, TAU, 14, lc, 1.5)
+			if e.mode == 1:
+				var k := clampf(e.mode_t / 0.6, 0.0, 1.0)
+				draw_arc(e.pos, lerpf(30.0, SIGNAL_R, k), 0.0, TAU, 48, Pal.red(0.5 * (1.0 - k) * dim, 1.6), 2.0)
+		QUEUE:
+			# the only face in the game: a small smile
+			var fwd := Vector2.from_angle(e.rot)
+			draw_arc(e.pos + fwd * 1.0, e.r * 0.45, e.rot - 0.9, e.rot + 0.9, 10, Pal.foe(0.8 * dim, 1.3), 1.5)
+		REGISTRAR:
+			# its window slit and the stamp hanging under it
+			draw_line(tr * Vector2(-e.r * 0.55, -e.r * 0.2), tr * Vector2(e.r * 0.55, -e.r * 0.2), Pal.foe(0.75 * dim), 2.0)
+			var drop := 0.0
+			if e.mode == 1:
+				drop = Pal.ease_in(clampf(e.mode_t / STAMP_WARN, 0.0, 1.0)) * 8.0
+			var sp: Vector2 = e.pos + Vector2(sin(e.t * 2.4) * 3.0, e.r + 7.0 + drop)
+			draw_rect(Rect2(sp - Vector2(6, 5), Vector2(12, 10)), Pal.red(0.85 * dim, 1.8), false, 2.0)
+			draw_line(e.pos + Vector2(0, e.r), sp - Vector2(0, 5), Pal.foe(0.5 * dim), 1.0)
+		TURNSTILE:
+			var hc := Pal.foe(dim, 1.2).lerp(Pal.ink(dim, 2.4), e.shield_flash)
+			for k in 3:
+				var dir := Vector2.from_angle(e.rot + TAU * k / 3.0)
+				var p1: Vector2 = e.pos + dir * e.r
+				var p2: Vector2 = e.pos + dir * (e.r + ARM)
+				draw_line(p1, p2, Color(hc.r, hc.g, hc.b, hc.a * 0.15), 9.0)
+				draw_line(p1, p2, hc, 3.5)
+				var mid := p1.lerp(p2, 0.55)
+				draw_line(mid - dir.orthogonal() * 4.0, mid + dir.orthogonal() * 4.0, Pal.red(0.8 * dim, 1.6), 1.5)
+		HOUND:
+			# its legs, keeping time with its stride; the red eye at the front
+			var fwd := Vector2.from_angle(e.rot)
+			var sd := fwd.orthogonal()
+			var swing := sin(e.t * 14.0) * 4.0 if e.mode == 0 else 0.0
+			for k in 2:
+				var base: Vector2 = e.pos + fwd * (e.r * (0.6 if k == 0 else -0.6))
+				for sg in [-1.0, 1.0]:
+					draw_line(base + sd * sg * e.r * 0.45, base + sd * sg * (e.r * 0.95) + fwd * swing * sg, Pal.foe(0.7 * dim), 1.5)
+			draw_circle(e.pos + fwd * e.r * 1.1, 2.6, Pal.red(0.95 * dim, 2.2))
+			if e.mode == 1 or e.mode == 2:
+				# where it will land: a red ring closing in
+				var k2 := clampf((e.mode_t if e.mode == 1 else 0.5 + e.mode_t) / (0.5 + LEAP_T), 0.0, 1.0)
+				draw_arc(e.aim_at, lerpf(46.0, e.r + 10.0, k2), 0.0, TAU, 32, Pal.red(0.85 * dim, 1.8), 2.0)
+				draw_line(e.aim_at - Vector2(7, 0), e.aim_at + Vector2(7, 0), Pal.red(0.7 * dim), 1.5)
+				draw_line(e.aim_at - Vector2(0, 7), e.aim_at + Vector2(0, 7), Pal.red(0.7 * dim), 1.5)
+			if e.mode == 2:
+				# its shadow on the floor under the leap
+				draw_circle(e.pos + Vector2(8, 14), e.r * 0.8, Color(0, 0, 0, 0.5))
+		DUD:
+			draw_circle(tr * Vector2(e.r * 1.25, 0), 3.5, Pal.red(0.95 * dim, 2.0))
+			if e.mode == 1:
+				var k := clampf(e.mode_t / FUSE, 0.0, 1.0)
+				draw_arc(e.pos, lerpf(FUSE_R, e.r, k), 0.0, TAU, 40, Pal.red((0.5 + 0.5 * sin(e.t * (10.0 + 30.0 * k))) * dim, 2.0), 2.0)
+		BYSTANDER:
+			# a faint target ring on its chest, and nothing red about it
+			draw_arc(e.pos, e.r * 0.45, 0.0, TAU, 12, Pal.foe(0.35 * dim), 1.0)
+
+
+func _draw_zones(dim: float) -> void:
+	for z in zones:
+		var r := Rect2(z.c - z.sz * 0.5, z.sz)
+		if not z.hit:
+			# the stamp's frame, closing in from outside, about to come down
+			var k := clampf(z.t / z.warn, 0.0, 1.0)
+			draw_rect(r.grow(30.0 * (1.0 - k)), Pal.red((0.4 + 0.5 * k) * dim, 1.8), false, 2.0)
+			draw_rect(r, Pal.red(0.07 * k * dim, 1.2))
+		else:
+			# the ink, fading
+			var left := 1.0 - clampf((z.t - z.warn) / z.ink, 0.0, 1.0)
+			draw_rect(r, Pal.red(0.05 * left * dim, 1.0))
+			draw_rect(r, Pal.red(0.5 * left * dim, 1.6), false, 1.5)

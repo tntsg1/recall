@@ -699,6 +699,13 @@ func _fly(b: B, dt: float) -> void:
 		_bend(b, ph.point, b.dir.rotated(ph.turn))
 		game.enemies.on_prism(ph.e, ph.point)
 		return
+	var ah: Dictionary = game.enemies.arm_hit(a, end)
+	if ah:
+		# a turnstile's arm: the round glances off it, and the glance joins its path
+		game.enemies.sweep(a, ah.point, b, false)
+		_bend(b, ah.point + ah.normal * 0.5, b.dir.bounce(ah.normal))
+		game.enemies.on_arm(ah.e, ah.point)
+		return
 	var bh: Dictionary = game.boss.hit_test(a, end)
 	if bh:
 		if bh.core:

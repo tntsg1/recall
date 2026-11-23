@@ -17,12 +17,20 @@ const I := Enemies.INSPECTOR
 const W := Enemies.PROOFREADER
 const X := Enemies.ESCORT
 const F := Enemies.PHASE
+const K := Enemies.COUPLER
+const N := Enemies.SIGNAL
+const Q := Enemies.QUEUE
+const R := Enemies.REGISTRAR
+const T := Enemies.TURNSTILE
+const D := Enemies.HOUND
+const B := Enemies.DUD
+const Y := Enemies.BYSTANDER
 const COUNT := 7
 const BOSS := 6
-const COST := {C: 1, G: 5, H: 4, P: 3, L: 3, U: 4, E: 3, I: 3, W: 3, X: 2, F: 3}
+const COST := {C: 1, G: 5, H: 4, P: 3, L: 3, U: 4, E: 3, I: 3, W: 3, X: 2, F: 3, K: 4, N: 3, Q: 5, R: 4, T: 5, D: 4, B: 3, Y: 0}
 const BUDGET := [16, 22, 28, 32, 40, 48]
 # the waves' own notes, by enemy pool (the boss wave's note comes from Chapters)
-const NOTES := [{2: "note_guard", 3: "note_charger"}, {0: "note_mirror", 1: "note_prism"}, {0: "note_arms", 1: "note_leech"}, {0: "note_rings", 1: "note_pulse"}, {0: "note_nodes"}, {0: "note_rails"}, {0: "note_lasers", 1: "note_echo"}, {0: "note_arcs", 1: "note_inspector"}, {0: "note_shelves", 1: "note_proofreader"}, {0: "note_vents"}, {0: "note_plates", 1: "note_escort"}, {0: "note_stasis", 1: "note_phase"}]
+const NOTES := [{2: "note_guard", 3: "note_charger", 4: "note_coupler", 5: "note_signal"}, {0: "note_mirror", 1: "note_queue", 2: "note_turnstile", 3: "note_registrar", 4: "note_prism"}, {0: "note_arms", 1: "note_leech"}, {0: "note_rings", 1: "note_pulse"}, {0: "note_nodes"}, {0: "note_rails"}, {0: "note_lasers", 1: "note_echo", 2: "note_hound", 3: "note_dud", 4: "note_bystander"}, {0: "note_arcs", 1: "note_inspector"}, {0: "note_shelves", 1: "note_proofreader"}, {0: "note_vents"}, {0: "note_plates", 1: "note_escort"}, {0: "note_stasis", 1: "note_phase"}]
 const SIDES := ["T", "B", "L", "R"]
 
 var game
@@ -78,9 +86,45 @@ func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
 		1 when pool == 0 or pool == 5 or pool == 4:
 			pass
 		1 when pool == 1:
+			# the hall: the queue first
+			kinds.append(Q)
+			left -= COST[Q]
+		2 when pool == 1:
+			kinds.append(T)
+			kinds.append(T)
+			left -= COST[T] * 2
+		3 when pool == 1:
+			kinds.append(R)
+			kinds.append(R)
+			kinds.append(Q)
+			left -= COST[R] * 2 + COST[Q]
+		4 when pool == 1:
 			kinds.append(P)
 			kinds.append(P)
-			left -= COST[P] * 2
+			kinds.append(T)
+			left -= COST[P] * 2 + COST[T]
+		2 when pool == 6:
+			for k in 3:
+				kinds.append(D)
+			left -= COST[D] * 3
+		3 when pool == 6:
+			for k in 3:
+				kinds.append(B)
+			left -= COST[B] * 3
+		4 when pool == 6:
+			kinds.append(D)
+			kinds.append(B)
+			left -= COST[D] + COST[B]
+		4 when pool == 0:
+			# the yard: coupled pairs (from the fifth wave, after the basics)
+			kinds.append(K)
+			kinds.append(K)
+			left -= COST[K] * 2
+		5 when pool == 0:
+			kinds.append(N)
+			kinds.append(H)
+			kinds.append(H)
+			left -= COST[N] + COST[H] * 2
 		1 when pool == 2:
 			kinds.append(L)
 			kinds.append(L)
@@ -125,7 +169,7 @@ func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
 			var specials := int((randi_range(2, 4) + chapter) * Loadout.specials())
 			var mix: Array = [G, H]
 			if pool == 1:
-				mix = [G, H, P, P]
+				mix = [G, H, P, Q, R, T]
 			elif pool == 2:
 				mix = [G, H, P, L, L]
 			elif pool == 5:
@@ -133,7 +177,7 @@ func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
 			elif pool == 3:
 				mix = [G, H, L, U, U]
 			elif pool == 6:
-				mix = [G, H, H, P, E]
+				mix = [G, H, P, E, D, D, B]
 			elif pool == 7:
 				mix = [G, H, P, L, I, I]
 			elif pool == 8:
@@ -170,6 +214,9 @@ func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
 		side_i = (side_i + 1 + randi() % 3) % 4
 		chase -= n
 		delay += randf_range(2.0, 3.4)
+	# the institute: passers-by walk through the later waves (they cost nothing, count for nothing)
+	if pool == 6 and i >= 3:
+		groups.append([randf_range(1.5, 4.0), Y, randi_range(3, 5), SIDES[randi() % 2 + 2]])
 	var last := 0.0
 	for g in groups:
 		last = maxf(last, g[0])
@@ -179,7 +226,7 @@ func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
 	if elites > 0:
 		var ek: Array = []
 		for g in groups:
-			if g[1] != C:
+			if g[1] != C and g[1] != Y:
 				ek.append(g[1])
 		# (a wave of chasers: the first chapters' get a chaser, not a shield yet)
 		if ek.is_empty():
@@ -349,3 +396,17 @@ func _spawn_group(kind: int, count: int, side: String, elite := false) -> void:
 		var e = game.enemies.spawn(kind, p, i * 0.07)
 		if elite:
 			game.enemies.make_elite(e)
+		if kind == K:
+			# a coupled pair: the other half a little way off, on the chain
+			var o = game.enemies.spawn(K, (p + Vector2.from_angle(randf() * TAU) * 120.0).clamp(room.position, room.end), i * 0.07 + 0.05)
+			e.link = o
+			o.link = e
+			o.seed = e.seed + 1.0
+		elif kind == Q:
+			# the queue: four behind the head, away from you
+			var back: Vector2 = (p - pl).normalized()
+			var ahead = e
+			for j in 4:
+				var sg = game.enemies.spawn(Enemies.QSEG, (p + back * (26.0 + 22.0 * j)).clamp(room.position, room.end), i * 0.07 + 0.05 * (j + 1))
+				sg.link = ahead
+				ahead = sg
