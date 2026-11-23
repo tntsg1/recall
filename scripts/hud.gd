@@ -585,7 +585,7 @@ func _draw_title(vp: Vector2) -> void:
 		var nw := 0.0
 		for r in rows:
 			nw = maxf(nw, font_s.get_string_size(r, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x)
-		view.draw_rect(Rect2(cx - nw / 2.0 - 12.0, bot + 10.0, nw + 24.0, 6.0 + rows.size() * 24.0), Color(0, 0, 0, 0.55 * na))
+		view.draw_rect(Rect2(cx - nw / 2.0 - 12.0, bot + 10.0, nw + 24.0, 6.0 + rows.size() * 24.0), Color(0.01, 0.012, 0.016, 0.85 * na))
 		for ri in rows.size():
 			_text_c(font_s, rows[ri], Vector2(cx, bot + 30.0 + ri * 24.0), 17, Pal.ink(0.7 * na))
 	var tick := Pal.ease_out(clampf((t - 0.2) / 0.5, 0.0, 1.0))
@@ -833,12 +833,15 @@ func _draw_radio(vp: Vector2) -> void:
 		var n := int(radio_text.length() * clampf((radio_t - 0.4) / clampf(radio_text.length() * 0.03, 2.2, 4.0), 0.0, 1.0))
 		var x := BAND_EDGE + 56.0
 		var y := 112.0
-		# (long broadcasts wrap onto more lines)
-		var rows := _wrap(radio_text, 18, 860.0)
+		# (long broadcasts wrap onto more lines; the band keeps to the top left, short of
+		# the boss bar in the middle, on a plate dark enough that the signs under it drop away)
+		var rows := _wrap(radio_text, 18, minf(860.0, vp.x / 2.0 - ZONE_TOP_MID - 24.0 - x))
 		var pw := 0.0
 		for r in rows:
 			pw = maxf(pw, font_s.get_string_size(r, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x)
-		view.draw_rect(Rect2(BAND_EDGE + 12.0, y - 36.0, pw + 64.0, 56.0 + (rows.size() - 1) * 24.0), Color(0, 0, 0, 0.62 * a))
+		var plate := Rect2(BAND_EDGE + 12.0, y - 36.0, pw + 64.0, 56.0 + (rows.size() - 1) * 24.0)
+		view.draw_rect(plate, Color(0.01, 0.012, 0.016, 0.88 * a))
+		view.draw_rect(plate, Pal.ink(0.18 * a), false, 1.0)
 		# a loudspeaker: a box and its horn, with waves while it speaks
 		var sp := Vector2(BAND_EDGE + 34.0, y - 10.0)
 		view.draw_rect(Rect2(sp + Vector2(-8, -5), Vector2(6, 10)), Pal.ink(0.7 * a))
@@ -897,7 +900,8 @@ func reroll_hit(p: Vector2) -> bool:
 
 # The band under the arena holds the whole build in one row, right-aligned to
 # the arena's edge: relics, a gap, then schools. Nothing of it sits in play.
-const BAND_EDGE := 80.0        # the arena frame's inner edge, from either screen side
+const BAND_EDGE := 80.0
+const ZONE_TOP_MID := 280.0   # half the width kept clear at the top centre (the boss bar, the wave title)        # the arena frame's inner edge, from either screen side
 const BAND_Y := 46.0           # the band's centre line, up from the screen's bottom
 
 
@@ -1720,6 +1724,9 @@ func _draw_flashes(vp: Vector2) -> void:
 			var tw := font_b.get_string_size(fl[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x * k
 			Picks.burst(view, p + Vector2(-tw / 2.0 - 52.0, 0.0), t, 0.32, 1.0)
 		view.draw_set_transform(p, 0.0, Vector2(k, k))
+		# a soft dark plate, so the words read over whatever the room has there
+		var fw := font_b.get_string_size(fl[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+		view.draw_rect(Rect2(-fw / 2.0 - 14.0, -16.0, fw + 28.0, 34.0), Color(0.01, 0.012, 0.016, 0.6 * a))
 		_text_c(font_b, fl[0], Vector2(0, 8), 22, Pal.ink(a, 1.5))
 		view.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
