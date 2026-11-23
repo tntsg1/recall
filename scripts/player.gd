@@ -4,6 +4,7 @@ extends Node2D
 # ticks around it; rounds that come home pop their tick back in.
 
 const R := 13.0
+static var halo := true      # the steady ring and floor shadow (2026-11-22; off to compare)
 const SPEED := 430.0
 const DASH_SPEED := 1500.0
 const DASH_TIME := 0.15
@@ -156,10 +157,20 @@ func muzzle() -> Vector2:
 func _draw() -> void:
 	if gone:
 		return
+	# a shadow at your feet, cast down and to the right, so you stand on the floor
+	if halo:
+		draw_set_transform(Vector2(6, 11), 0.0, Vector2(1.15, 0.55))
+		draw_circle(Vector2.ZERO, R + 6.0, Color(0, 0, 0, 0.55))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# a dark pool under you, so your own rounds' light never swallows you
 	draw_texture_rect(Fx.make_glow_texture(), Rect2(-Vector2(46, 46), Vector2(92, 92)), false, Color(0, 0, 0, 0.7))
 	# and a dark rim, so you read over any words you stand on
 	draw_circle(Vector2.ZERO, R + 5.0, Color(0, 0, 0, 0.6))
+	# a steady ring of your own light: found at a glance among white enemies and walls
+	if halo:
+		var hr := R + 24.0
+		draw_texture_rect(Fx.make_glow_texture(), Rect2(-Vector2(hr, hr), Vector2(hr, hr) * 2.0), false, Pal.you(0.16, 1.3))
+		draw_arc(Vector2.ZERO, R + 11.0, 0.0, TAU, 48, Pal.you(0.5, 1.5), 2.0, true)
 	var f: float = game.focus
 	# a dodge is a burst of your light: the line it runs leaves a fading tube
 	if streak.size() > 1:
