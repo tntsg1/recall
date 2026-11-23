@@ -22,18 +22,24 @@ const SPEC := {
 	ESCORT: {"hp": 26.0, "r": 12.0, "sides": 3, "speed": 520.0},
 	PHASE: {"hp": 48.0, "r": 21.0, "sides": 6, "speed": 150.0},
 	# chapter 1, the yard: chained pairs and the signalman
-	COUPLER: {"hp": 28.0, "r": 13.0, "sides": 3, "speed": 235.0},
-	SIGNAL: {"hp": 40.0, "r": 10.0, "sides": 4, "speed": 90.0},
+	COUPLER: {"hp": 28.0, "r": 20.0, "sides": 14, "speed": 235.0},
+	SIGNAL: {"hp": 40.0, "r": 13.0, "sides": 4, "speed": 90.0},
 	# chapter 2, the registration hall: the queue, the registrar, the turnstile
-	QUEUE: {"hp": 40.0, "r": 15.0, "sides": 5, "speed": 190.0},
-	QSEG: {"hp": 20.0, "r": 10.0, "sides": 4, "speed": 190.0},
-	REGISTRAR: {"hp": 70.0, "r": 20.0, "sides": 6, "speed": 90.0},
-	TURNSTILE: {"hp": 80.0, "r": 16.0, "sides": 6, "speed": 60.0},
+	QUEUE: {"hp": 40.0, "r": 18.0, "sides": 5, "speed": 190.0},
+	QSEG: {"hp": 20.0, "r": 12.0, "sides": 4, "speed": 190.0},
+	REGISTRAR: {"hp": 70.0, "r": 23.0, "sides": 8, "speed": 90.0},
+	TURNSTILE: {"hp": 80.0, "r": 18.0, "sides": 6, "speed": 60.0},
 	# chapter 3, the ordnance institute: the hound, the dud, the passers-by
-	HOUND: {"hp": 55.0, "r": 16.0, "sides": 4, "speed": 210.0},
-	DUD: {"hp": 35.0, "r": 17.0, "sides": 5, "speed": 70.0},
+	HOUND: {"hp": 55.0, "r": 19.0, "sides": 6, "speed": 210.0},
+	DUD: {"hp": 35.0, "r": 20.0, "sides": 5, "speed": 70.0},
 	BYSTANDER: {"hp": 1.0, "r": 11.0, "sides": 12, "speed": 80.0},
 }
+# each chapter's own enemies wear that chapter's colour (red stays for danger alone)
+const RUST := Color(1.0, 0.52, 0.2)      # chapter 1, the yard
+const FILE_BLUE := Color(0.36, 0.62, 1.0)  # chapter 2, the registration hall
+const STERILE := Color(0.3, 1.0, 0.62)     # chapter 3, the institute
+const ACCENT := {COUPLER: RUST, SIGNAL: RUST, QUEUE: FILE_BLUE, QSEG: FILE_BLUE, REGISTRAR: FILE_BLUE, TURNSTILE: FILE_BLUE,
+	HOUND: STERILE, DUD: STERILE, BYSTANDER: STERILE}
 const CHAIN_MIN := 140.0      # a coupled pair's chain goes taut between these
 const CHAIN_MAX := 290.0
 const CHAIN_WARN := 0.5
@@ -1207,23 +1213,40 @@ func _poly(e: E) -> Array[Vector2]:
 			# a pen nib, pointing the way it walks
 			pts = [Vector2(e.r * 1.35, 0), Vector2(e.r * 0.15, e.r * 0.72), Vector2(-e.r * 0.95, e.r * 0.55), Vector2(-e.r * 0.95, -e.r * 0.55), Vector2(e.r * 0.15, -e.r * 0.72)]
 		COUPLER:
-			pts = [Vector2(e.r * 1.3, 0), Vector2(-e.r * 0.9, -e.r * 0.9), Vector2(-e.r * 0.9, e.r * 0.9)]
+			# seen from above: the buffer beam, the drawbar, the coupler head with its jaw
+			for v in [Vector2(-1.0, -0.85), Vector2(-0.7, -0.85), Vector2(-0.7, -0.3), Vector2(0.45, -0.3), Vector2(0.62, -0.72),
+					Vector2(1.38, -0.72), Vector2(1.38, -0.2), Vector2(1.38, 0.2), Vector2(1.38, 0.72), Vector2(0.62, 0.72),
+					Vector2(0.45, 0.3), Vector2(-0.7, 0.3)]:
+				pts.append(v * e.r)
+			pts.append(Vector2(-0.7, 0.85) * e.r)
+			pts.append(Vector2(-1.0, 0.85) * e.r)
 		SIGNAL:
 			# a post, three times as tall as it is wide (it does not turn)
 			pts = [Vector2(e.r * 0.55, -e.r * 1.6), Vector2(e.r * 0.55, e.r * 1.6), Vector2(-e.r * 0.55, e.r * 1.6), Vector2(-e.r * 0.55, -e.r * 1.6)]
 		QUEUE:
 			for k in 5:
 				pts.append(Vector2.from_angle(TAU * k / 5.0) * e.r)
-		QSEG, BYSTANDER:
+		QSEG:
 			for k in e.sides:
 				pts.append(Vector2.from_angle(PI / 4.0 + TAU * k / e.sides) * e.r)
-		REGISTRAR, TURNSTILE:
+		BYSTANDER:
+			# a person from above: the shoulders, wider than deep
+			for k in e.sides:
+				var q := Vector2.from_angle(TAU * k / e.sides)
+				pts.append(Vector2(q.x * 0.5, q.y) * e.r)
+		REGISTRAR:
+			# a desk, corners cut
+			for v in [Vector2(-1.15, -0.45), Vector2(-0.95, -0.65), Vector2(0.95, -0.65), Vector2(1.15, -0.45),
+					Vector2(1.15, 0.45), Vector2(0.95, 0.65), Vector2(-0.95, 0.65), Vector2(-1.15, 0.45)]:
+				pts.append(v * e.r)
+		TURNSTILE:
 			for k in 6:
 				pts.append(Vector2.from_angle(TAU * k / 6.0) * e.r)
 		HOUND:
 			# a long low body, longer still as it crouches
 			var crouch := 1.0 + (0.25 if e.mode == 1 else 0.0)
-			pts = [Vector2(e.r * 1.5 * crouch, 0), Vector2(0, -e.r * 0.55 / crouch), Vector2(-e.r * 1.3 * crouch, 0), Vector2(0, e.r * 0.55 / crouch)]
+			for v in [Vector2(1.6, 0), Vector2(0.9, -0.45), Vector2(-0.6, -0.55), Vector2(-1.35, 0), Vector2(-0.6, 0.55), Vector2(0.9, 0.45)]:
+				pts.append(Vector2(v.x * crouch, v.y / crouch) * e.r)
 		DUD:
 			# a shell case: long, a blunt nose
 			pts = [Vector2(e.r * 1.4, 0), Vector2(e.r * 0.7, -e.r * 0.55), Vector2(-e.r * 1.1, -e.r * 0.55), Vector2(-e.r * 1.1, e.r * 0.55), Vector2(e.r * 0.7, e.r * 0.55)]
@@ -1259,6 +1282,16 @@ func _draw() -> void:
 		var sc := Transform2D(Vector2(1.0 - sq, 0), Vector2(0, 1.0 + sq * 0.7), Vector2.ZERO)
 		var tr := Transform2D(0.0, e.pos + shake) * basis * sc * basis.affine_inverse() * Transform2D(e.rot, Vector2.ZERO) * Transform2D(Vector2(extra, 0), Vector2(0, 1.0 / maxf(extra, 0.5)), Vector2.ZERO)
 		var col := Pal.foe(dim).lerp(Pal.red(dim, 2.4), e.red * 0.85)
+		if ACCENT.has(e.kind):
+			col = acc(e.kind, dim, 1.25).lerp(Pal.red(dim, 2.4), e.red * 0.85)
+			if e.kind == BYSTANDER:
+				col = acc(BYSTANDER, 0.45 * dim, 1.0)
+			elif e.state == ALIVE:
+				# a solid body in its chapter's colour, so it reads as a thing, not a wire
+				var fill := PackedVector2Array()
+				for k in pts.size() - 1:
+					fill.append(tr * pts[k])
+				draw_colored_polygon(fill, acc(e.kind, 0.2 * dim, 0.8))
 		if e.kind == PHASE and e.state == ALIVE:
 			var pk := phase_k(e)
 			var turning := pk > 0.02 and pk < 0.98
@@ -1829,7 +1862,8 @@ func _bystander(e: E, dt: float) -> void:
 		e.state = DEAD
 		return
 	e.vel = Pal.damp2(e.vel, _steer(e, _route(e, e.aim_at)) * e.speed, 3.0, dt)
-	e.rot = 0.0
+	if e.vel.length() > 8.0:
+		e.rot = e.vel.angle()
 
 
 func _misfire(e: E) -> void:
@@ -1871,47 +1905,16 @@ func _died(e: E) -> void:
 func _draw_extra(e: E, tr: Transform2D, dim: float) -> void:
 	match e.kind:
 		COUPLER:
-			if e.link != null and e.link.state == ALIVE and not e.cut and e.id < e.link.id:
-				var live := _chain_live(e)
-				var warm := clampf(e.mode_t / CHAIN_WARN, 0.0, 1.0)
-				var a: Vector2 = e.pos
-				var b: Vector2 = e.link.pos
-				if live:
-					draw_line(a, b, Pal.red(0.25 * dim, 2.0), 6.0)
-					draw_line(a, b, Pal.red(0.95 * dim, 2.2), 2.0)
-				else:
-					var segs := PackedVector2Array()
-					var l := a.distance_to(b)
-					var n := (b - a) / maxf(l, 0.001)
-					var s0 := 0.0
-					while s0 < l:
-						segs.append(a + n * s0)
-						segs.append(a + n * minf(s0 + 7.0, l))
-						s0 += 13.0
-					if segs.size() > 1:
-						draw_multiline(segs, Pal.foe(0.5 * dim).lerp(Pal.red(0.9 * dim, 2.0), warm), 1.5)
-				# the hook in the middle
-				draw_circle((a + b) * 0.5, 3.5, Pal.red(0.95 * dim, 2.0))
-			# the rivets of the yard
-			draw_circle(tr * Vector2(-e.r * 0.3, 0), 1.6, Pal.foe(0.7 * dim))
+			_draw_coupler(e, tr, dim)
 		SIGNAL:
-			var lamp: Vector2 = e.pos + Vector2(0, -e.r * 1.6 - 6.0)
-			var on: bool = e.mode == 1 or int(e.t * 2.0) % 2 == 0
-			var lc := Pal.red(0.95 * dim, 2.2) if e.mode == 1 else Pal.foe(0.9 * dim, 1.3)
-			if on:
-				draw_circle(lamp, 5.0, lc)
-			else:
-				draw_arc(lamp, 5.0, 0.0, TAU, 14, lc, 1.5)
+			_draw_signal(e, tr, dim)
 			if e.mode == 1:
 				var k := clampf(e.mode_t / 0.6, 0.0, 1.0)
 				draw_arc(e.pos, lerpf(30.0, SIGNAL_R, k), 0.0, TAU, 48, Pal.red(0.5 * (1.0 - k) * dim, 1.6), 2.0)
-		QUEUE:
-			# the only face in the game: a small smile
-			var fwd := Vector2.from_angle(e.rot)
-			draw_arc(e.pos + fwd * 1.0, e.r * 0.45, e.rot - 0.9, e.rot + 0.9, 10, Pal.foe(0.8 * dim, 1.3), 1.5)
+		QUEUE, QSEG:
+			_draw_queue(e, tr, dim)
 		REGISTRAR:
-			# its window slit and the stamp hanging under it
-			draw_line(tr * Vector2(-e.r * 0.55, -e.r * 0.2), tr * Vector2(e.r * 0.55, -e.r * 0.2), Pal.foe(0.75 * dim), 2.0)
+			_draw_desk(e, tr, dim)
 			var drop := 0.0
 			if e.mode == 1:
 				drop = Pal.ease_in(clampf(e.mode_t / STAMP_WARN, 0.0, 1.0)) * 8.0
@@ -1919,13 +1922,16 @@ func _draw_extra(e: E, tr: Transform2D, dim: float) -> void:
 			draw_rect(Rect2(sp - Vector2(6, 5), Vector2(12, 10)), Pal.red(0.85 * dim, 1.8), false, 2.0)
 			draw_line(e.pos + Vector2(0, e.r), sp - Vector2(0, 5), Pal.foe(0.5 * dim), 1.0)
 		TURNSTILE:
-			var hc := Pal.foe(dim, 1.2).lerp(Pal.ink(dim, 2.4), e.shield_flash)
+			_draw_gate(e, dim)
+			var hc := acc(TURNSTILE, dim, 1.3).lerp(Pal.ink(dim, 2.4), e.shield_flash)
 			for k in 3:
 				var dir := Vector2.from_angle(e.rot + TAU * k / 3.0)
 				var p1: Vector2 = e.pos + dir * e.r
 				var p2: Vector2 = e.pos + dir * (e.r + ARM)
 				draw_line(p1, p2, Color(hc.r, hc.g, hc.b, hc.a * 0.15), 9.0)
 				draw_line(p1, p2, hc, 3.5)
+				draw_circle(p2, 4.0, hc)
+				draw_circle(p2, 1.8, Color(0.03, 0.03, 0.035, dim))
 				var mid := p1.lerp(p2, 0.55)
 				draw_line(mid - dir.orthogonal() * 4.0, mid + dir.orthogonal() * 4.0, Pal.red(0.8 * dim, 1.6), 1.5)
 		HOUND:
@@ -1933,11 +1939,12 @@ func _draw_extra(e: E, tr: Transform2D, dim: float) -> void:
 			var fwd := Vector2.from_angle(e.rot)
 			var sd := fwd.orthogonal()
 			var swing := sin(e.t * 14.0) * 4.0 if e.mode == 0 else 0.0
+			_draw_hound(e, tr, dim)
 			for k in 2:
 				var base: Vector2 = e.pos + fwd * (e.r * (0.6 if k == 0 else -0.6))
 				for sg in [-1.0, 1.0]:
 					draw_line(base + sd * sg * e.r * 0.45, base + sd * sg * (e.r * 0.95) + fwd * swing * sg, Pal.foe(0.7 * dim), 1.5)
-			draw_circle(e.pos + fwd * e.r * 1.1, 2.6, Pal.red(0.95 * dim, 2.2))
+			draw_circle(tr * Vector2(e.r * 1.25, 0), 2.8, Pal.red(0.95 * dim, 2.2))
 			if e.mode == 1 or e.mode == 2:
 				# where it will land: a red ring closing in
 				var k2 := clampf((e.mode_t if e.mode == 1 else 0.5 + e.mode_t) / (0.5 + LEAP_T), 0.0, 1.0)
@@ -1948,13 +1955,215 @@ func _draw_extra(e: E, tr: Transform2D, dim: float) -> void:
 				# its shadow on the floor under the leap
 				draw_circle(e.pos + Vector2(8, 14), e.r * 0.8, Color(0, 0, 0, 0.5))
 		DUD:
+			_draw_dud(e, tr, dim)
 			draw_circle(tr * Vector2(e.r * 1.25, 0), 3.5, Pal.red(0.95 * dim, 2.0))
 			if e.mode == 1:
 				var k := clampf(e.mode_t / FUSE, 0.0, 1.0)
 				draw_arc(e.pos, lerpf(FUSE_R, e.r, k), 0.0, TAU, 40, Pal.red((0.5 + 0.5 * sin(e.t * (10.0 + 30.0 * k))) * dim, 2.0), 2.0)
 		BYSTANDER:
-			# a faint target ring on its chest, and nothing red about it
-			draw_arc(e.pos, e.r * 0.45, 0.0, TAU, 12, Pal.foe(0.35 * dim), 1.0)
+			# a head, a case in one hand; faint, and nothing red about it
+			var pc := acc(BYSTANDER, 0.5 * dim, 1.0)
+			draw_circle(e.pos, e.r * 0.38, acc(BYSTANDER, 0.18 * dim, 0.8))
+			draw_arc(e.pos, e.r * 0.38, 0.0, TAU, 14, pc, 1.4)
+			var sw := sin(e.t * 7.0 + e.seed) * 0.12 * e.r
+			draw_rect(Rect2(tr * Vector2(sw, e.r * 1.15) - Vector2(4, 3), Vector2(8, 6)), pc, false, 1.2)
+
+
+func acc(kind: int, a: float, k: float = 1.0) -> Color:
+	var c: Color = ACCENT[kind]
+	return Color(c.r * k, c.g * k, c.b * k, Pal.ink(a).a)
+
+
+# The coupled pair: a railway coupler seen from above, and the real chain between
+# the two, sagging and swinging while slack, pulled straight and red when taut.
+func _draw_coupler(e: E, tr: Transform2D, dim: float) -> void:
+	var r := e.r
+	var ac := acc(COUPLER, dim, 1.3)
+	var hi := Pal.ink(0.9 * dim, 1.3)
+	# hazard stripes across the buffer beam
+	for j in 3:
+		var y0 := -0.78 + j * 0.56
+		draw_line(tr * Vector2(-0.97 * r, y0 * r), tr * Vector2(-0.73 * r, (y0 + 0.36) * r), ac, 2.5)
+	# the two buffers on the back, springing with each step
+	var push := sin(e.t * 11.0 + e.seed) * minf(1.0, e.vel.length() / 120.0) * 0.07 * r
+	for sg: float in [-1.0, 1.0]:
+		var bp := Vector2(-1.18 * r + push, sg * 0.55 * r)
+		draw_line(tr * Vector2(-r, sg * 0.55 * r), tr * bp, hi, 2.0)
+		draw_circle(tr * bp, 0.2 * r, ac)
+		draw_arc(tr * bp, 0.2 * r, 0.0, TAU, 12, hi, 1.2)
+	# rivets down the drawbar
+	for x: float in [-0.4, 0.0, 0.32]:
+		draw_circle(tr * Vector2(x * r, 0.0), 1.7, hi)
+	# the knuckle: swings shut and open in the jaw, a slow mechanical breath
+	var open := Pal.ease_io(0.5 + 0.5 * sin(e.t * 2.4 + e.seed))
+	var piv := Vector2(1.18 * r, -0.46 * r)
+	var ang := lerpf(PI * 0.5, 0.15, open)
+	var kn := piv + Vector2.from_angle(ang) * 0.62 * r
+	draw_line(tr * piv, tr * kn, Pal.ink(dim, 1.6), 3.0)
+	draw_line(tr * kn, tr * (kn + Vector2.from_angle(ang + PI * 0.5) * 0.22 * r), Pal.ink(dim, 1.6), 3.0)
+	draw_circle(tr * piv, 2.6, ac)
+	if e.link == null or e.link.state != ALIVE or e.cut or e.id > e.link.id:
+		return
+	# the chain, head to head
+	var live := _chain_live(e)
+	var warm := clampf(e.mode_t / CHAIN_WARN, 0.0, 1.0) if not live else 1.0
+	var a: Vector2 = e.pos + Vector2.from_angle(e.rot) * 1.3 * r
+	var b: Vector2 = e.link.pos + Vector2.from_angle(e.link.rot) * 1.3 * e.link.r
+	var l := a.distance_to(b)
+	var n := (b - a) / maxf(l, 0.001)
+	var side := n.orthogonal()
+	var slack := 0.0 if live else clampf((CHAIN_MAX - l) / (CHAIN_MAX - CHAIN_MIN * 0.5), 0.0, 1.0) * (1.0 - warm)
+	var sag := slack * 46.0
+	var sway := sin(e.t * 2.2 + e.seed) * 0.6
+	var cc := ac.lerp(Pal.red(0.95 * dim, 2.2), warm)
+	if live:
+		draw_line(a, b, Pal.red(0.22 * dim, 2.0), 9.0)
+	var count := maxi(4, int(l / 11.0))
+	var prev := a
+	for i in count + 1:
+		var t := float(i) / count
+		var p := a.lerp(b, t) + side * sag * 4.0 * t * (1.0 - t) * (1.0 + sway * (t - 0.5))
+		if i > 0:
+			# links alternate: one seen flat (an oval), the next edge-on (a bar)
+			var mid := (prev + p) * 0.5
+			var dirl := (p - prev).normalized()
+			if i % 2 == 1:
+				var ov := PackedVector2Array()
+				for k in 9:
+					var q := Vector2.from_angle(TAU * k / 8.0)
+					ov.append(mid + dirl * q.x * 7.0 + dirl.orthogonal() * q.y * 3.6)
+				draw_polyline(ov, cc, 1.8)
+			else:
+				draw_line(mid - dirl * 6.5, mid + dirl * 6.5, cc, 2.4)
+		prev = p
+
+
+func _rect_pts(tr: Transform2D, x0: float, y0: float, x1: float, y1: float) -> PackedVector2Array:
+	return PackedVector2Array([tr * Vector2(x0, y0), tr * Vector2(x1, y0), tr * Vector2(x1, y1), tr * Vector2(x0, y1), tr * Vector2(x0, y0)])
+
+
+# The signalman: a mast with its ladder, a semaphore arm that never rests, and
+# the lamp in its hood: the yard's own colour while it waits, red when it calls.
+func _draw_signal(e: E, tr: Transform2D, dim: float) -> void:
+	var r := e.r
+	var ac := acc(SIGNAL, dim, 1.3)
+	var hi := Pal.ink(0.8 * dim, 1.3)
+	for j in 5:
+		var y := lerpf(1.25, -1.2, j / 4.0) * r
+		draw_line(tr * Vector2(-0.36 * r, y), tr * Vector2(0.36 * r, y), hi, 1.4)
+	draw_colored_polygon(_rect_pts(tr, -1.0 * r, 1.45 * r, 1.0 * r, 1.85 * r), ac)
+	var calling := e.mode == 1
+	var sw := -0.85 if calling else 0.3 * sin(e.t * 1.6 + e.seed)
+	var piv := tr * Vector2(0.55 * r, -1.1 * r)
+	var tip := piv + Vector2.from_angle(sw) * 1.7 * r
+	draw_line(piv, tip, Pal.ink(dim, 1.5), 4.0)
+	draw_line(piv.lerp(tip, 0.55), piv.lerp(tip, 0.8), Pal.red(0.95 * dim, 2.0) if calling else ac, 4.5)
+	draw_circle(piv, 3.0, ac)
+	var lamp := tr * Vector2(0, -1.6 * r - 9.0)
+	var on: bool = calling or int(e.t * 2.0) % 2 == 0
+	var lc := Pal.red(0.95 * dim, 2.2) if calling else ac
+	draw_circle(lamp, 9.0, Color(0.03, 0.03, 0.035, dim))
+	draw_arc(lamp, 9.0, PI * 0.85, PI * 2.15, 16, hi, 2.2)
+	if on:
+		draw_circle(lamp, 13.0, Color(lc.r, lc.g, lc.b, lc.a * 0.18))
+		draw_circle(lamp, 5.5, lc)
+	else:
+		draw_arc(lamp, 5.5, 0.0, TAU, 14, lc, 1.5)
+
+
+# The queue: a number board on the head, a ticket on each behind, and the lane
+# of barrier belts they walk between.
+func _draw_queue(e: E, tr: Transform2D, dim: float) -> void:
+	var r := e.r
+	var ac := acc(e.kind, dim, 1.3)
+	var hi := Pal.ink(0.85 * dim, 1.3)
+	if e.kind == QUEUE:
+		# the only face in the game: a small smile, and the board above it
+		var fwd := Vector2.from_angle(e.rot)
+		draw_arc(e.pos + fwd * 2.0, r * 0.42, e.rot - 0.9, e.rot + 0.9, 10, hi, 1.6)
+		draw_colored_polygon(_rect_pts(tr, -0.85 * r, -0.4 * r, -0.2 * r, 0.4 * r), Color(0.03, 0.03, 0.035, dim))
+		draw_polyline(_rect_pts(tr, -0.85 * r, -0.4 * r, -0.2 * r, 0.4 * r), ac, 1.4)
+		# its number rolling over
+		var n := int(e.t * 1.5 + e.seed * 7.0) % 4
+		for j in 3:
+			if (n + j) % 2 == 0:
+				var y := lerpf(-0.25, 0.25, j / 2.0) * r
+				draw_line(tr * Vector2(-0.72 * r, y), tr * Vector2(-0.33 * r, y), ac, 2.0)
+		return
+	# a ticket, its light running down the line
+	var blink := 0.45 + 0.55 * maxf(0.0, sin(e.t * 4.0 - e.seed * 3.0))
+	draw_colored_polygon(_rect_pts(tr, -0.35 * r, -0.3 * r, 0.35 * r, 0.3 * r), acc(QSEG, blink * dim, 1.4))
+	if e.link != null and e.link.state == ALIVE:
+		var a: Vector2 = e.pos
+		var b: Vector2 = e.link.pos
+		var side := (b - a).normalized().orthogonal()
+		for sg: float in [-1.0, 1.0]:
+			var pa := a + side * sg * (r + 7.0)
+			var pb: Vector2 = b + side * sg * (e.link.r + 7.0)
+			var mid: Vector2 = (pa + pb) * 0.5 + side * sg * 2.5
+			draw_polyline(PackedVector2Array([pa, mid, pb]), Color(ac.r, ac.g, ac.b, ac.a * 0.7), 2.5)
+			draw_circle(pa, 3.0, hi)
+
+
+# The registrar: a desk, its window, a stack of forms with the top one lifting.
+func _draw_desk(e: E, tr: Transform2D, dim: float) -> void:
+	var r := e.r
+	var ac := acc(REGISTRAR, dim, 1.3)
+	var hi := Pal.ink(0.8 * dim, 1.3)
+	draw_line(tr * Vector2(-0.6 * r, -0.3 * r), tr * Vector2(0.6 * r, -0.3 * r), hi, 2.4)
+	for j in 3:
+		var o := j * 0.07 * r
+		var lift := (sin(e.t * 3.0 + e.seed) * 0.08 * r) if j == 2 else 0.0
+		draw_polyline(_rect_pts(tr, -0.95 * r + o, 0.0 + o - lift, -0.4 * r + o, 0.42 * r + o - lift), ac, 1.3)
+	draw_circle(tr * Vector2(0.65 * r, 0.2 * r), 0.16 * r, Pal.red(0.5 * dim, 1.2))
+	draw_arc(tr * Vector2(0.65 * r, 0.2 * r), 0.16 * r, 0.0, TAU, 12, hi, 1.2)
+
+
+# The turnstile: the floor it sweeps, marked out; a counter ring in its hub.
+func _draw_gate(e: E, dim: float) -> void:
+	var ac := acc(TURNSTILE, dim, 1.0)
+	var rr := e.r + ARM + 4.0
+	for k in 24:
+		var a0 := TAU * k / 24.0
+		draw_arc(e.pos, rr, a0, a0 + TAU / 48.0, 3, Color(ac.r, ac.g, ac.b, ac.a * 0.35), 1.5)
+	for k in 6:
+		var a1 := -e.rot * 1.5 + TAU * k / 6.0
+		draw_line(e.pos + Vector2.from_angle(a1) * e.r * 0.45, e.pos + Vector2.from_angle(a1) * e.r * 0.7, Pal.ink(0.8 * dim, 1.3), 1.4)
+
+
+# The hound: armour plates down its spine, ears back, a tail that will not keep still.
+func _draw_hound(e: E, tr: Transform2D, dim: float) -> void:
+	var r := e.r
+	var ac := acc(HOUND, dim, 1.3)
+	var hi := Pal.ink(0.85 * dim, 1.3)
+	for j in 3:
+		var x := lerpf(0.45, -0.75, j / 2.0) * r
+		draw_colored_polygon(_rect_pts(tr, x - 0.14 * r, -0.26 * r, x + 0.14 * r, 0.26 * r), ac)
+	var twitch := 0.08 * r * sin(e.t * 9.0 + e.seed) if e.mode == 0 else 0.0
+	for sg: float in [-1.0, 1.0]:
+		draw_line(tr * Vector2(0.95 * r, sg * 0.35 * r), tr * Vector2(0.6 * r - twitch, sg * 0.7 * r), hi, 2.0)
+	var wag := sin(e.t * 12.0 + e.seed) * 0.5 if e.mode == 0 else 0.0
+	var tb := tr * Vector2(-1.35 * r, 0)
+	var tt := tb + Vector2.from_angle(e.rot + PI + wag) * 0.75 * r
+	draw_line(tb, tt, hi, 2.0)
+	draw_circle(tt, 2.2, ac)
+
+
+# The dud: fins at the tail, bands round the case, and a fuse that fizzes even asleep.
+func _draw_dud(e: E, tr: Transform2D, dim: float) -> void:
+	var r := e.r
+	var ac := acc(DUD, dim, 1.3)
+	var hi := Pal.ink(0.85 * dim, 1.3)
+	for sg: float in [-1.0, 1.0]:
+		draw_colored_polygon(PackedVector2Array([tr * Vector2(-0.75 * r, sg * 0.55 * r), tr * Vector2(-1.1 * r, sg * 0.55 * r), tr * Vector2(-1.45 * r, sg * 0.95 * r), tr * Vector2(-1.2 * r, sg * 0.95 * r)]), ac)
+	draw_line(tr * Vector2(-1.1 * r, 0), tr * Vector2(-1.45 * r, 0), ac, 3.0)
+	for x: float in [0.45, -0.35]:
+		draw_line(tr * Vector2(x * r, -0.55 * r), tr * Vector2(x * r, 0.55 * r), hi if x > 0.0 else ac, 3.0)
+	if e.mode == 0:
+		for k in 3:
+			var h := fmod(e.t * 3.0 + k * 0.37 + e.seed, 1.0)
+			var sp := tr * Vector2(r * 1.4, 0) + Vector2.from_angle(e.seed * 5.0 + k * 2.1 + h * 1.3) * h * 12.0
+			draw_circle(sp, 1.6 * (1.0 - h), Pal.ink((1.0 - h) * dim, 2.0))
 
 
 func _draw_zones(dim: float) -> void:

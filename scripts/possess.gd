@@ -1313,6 +1313,15 @@ func _shape(kind: int) -> PackedVector2Array:
 			pts = [Vector2(r * 1.25, 0), Vector2(-r * 0.85, -r * 0.85), Vector2(-r * 0.85, r * 0.85)]
 		Enemies.CHARGER:
 			pts = [Vector2(r * 1.45, 0), Vector2(0, -r * 0.8), Vector2(-r, 0), Vector2(0, r * 0.8)]
+		_ when Enemies.ACCENT.has(kind):
+			# chapters 1-3's own: their real outline, from the enemies' own geometry
+			var fake := Enemies.E.new()
+			fake.kind = kind
+			fake.r = r
+			fake.sides = Enemies.SPEC[kind].sides
+			var own: Array[Vector2] = game.enemies._poly(fake)
+			own.pop_back()
+			pts = PackedVector2Array(own)
 		_:
 			var n: int = Enemies.SPEC[kind].sides
 			var off := PI / 4.0 if kind == Enemies.GUARD else 0.0
