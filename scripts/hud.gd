@@ -1299,13 +1299,36 @@ func _tip_lines(key: String) -> Array:
 		var said := Cards.relic_desc(id, game.star(id))
 		if Cards.STARS.has(id):
 			var nxt := Cards.next_value(id, game.star(id))
-			said += ("；" if Txt.zh else "; ") + (Txt.t("relic_max") if nxt == "" else Txt.t("relic_next") % nxt)
+			said = _join_said([said, Txt.t("relic_max") if nxt == "" else Txt.t("relic_next") % nxt])
 		return [Cards.relic_name(id), kind, said, rar]
 	var lvl: int = game.lv.get(id, 0)
 	var parts: PackedStringArray = []
 	for n in range(1, maxi(1, lvl) + 1):
 		parts.append(Txt.t("up_%s_%d" % [id, n]))
-	return [Txt.t("sch_" + id) + "  Lv%d" % lvl, Txt.t("card_school"), ("；" if Txt.zh else "; ").join(parts), 0]
+	return [Txt.t("sch_" + id) + "  Lv%d" % lvl, Txt.t("card_school"), _join_said(parts), 0]
+
+
+# Sentences that already end in a full stop are not given a second mark ("。；").
+static func _join_said(parts: Array) -> String:
+	var out := ""
+	for raw in parts:
+		var p: String = String(raw).strip_edges()
+		while p.begins_with("；") or p.begins_with(";"):
+			p = p.substr(1).strip_edges()
+		if p == "":
+			continue
+		if out != "":
+			var ends := out.right(1)
+			if ends in ["。", "！", "？", "；"]:
+				pass
+			elif ends in [".", "!", "?", ";"]:
+				out += " "
+			else:
+				out += "。" if Txt.zh else ". "
+		if out != "" and not Txt.zh:
+			p = p.left(1).to_upper() + p.substr(1)
+		out += p
+	return out
 
 
 func _draw_tip(vp: Vector2) -> void:
@@ -1339,8 +1362,30 @@ func _draw_build(vp: Vector2, a: float) -> void:
 	# the pause screen's right column: every school and relic with what it does
 	var w := 430.0
 	var x := vp.x - BAND_EDGE - w
-	var y := vp.y * 0.3
 	var i := 0
+	var entries0: Array = []
+	for k in _held_schools():
+		entries0.append("school:" + k)
+	for id in game.relics:
+		entries0.append("relic:" + id)
+	# fit the column between its top and the slot bar: start higher, then smaller
+	# type, then fewer lines per entry, until it all fits
+	var bottom := vp.y - 130.0
+	var fit := [[15, 22, 99], [14, 19, 99], [13, 17, 99], [13, 17, 4], [13, 17, 3], [12, 15, 2]]
+	var fs := 15
+	var lh := 22.0
+	var cap := 99
+	var y := vp.y * 0.3
+	for f in fit:
+		fs = f[0]
+		lh = f[1]
+		cap = f[2]
+		var need := 42.0
+		for key in entries0:
+			need += 24.0 + mini(cap, _wrap(_tip_lines(key)[2], fs, w).size()) * lh + 10.0
+		y = clampf(bottom - need, vp.y * 0.08, vp.y * 0.3)
+		if y + need <= bottom:
+			break
 	view.draw_string(font_b, Vector2(x, y), Txt.t("build_title"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Pal.ink(0.55 * a))
 	view.draw_line(Vector2(x, y + 12.0), Vector2(x + w * a, y + 12.0), Pal.ink(0.25 * a), 1.0)
 	y += 42.0
@@ -1359,10 +1404,14 @@ func _draw_build(vp: Vector2, a: float) -> void:
 		var dx := (1.0 - ki) * 30.0
 		view.draw_string(font_xl, Vector2(x + dx, y), L[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, (Pal.red(ea, 1.6) if L[3] == 2 else Pal.ink(ea)))
 		y += 24.0
-		for ln in _wrap(L[2], 15, w):
-			view.draw_string(font_s, Vector2(x + dx, y), ln, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Pal.ink(0.6 * ea))
-			y += 22.0
-		y += 14.0
+		var said := _wrap(L[2], fs, w)
+		if said.size() > cap:
+			said = said.slice(0, cap)
+			said[cap - 1] = String(said[cap - 1]).left(-1) + "…"
+		for ln in said:
+			view.draw_string(font_s, Vector2(x + dx, y), ln, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Pal.ink(0.6 * ea))
+			y += lh
+		y += 10.0
 		i += 1
 
 
