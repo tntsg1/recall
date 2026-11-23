@@ -109,5 +109,45 @@ func _run() -> void:
 	await shot("3_institute")
 	await frames(90)
 	await shot("3_institute_b")
+	# ---- each new shell: seize it, three clicks, with targets around
+	var bad := 0
+	for k in [Enemies.COUPLER, Enemies.SIGNAL, Enemies.QUEUE, Enemies.REGISTRAR, Enemies.TURNSTILE, Enemies.HOUND, Enemies.DUD]:
+		clear()
+		if game.possess.state != Possess.IDLE:
+			game.possess.end(false)
+			await frames(30)
+		game.player.pos = pl
+		var sh = put(k, pl)
+		sh.state = Enemies.ALIVE
+		var foes: Array = []
+		for j in 5:
+			var f = put(Enemies.CHASER, pl + Vector2(140 + 40 * j, -60 + 30 * j))
+			f.state = Enemies.ALIVE
+			f.hp = 999.0
+			foes.append(f)
+		game.wave_ctl.phase = Waves.FIGHT
+		game.possess.seize_now(sh)
+		await frames(20)
+		bot.aim = pl + Vector2(300, 0)
+		var hp0 := 0.0
+		for f in foes:
+			hp0 += f.hp
+		for c in 3:
+			bot.fire = true
+			await frames(2)
+			bot.fire = false
+			game.wave_ctl.phase = Waves.FIGHT
+			await frames(28)
+		await frames(20)
+		var hp1 := 0.0
+		for f in foes:
+			hp1 += f.hp
+		var nm: String = Txt.t("shell_k%d" % k)
+		print("shell ", nm, " dealt ", int(hp0 - hp1))
+		if hp1 >= hp0:
+			bad += 1
+		if k == Enemies.TURNSTILE:
+			await shot("shell_turnstile")
+	print("shells bad ", bad)
 	print("foes ok")
 	quit()

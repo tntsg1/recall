@@ -19,7 +19,11 @@ const SHELL_HITS := 3
 const DAZE_TIME := 1.4          # how long a spared enemy reels
 const SPARE_GAP := 6.0          # seconds before another can be spared
 const PX := 2.0                 # one effect pixel = two world units
-const KINDS := [Enemies.CHASER, Enemies.LEECH, Enemies.GUARD, Enemies.CHARGER, Enemies.PRISM, Enemies.PULSE, Enemies.ECHO]
+const KINDS := [Enemies.CHASER, Enemies.LEECH, Enemies.GUARD, Enemies.CHARGER, Enemies.PRISM, Enemies.PULSE, Enemies.ECHO,
+	Enemies.COUPLER, Enemies.SIGNAL, Enemies.QUEUE, Enemies.REGISTRAR, Enemies.TURNSTILE, Enemies.HOUND, Enemies.DUD]
+# chapters 1-3's own shells borrow the pixel body of the old shell nearest their shape
+const ART := {Enemies.COUPLER: "chaser", Enemies.SIGNAL: "guard", Enemies.QUEUE: "leech", Enemies.REGISTRAR: "pulse",
+	Enemies.TURNSTILE: "pulse", Enemies.HOUND: "charger", Enemies.DUD: "leech"}
 const NAMES := {Enemies.CHASER: "chaser", Enemies.LEECH: "leech", Enemies.GUARD: "guard", Enemies.CHARGER: "charger",
 	Enemies.PRISM: "prism", Enemies.PULSE: "pulse", Enemies.ECHO: "echo"}
 const BLAST_R := 120.0
@@ -133,6 +137,7 @@ var boss_hit := {}              # one boss hit per dash / ram / beam
 # the floor infection: the shell itself, its recent trail, and the big landings
 var residue: Array = []         # [pos, radius, life, max life]
 var residue_cd := 0.0
+var boost_t := 0.0              # a signalman's green light, a dud's run: faster for a moment
 
 
 func _ready() -> void:
@@ -482,6 +487,7 @@ func host_step(sdt: float, dt: float, move: Vector2, aim_at: Vector2, fire_held:
 	t_left -= sdt
 	iframes = maxf(0.0, iframes - sdt)
 	recover = maxf(0.0, recover - sdt)
+	boost_t = maxf(0.0, boost_t - sdt)
 	grow = minf(1.0, grow + dt / 0.35)
 	shell.flash = maxf(0.0, shell.flash - dt / 0.12)
 	shell.t += sdt
@@ -498,7 +504,7 @@ func host_step(sdt: float, dt: float, move: Vector2, aim_at: Vector2, fire_held:
 		queued = false
 	# guard, prism and echo take the remembered click once they are ready again
 	var pressed := queued and recover <= 0.0 and dash_t <= 0.0 and spin_t < 0.0 and rush_t <= 0.0 and leap_t < 0.0
-	if pressed and shell.kind in [Enemies.GUARD, Enemies.PRISM, Enemies.ECHO, Enemies.PULSE]:
+	if pressed and shell.kind in [Enemies.GUARD, Enemies.PRISM, Enemies.ECHO, Enemies.PULSE, Enemies.COUPLER, Enemies.SIGNAL, Enemies.QUEUE, Enemies.REGISTRAR, Enemies.TURNSTILE, Enemies.HOUND, Enemies.DUD]:
 		queued = false
 	var r: float = shell.r * 1.3
 	var before: Vector2 = shell.pos
@@ -517,6 +523,22 @@ func host_step(sdt: float, dt: float, move: Vector2, aim_at: Vector2, fire_held:
 			_pulse(sdt, pressed, move, aim_at)
 		Enemies.ECHO:
 			_echo(sdt, pressed, move)
+		Enemies.COUPLER:
+			_s_coupler(sdt, pressed, move)
+		Enemies.SIGNAL:
+			_s_signal(sdt, pressed, move)
+		Enemies.QUEUE:
+			_s_queue(sdt, pressed, move)
+		Enemies.REGISTRAR:
+			_s_registrar(sdt, pressed, move, aim_at)
+		Enemies.TURNSTILE:
+			_s_turnstile(sdt, pressed, move)
+		Enemies.HOUND:
+			_s_hound(sdt, pressed, move, aim_at)
+		Enemies.DUD:
+			_s_dud(sdt, pressed, move)
+			if state != HOST:
+				return
 	var free_pos: Vector2 = shell.pos
 	shell.pos = game.arena.push_circle(shell.pos, r)
 	shell.pos = shell.pos.clamp(Arena.ROOM.position + Vector2(r, r), Arena.ROOM.end - Vector2(r, r))
@@ -1187,7 +1209,7 @@ func _boss_area(at: Vector2, radius: float, dmg: float) -> void:
 # ---------------------------------------------------------------- damage
 
 func _deal(e, dmg: float, dir: Vector2, heavy: bool) -> void:
-	if e.state != Enemies.ALIVE:
+	if e.state != Enemies.ALIVE or e.kind == Enemies.BYSTANDER:
 		return
 	# no damage numbers here: the shell's hits speak through sparks, shake and sound
 	dmg *= power()
@@ -1307,9 +1329,9 @@ const _KIND_OF := {"chaser": Enemies.CHASER, "leech": Enemies.LEECH, "guard": En
 # core outward — the outline breaks into pixel runs (more of it the further the
 # growth has gone), a pixel body shows through, and a fringe of loose pixels
 # dithers the border between the two worlds.
-func _part(name: String, at: Vector2, angle: float, mod: Color) -> void:
+func _part(name: String, at: Vector2, angle: float, mod: Color, shape_of: int = -1) -> void:
 	var parts := name.split("_")
-	var kind: int = _KIND_OF[parts[0]]
+	var kind: int = shape_of if shape_of >= 0 else int(_KIND_OF[parts[0]])
 	var a := mod.a
 	if parts.size() > 1:
 		# the spikes are pure pixel growth
@@ -1477,11 +1499,11 @@ func _draw() -> void:
 		var bf: float = game.sfx.beat_frac()
 		_px_ring(shell.pos, lerpf(70.0, 30.0, bf), cyan(0.15 + 0.5 * (1.0 if on_beat_now() else 0.0), 2.0), 24)
 	var pos: Vector2 = shell.pos
-	var kind_name: String = NAMES[shell.kind]
+	var kind_name: String = art_name(shell.kind)
 	# afterimages
 	for g in ghosts:
 		var gk: float = 1.0 - g[1] / 0.3
-		_part(kind_name, g[0], g[2], Color(0.5, 1.6, 1.8, 0.35 * gk * gk))
+		_part(kind_name, g[0], g[2], Color(0.5, 1.6, 1.8, 0.35 * gk * gk), shell.kind)
 	# the leech's well and the tether to it
 	if well_on:
 		var squeeze := well_t >= SQUEEZE_AT
@@ -1521,7 +1543,7 @@ func _draw() -> void:
 		var lk := clampf(leap_t / LEAP_TIME, 0.0, 1.0)
 		shake.y -= sin(lk * PI) * 70.0
 		_px_ring(leap_to, BLINK_SLAM_R * (1.0 - 0.6 * lk), cyan(0.3 + 0.5 * lk, 2.0))
-	_part(kind_name, pos + shake, draw_rot, mod)
+	_part(kind_name, pos + shake, draw_rot, mod, shell.kind)
 	if shell.kind == Enemies.GUARD:
 		# the raised shield: a thick pixel arc toward the aim
 		for j in 9:
@@ -1554,3 +1576,183 @@ func _draw_key(at: Vector2, a: float) -> void:
 	_px_line(Vector2(box.position.x, box.end.y), box.end, cyan(a * 0.8, 1.6))
 	_px_line(box.position, Vector2(box.position.x, box.end.y), cyan(a * 0.8, 1.6))
 	_px_line(Vector2(box.end.x, box.position.y), box.end, cyan(a * 0.8, 1.6))
+
+
+
+static func art_name(kind: int) -> String:
+	return NAMES[kind] if NAMES.has(kind) else String(ART[kind])
+
+
+# ================================================================ chapters 1-3's own shells
+# One click, a second, a third that finishes; the same rhythm as the old shells.
+func _staged(pressed: bool) -> int:
+	stage_window -= 0.0
+	if not pressed or recover > 0.0:
+		return 0
+	stage = stage + 1 if stage_window > 0.0 and stage < 3 else 1
+	stage_window = 0.7
+	recover = 0.16
+	return stage
+
+
+func _land(at: Vector2, radius: float, dmg: float, heavy: bool) -> void:
+	for e in game.enemies.list:
+		if e.state == Enemies.ALIVE and e.pos.distance_to(at) < radius + e.r:
+			var d: Vector2 = (e.pos - at).normalized() if e.pos.distance_to(at) > 1.0 else Vector2.UP
+			_deal(e, dmg, d, true)
+			e.knock += d * (600.0 if heavy else 380.0)
+	_boss_area(at, radius, dmg)
+	bursts.append([at, radius, 0.0])
+	game.sfx.play("p_slam" if heavy else "p_hit", 1.0 if heavy else 1.15, -1.0 if heavy else -4.0)
+	game.cam.add_trauma(0.4 if heavy else 0.18)
+	if heavy:
+		_finisher(at, radius)
+
+
+# The coupled pair: the other half on its chain swings round you; the third
+# click throws it.
+func _s_coupler(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 360.0, 12.0)
+	match _staged(pressed):
+		1, 2:
+			for e in game.enemies.list:
+				var d: Vector2 = e.pos - shell.pos
+				if e.state == Enemies.ALIVE and d.length() < 180.0 + e.r:
+					_deal(e, 35.0, d.normalized() if d.length() > 1.0 else Vector2.UP, true)
+			_boss_area(shell.pos, 180.0, 35.0)
+			bursts.append([shell.pos, 160.0, 0.0])
+			game.sfx.play("p_hit", 1.2, -3.0)
+		3:
+			var to: Vector2 = shell.pos + aim * 260.0
+			to = to.clamp(Arena.ROOM.position + Vector2(30, 30), Arena.ROOM.end - Vector2(30, 30))
+			afterlines.append([shell.pos, to, 0.0])
+			_land(to, 110.0, 60.0, true)
+			stage = 0
+
+
+# The signalman: red light holds a cone of them still; green light sends you off
+# fast; the third click turns every light near you red.
+func _s_signal(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 320.0 * (2.0 if boost_t > 0.0 else 1.0), 12.0)
+	match _staged(pressed):
+		1:
+			for e in game.enemies.list:
+				var d: Vector2 = e.pos - shell.pos
+				if e.state == Enemies.ALIVE and d.length() < 380.0 + e.r and absf(aim.angle_to(d)) < 0.6:
+					e.dazed = 1.2
+					_deal(e, 10.0, d.normalized(), false)
+			for k in 7:
+				bursts.append([shell.pos + aim.rotated(lerpf(-0.6, 0.6, k / 6.0)) * 240.0, 14.0, 0.15])
+			game.sfx.play("horn", 1.6, -8.0)
+		2:
+			boost_t = 1.0
+			bursts.append([shell.pos, 50.0, 0.0])
+			game.sfx.play("dash", 1.3, -6.0)
+		3:
+			for e in game.enemies.list:
+				var d: Vector2 = e.pos - shell.pos
+				if e.state == Enemies.ALIVE and d.length() < 380.0 + e.r:
+					e.dazed = 1.6
+					_deal(e, 20.0, d.normalized() if d.length() > 1.0 else Vector2.UP, true)
+			_finisher(shell.pos, 380.0)
+			stage = 0
+
+
+# The queue: its tail swept round in an arc; the third click sends the four
+# behind it off as lines at the nearest four.
+func _s_queue(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 360.0, 12.0)
+	match _staged(pressed):
+		1, 2:
+			_cone(aim, 1.2, 200.0, 30.0, 420.0, true)
+			game.sfx.play("p_hit", 1.1, -3.0)
+		3:
+			var near: Array = []
+			for e in game.enemies.list:
+				if e.state == Enemies.ALIVE and e.kind != Enemies.BYSTANDER:
+					near.append(e)
+			near.sort_custom(func(a, b): return a.pos.distance_squared_to(shell.pos) < b.pos.distance_squared_to(shell.pos))
+			for k in mini(4, near.size()):
+				_beam((near[k].pos - shell.pos).normalized(), 45.0)
+			if near.is_empty():
+				_beam(aim, 45.0)
+			_finisher(shell.pos, 150.0)
+			stage = 0
+
+
+# The registrar: a stamp where you aim; the third click stamps everything near.
+func _s_registrar(sdt: float, pressed: bool, move: Vector2, aim_at: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 280.0, 12.0)
+	match _staged(pressed):
+		1, 2:
+			var to: Vector2 = shell.pos + (aim_at - shell.pos).limit_length(320.0)
+			_land(to, 80.0, 45.0, false)
+			game.sfx.play("stamp", 1.4, -4.0)
+		3:
+			for e in game.enemies.list:
+				if e.state == Enemies.ALIVE and e.pos.distance_to(shell.pos) < 520.0:
+					_deal(e, 40.0, Vector2.DOWN, true)
+					bursts.append([e.pos, 40.0, 0.0])
+			game.sfx.play("stamp", 1.0, -1.0)
+			_finisher(shell.pos, 260.0)
+			stage = 0
+
+
+# The turnstile: spinning hard, its arms throw back all round; the third click
+# lets the three arms go as blades.
+func _s_turnstile(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 260.0, 10.0)
+	shell.rot += 6.0 * sdt
+	match _staged(pressed):
+		1, 2:
+			_cone(aim, PI, 130.0, 30.0, 600.0)
+			game.sfx.play("shield", 1.4, -4.0)
+		3:
+			for k in 3:
+				_beam(Vector2.from_angle(shell.rot + TAU * k / 3.0), 50.0)
+			_finisher(shell.pos, 140.0)
+			stage = 0
+
+
+# The hound: a leap to where you aim; the third lands hard.
+func _s_hound(sdt: float, pressed: bool, move: Vector2, aim_at: Vector2) -> void:
+	stage_window -= sdt
+	if leap_t >= 0.0:
+		leap_t += sdt
+		var k := clampf(leap_t / LEAP_TIME, 0.0, 1.0)
+		shell.pos = leap_from.lerp(leap_to, Pal.ease_io(k))
+		vel = Vector2.ZERO
+		if k >= 1.0:
+			leap_t = -1.0
+			var hard := stage >= 3
+			_land(leap_to, 150.0 if hard else 90.0, 80.0 if hard else 40.0, hard)
+			if hard:
+				stage = 0
+			recover = 0.2
+		return
+	_move(sdt, move, 380.0, 12.0)
+	if _staged(pressed) > 0:
+		var to: Vector2 = shell.pos + (aim_at - shell.pos).limit_length(360.0)
+		to = game.arena.push_circle(to, shell.r * 1.3)
+		leap_t = 0.0
+		leap_from = shell.pos
+		leap_to = to.clamp(Arena.ROOM.position + Vector2(30, 30), Arena.ROOM.end - Vector2(30, 30))
+		game.sfx.play("dash_e", 1.1, -4.0)
+
+
+# The dud: a run, then it goes off, wider than any shell's end.
+func _s_dud(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 240.0 * (2.0 if boost_t > 0.0 else 1.0), 10.0)
+	match _staged(pressed):
+		1:
+			boost_t = 1.5
+			game.sfx.play("dash", 0.9, -5.0)
+		2, 3:
+			_land(shell.pos, 200.0, 110.0, true)
+			end(false)
