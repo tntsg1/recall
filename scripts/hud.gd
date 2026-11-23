@@ -18,6 +18,7 @@ var combo_live := false
 var combo_stamp := 0.0
 var combo_seize := false   # counting a seized shell's hits (cyan, "combo") instead of pierces
 var hint_a := 1.0
+const HINT_LEARNED := 3        # times an action is done before its hint leaves the band
 var hint_fade := false
 var hint_timer := 0.0
 var paused := false
@@ -432,6 +433,9 @@ func _draw_view() -> void:
 		var hint_keys := ["hint_fire", "hint_recall", "hint_dash"]
 		if game.lightwalk != null and game.lightwalk.available():
 			hint_keys.append("hint_lightwalk")
+		# a hint goes for good once you have done what it says a few times
+		var md := Meta.load_data()
+		hint_keys = hint_keys.filter(func(k): return int(md.get(k, 0)) < HINT_LEARNED)
 		# the row stops short of the cracks in the middle; what does not fit goes on a line above
 		var room_w := vp.x / 2.0 - 260.0 - BAND_EDGE
 		var rows: Array = [""]

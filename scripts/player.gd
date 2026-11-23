@@ -97,6 +97,8 @@ func try_dash(move: Vector2) -> bool:
 	if dash_cd > 0.0 or dash_t > 0.0:
 		return false
 	dash_dir = move.normalized() if move.length() > 0.1 else aim
+	if game.bot == null:
+		Meta.count("hint_dash")
 	dash_t = DASH_TIME * (1.0 + game.sv("swift_feet") / 100.0 if game.has("swift_feet") else 1.0)
 	dash_cd = DASH_CD * (1.0 - game.sv("lightstep") / 100.0 if game.has("lightstep") else 1.0)
 	ghost_cd = 0.0

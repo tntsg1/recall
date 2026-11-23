@@ -123,6 +123,8 @@ func try_start(move: Vector2) -> bool:
 	to = maxf(0.0, b.total() - OFF_WALL) if dir > 0.0 else 0.0
 	cut.clear()
 	on = true
+	if game.bot == null:
+		Meta.count("hint_lightwalk")
 	flare = 1.0
 	at_in = b.sample(s)
 	b.walked = true

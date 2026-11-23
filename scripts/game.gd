@@ -1123,6 +1123,8 @@ func _release() -> void:
 	if on_beat and Meta.count("beat") >= 10:
 		ach("beat10")
 	ach("first_recall")
+	if bot == null:
+		Meta.count("hint_recall")
 	pass_beat = has("downbeat") and on_beat
 	if pass_beat:
 		hud.flash_text(Cards.relic_name("downbeat"))

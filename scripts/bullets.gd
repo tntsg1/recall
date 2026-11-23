@@ -345,6 +345,8 @@ func recall_active() -> bool:
 
 
 func fire(origin: Vector2, dir: Vector2) -> void:
+	if game.bot == null:
+		Meta.count("hint_fire")      # (its hint in the band goes once you have done it a few times)
 	var b := B.new()
 	b.pos = origin
 	b.dir = dir.normalized()
