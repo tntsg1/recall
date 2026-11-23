@@ -21,12 +21,15 @@ const SPARE_GAP := 6.0          # seconds before another can be spared
 const PX := 2.0                 # one effect pixel = two world units
 const KINDS := [Enemies.CHASER, Enemies.LEECH, Enemies.GUARD, Enemies.CHARGER, Enemies.PRISM, Enemies.PULSE, Enemies.ECHO,
 	Enemies.COUPLER, Enemies.SIGNAL, Enemies.QUEUE, Enemies.REGISTRAR, Enemies.TURNSTILE, Enemies.HOUND, Enemies.DUD,
-	Enemies.HOPPER, Enemies.FORKLIFT, Enemies.SLED, Enemies.CONSIST, Enemies.PANTO, Enemies.SURGE, Enemies.CABLER]
+	Enemies.HOPPER, Enemies.FORKLIFT, Enemies.SLED, Enemies.CONSIST, Enemies.PANTO, Enemies.SURGE, Enemies.CABLER,
+	Enemies.SUBWOOFER, Enemies.CHOIR, Enemies.FORGER, Enemies.REDACTOR, Enemies.DRIFTER, Enemies.BOOTMAN, Enemies.TANK]
 # chapters 1-3's own shells borrow the pixel body of the old shell nearest their shape
 const ART := {Enemies.COUPLER: "chaser", Enemies.SIGNAL: "guard", Enemies.QUEUE: "leech", Enemies.REGISTRAR: "pulse",
 	Enemies.TURNSTILE: "pulse", Enemies.HOUND: "charger", Enemies.DUD: "leech",
 	Enemies.HOPPER: "guard", Enemies.FORKLIFT: "charger", Enemies.SLED: "charger", Enemies.CONSIST: "leech",
-	Enemies.PANTO: "pulse", Enemies.SURGE: "pulse", Enemies.CABLER: "chaser"}
+	Enemies.PANTO: "pulse", Enemies.SURGE: "pulse", Enemies.CABLER: "chaser",
+	Enemies.SUBWOOFER: "pulse", Enemies.CHOIR: "echo", Enemies.FORGER: "guard", Enemies.REDACTOR: "guard",
+	Enemies.DRIFTER: "chaser", Enemies.BOOTMAN: "guard", Enemies.TANK: "leech"}
 const NAMES := {Enemies.CHASER: "chaser", Enemies.LEECH: "leech", Enemies.GUARD: "guard", Enemies.CHARGER: "charger",
 	Enemies.PRISM: "prism", Enemies.PULSE: "pulse", Enemies.ECHO: "echo"}
 const BLAST_R := 120.0
@@ -556,6 +559,20 @@ func host_step(sdt: float, dt: float, move: Vector2, aim_at: Vector2, fire_held:
 			_s_surge(sdt, pressed, move)
 		Enemies.CABLER:
 			_s_cabler(sdt, pressed, move)
+		Enemies.SUBWOOFER:
+			_s_subwoofer(sdt, pressed, move)
+		Enemies.CHOIR:
+			_s_choir(sdt, pressed, move)
+		Enemies.FORGER:
+			_s_forger(sdt, pressed, move)
+		Enemies.REDACTOR:
+			_s_redactor(sdt, pressed, move)
+		Enemies.DRIFTER:
+			_s_drifter(sdt, pressed, move)
+		Enemies.BOOTMAN:
+			_s_bootman(sdt, pressed, move)
+		Enemies.TANK:
+			_s_tank(sdt, pressed, move)
 	var free_pos: Vector2 = shell.pos
 	shell.pos = game.arena.push_circle(shell.pos, r)
 	shell.pos = shell.pos.clamp(Arena.ROOM.position + Vector2(r, r), Arena.ROOM.end - Vector2(r, r))
@@ -1911,4 +1928,138 @@ func _s_cabler(sdt: float, pressed: bool, move: Vector2) -> void:
 					e.knock += d.normalized() * 600.0
 					_deal(e, 50.0, d.normalized(), true)
 			_finisher(shell.pos, 220.0)
+			stage = 0
+
+
+
+# ================================================================ chapters 7-9's own shells
+func _near_foes(n: int) -> Array:
+	var near: Array = []
+	for e in game.enemies.list:
+		if e.state == Enemies.ALIVE and e.kind != Enemies.BYSTANDER:
+			near.append(e)
+	near.sort_custom(func(a, b): return a.pos.distance_squared_to(shell.pos) < b.pos.distance_squared_to(shell.pos))
+	return near.slice(0, n)
+
+
+# The subwoofer: a ring of sound about you, twice as hard on the beat; the
+# third click sends three.
+func _s_subwoofer(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 240.0, 10.0)
+	var bf: float = game.sfx.beat_frac()
+	var on_beat := bf < 0.2 or bf > 0.85
+	match _staged(pressed):
+		1, 2:
+			_ring_hit(shell.pos, 160.0, 40.0 if on_beat else 20.0)
+			game.sfx.play("slam", 0.6, -6.0)
+		3:
+			for rr: float in [120.0, 200.0, 280.0]:
+				_ring_hit(shell.pos, rr, 25.0)
+			_finisher(shell.pos, 280.0)
+			stage = 0
+
+
+# The choir: three voices with yours, lines out three ways; the third click
+# pulls the nearest to you.
+func _s_choir(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 320.0, 12.0)
+	match _staged(pressed):
+		1, 2:
+			for a: float in [-0.45, 0.0, 0.45]:
+				_beam(aim.rotated(a), 30.0)
+			game.sfx.play("lit", 1.5, -6.0)
+		3:
+			for e in _near_foes(4):
+				var d: Vector2 = shell.pos - e.pos
+				e.knock += d.normalized() * 800.0
+				_deal(e, 40.0, d.normalized(), true)
+			_finisher(shell.pos, 180.0)
+			stage = 0
+
+
+# The forger: a false round where you aim that goes off; the third sends
+# lines at the nearest three.
+func _s_forger(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 300.0, 12.0)
+	match _staged(pressed):
+		1, 2:
+			_land(shell.pos + aim * 220.0, 70.0, 35.0, false)
+		3:
+			var near := _near_foes(3)
+			for e in near:
+				_beam((e.pos - shell.pos).normalized(), 45.0)
+			if near.is_empty():
+				_beam(aim, 45.0)
+			_finisher(shell.pos, 150.0)
+			stage = 0
+
+
+# The redactor: a black bar down the line you aim; the third click blacks out
+# a whole patch, everything in it reeling.
+func _s_redactor(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 280.0, 12.0)
+	match _staged(pressed):
+		1, 2:
+			_beam(aim, 30.0)
+			game.sfx.play("stamp", 0.8, -6.0)
+		3:
+			var at: Vector2 = shell.pos + aim * 200.0
+			for e in game.enemies.list:
+				if e.state == Enemies.ALIVE and e.pos.distance_to(at) < 160.0 + e.r:
+					e.dazed = 1.0
+			_land(at, 160.0, 30.0, true)
+			stage = 0
+
+
+# The drifter: thrust hard down the line you aim; the third spins you round.
+func _s_drifter(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 380.0, 6.0)
+	match _staged(pressed):
+		1, 2:
+			_beam(aim, 60.0)
+			var to: Vector2 = (shell.pos + aim * 200.0).clamp(Arena.ROOM.position + Vector2(30, 30), Arena.ROOM.end - Vector2(30, 30))
+			afterlines.append([shell.pos, to, 0.0])
+			shell.pos = game.arena.push_circle(to, shell.r * 1.3)
+			game.sfx.play("dash", 1.1, -5.0)
+		3:
+			_ring_hit(shell.pos, 150.0, 60.0)
+			_finisher(shell.pos, 150.0)
+			stage = 0
+
+
+# The bootman: the floor stamped, everything thrown back; the third stamps hard.
+func _s_bootman(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 220.0, 12.0)
+	match _staged(pressed):
+		1, 2:
+			for e in game.enemies.list:
+				var d: Vector2 = e.pos - shell.pos
+				if e.state == Enemies.ALIVE and d.length() < 150.0 + e.r:
+					e.knock += d.normalized() * 700.0
+			_ring_hit(shell.pos, 150.0, 30.0)
+			game.sfx.play("slam", 0.8, -4.0)
+		3:
+			_land(shell.pos, 200.0, 60.0, true)
+			stage = 0
+
+
+# The oxygen tank: vent, and the jet throws you forward and what is ahead aside.
+func _s_tank(sdt: float, pressed: bool, move: Vector2) -> void:
+	stage_window -= sdt
+	_move(sdt, move, 260.0, 10.0)
+	var s := _staged(pressed)
+	if s > 0:
+		_cone(aim, 0.4, 260.0, 40.0, 800.0)
+		var to: Vector2 = (shell.pos + aim * 300.0).clamp(Arena.ROOM.position + Vector2(30, 30), Arena.ROOM.end - Vector2(30, 30))
+		afterlines.append([shell.pos, to, 0.0])
+		shell.pos = game.arena.push_circle(to, shell.r * 1.3)
+		game.sfx.play("release", 1.4, -6.0)
+		if s == 3:
+			_finisher(shell.pos, 160.0)
 			stage = 0

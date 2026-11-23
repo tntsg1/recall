@@ -7,7 +7,8 @@ extends Node2D
 enum { WARN, SPAWN, ALIVE, DEAD, HOST }   # HOST: seized by you (Possess drives it)
 enum { CHASER, GUARD, CHARGER, PRISM, LEECH, PULSE, ECHO, INSPECTOR, PROOFREADER, ESCORT, PHASE,
 	COUPLER, SIGNAL, QUEUE, QSEG, REGISTRAR, TURNSTILE, HOUND, DUD, BYSTANDER,
-	HOPPER, CAN, FORKLIFT, SLED, CONSIST, CAR, PANTO, SURGE, CABLER }
+	HOPPER, CAN, FORKLIFT, SLED, CONSIST, CAR, PANTO, SURGE, CABLER,
+	SUBWOOFER, CHOIR, FORGER, REDACTOR, DRIFTER, BOOTMAN, TANK }
 enum { APPROACH, WINDUP, DASH, STUN, RECOVER }
 
 const SPEC := {
@@ -46,6 +47,16 @@ const SPEC := {
 	# chapter 6, the energy bureau: the surge, the cabler
 	SURGE: {"hp": 45.0, "r": 16.0, "sides": 6, "speed": 190.0},
 	CABLER: {"hp": 40.0, "r": 14.0, "sides": 4, "speed": 170.0},
+	# chapter 7, the bureau of thought: the subwoofer, the choir
+	SUBWOOFER: {"hp": 90.0, "r": 22.0, "sides": 8, "speed": 0.0},
+	CHOIR: {"hp": 45.0, "r": 12.0, "sides": 6, "speed": 80.0},
+	# chapter 8, the deep archive: the forger, the redactor
+	FORGER: {"hp": 55.0, "r": 20.0, "sides": 5, "speed": 110.0},
+	REDACTOR: {"hp": 50.0, "r": 16.0, "sides": 4, "speed": 80.0},
+	# chapter 9, the orbital elevator: the drifter, the bootman, the oxygen tank
+	DRIFTER: {"hp": 26.0, "r": 13.0, "sides": 3, "speed": 360.0},
+	BOOTMAN: {"hp": 110.0, "r": 23.0, "sides": 4, "speed": 80.0},
+	TANK: {"hp": 40.0, "r": 18.0, "sides": 6, "speed": 40.0},
 }
 # each chapter's own enemies wear that chapter's colour (red stays for danger alone)
 const RUST := Color(1.0, 0.52, 0.2)      # chapter 1, the yard
@@ -54,11 +65,15 @@ const STERILE := Color(0.3, 1.0, 0.62)     # chapter 3, the institute
 const CAN_YELLOW := Color(1.0, 0.82, 0.25)   # chapter 4, the production union
 const RAIL_VIOLET := Color(0.68, 0.5, 1.0)   # chapter 5, the superconducting line
 const VOLT_PINK := Color(1.0, 0.4, 0.85)     # chapter 6, the energy bureau
+const LIME := Color(0.75, 1.0, 0.2)          # chapter 7, the bureau of thought
+const PAPER := Color(0.9, 0.75, 0.5)         # chapter 8, the deep archive
+const ICE := Color(0.9, 0.95, 1.0)           # chapter 9, the orbital elevator
 const ACCENT := {COUPLER: RUST, SIGNAL: RUST, QUEUE: FILE_BLUE, QSEG: FILE_BLUE, REGISTRAR: FILE_BLUE, TURNSTILE: FILE_BLUE,
 	HOUND: STERILE, DUD: STERILE, BYSTANDER: STERILE,
 	HOPPER: CAN_YELLOW, CAN: CAN_YELLOW, FORKLIFT: CAN_YELLOW,
 	SLED: RAIL_VIOLET, CONSIST: RAIL_VIOLET, CAR: RAIL_VIOLET, PANTO: RAIL_VIOLET,
-	SURGE: VOLT_PINK, CABLER: VOLT_PINK}
+	SURGE: VOLT_PINK, CABLER: VOLT_PINK,
+	SUBWOOFER: LIME, CHOIR: LIME, FORGER: PAPER, REDACTOR: PAPER, DRIFTER: ICE, BOOTMAN: ICE, TANK: ICE}
 const CHAIN_MIN := 140.0      # a coupled pair's chain goes taut between these
 const CHAIN_MAX := 290.0
 const CHAIN_WARN := 0.5
@@ -138,6 +153,12 @@ var fixes: Array = []        # a proofreader's corrections: [round, from, to, t]
 var zones: Array = []        # ground danger: {c, size, t, warn, ink, hit, by}
 var misfired_wave := -1      # (the broadcast about hitting a passer-by: once a wave)
 var quench := {}             # a surge has eaten the current of these rounds: instance id -> seconds
+var rings: Array = []        # a subwoofer's sound rings: {c, t, hit}
+var choirs := {}             # choir id -> {c, a, f, dead: [[slot, t]]}
+var next_choir := 1
+var step_n := 0
+var fakes: Array = []        # a forger's false rounds: {p, by, fire}
+var blots: Array = []        # a redactor's ink: {c, from, w, life}
 
 
 func _ready() -> void:
@@ -205,6 +226,16 @@ func spawn(kind: int, pos: Vector2, delay: float = 0.0) -> E:
 			e.cool = 1.0
 		CONSIST:
 			_next_corner(e)
+		SUBWOOFER:
+			_to_wall(e)
+		PULSE:
+			# the bureau of thought: half of them jump between the beats
+			if Chapters.story(game.chapter) == 7 and randf() < 0.5:
+				e.shunt = true
+		TANK:
+			if game.vents.active():
+				var dk: int = randi() % game.vents.doors.size()
+				e.pos = game.vents.door_pos(dk) + game.vents.doors[dk][1] * randf_range(150.0, 220.0) + Vector2.from_angle(randf() * TAU) * 40.0
 	for k in e.sides:
 		e.offs.append([Vector2.from_angle(randf() * TAU) * randf_range(50, 90), randf_range(-2.5, 2.5)])
 	list.append(e)
@@ -308,6 +339,9 @@ func sweep(a: Vector2, b: Vector2, bullet, ret: bool) -> void:
 			continue
 		if e.kind == HOUND and e.mode == 2:
 			continue
+		if not blots.is_empty() and inked(e.pos):
+			# in a redactor's ink: struck from the record, nothing touches it
+			continue
 		if e.kind == PHASE and phased(e):
 			# it passes through: a glint where it crossed
 			if not bullet.hit.has(-e.id):
@@ -332,8 +366,9 @@ func sweep(a: Vector2, b: Vector2, bullet, ret: bool) -> void:
 			if not ret and game.has("sniper"):
 				dmg *= 1.0 + game.sv("sniper") / 100.0 * bullet.total() / 100.0
 			if e.kind == PULSE:
-				# its shell is open just after each beat
-				dmg *= 1.5 if game.sfx.beat_frac() < 0.35 else 0.25
+				# its shell is open just after each beat (an offbeat one's, between them)
+				var bf: float = fmod(game.sfx.beat_frac() + (0.5 if e.shunt else 0.0), 1.0)
+				dmg *= 1.5 if bf < 0.35 else 0.25
 			if ret and e.pinned > 0.0:
 				dmg *= 2.0
 			if ret:
@@ -402,6 +437,8 @@ func _hit(e: E, dmg: float, dir: Vector2, at: Vector2, ret: bool) -> void:
 			game.sfx.play("p_slam", 1.4, -8.0)
 		return
 	dmg *= _armor(e)
+	if e.kind == TANK:
+		e.dash_dir = dir
 	var before := _edges_left(e)
 	e.hp -= dmg
 	var after := _edges_left(e)
@@ -482,6 +519,8 @@ func blast_hit(e: E, dir: Vector2, dmg: float, show_number: bool = true) -> void
 	if e.kind == PHASE and phased(e):
 		return
 	dmg *= _armor(e)
+	if e.kind == TANK:
+		e.dash_dir = dir
 	e.hp -= dmg
 	e.flash = 1.0
 	e.knock += dir * 220.0
@@ -580,6 +619,11 @@ func step(dt: float) -> void:
 		quench[qk] -= dt
 		if quench[qk] <= 0.0:
 			quench.erase(qk)
+	step_n += 1
+	_step_rings(dt, pl)
+	_step_choirs(dt, pl)
+	_step_fakes(dt, pl)
+	_step_blots(dt)
 	_step_fixes(dt)
 	_step_zones(dt, pl)
 	var i := 0
@@ -701,7 +745,21 @@ func step(dt: float) -> void:
 						_surge(e, pl, dt)
 					CABLER:
 						_cabler(e, pl, dt)
-				if not (e.kind in [QSEG, BYSTANDER, SLED, CAR, HOPPER, PANTO]) and not (e.kind == HOUND and e.mode == 2):
+					SUBWOOFER:
+						_subwoofer(e, dt)
+					CHOIR:
+						_choir(e, pl, dt)
+					FORGER:
+						_forger(e, pl, dt)
+					REDACTOR:
+						_redactor(e, pl, dt)
+					DRIFTER:
+						_drifter(e, pl, dt)
+					BOOTMAN:
+						_bootman(e, pl, dt)
+					TANK:
+						_tank(e, dt)
+				if not (e.kind in [QSEG, BYSTANDER, SLED, CAR, HOPPER, PANTO, SUBWOOFER, CHOIR]) and not (e.kind == HOUND and e.mode == 2):
 					_separate(e, dt)
 				if game.focusing and game.has("gravity"):
 					_gravity(e, dt)
@@ -733,6 +791,9 @@ func step(dt: float) -> void:
 					_slam(e)
 				if ((e.kind == FORKLIFT and e.mode == 2) or (e.kind == CONSIST and e.mode == 3)) and e.pos.distance_to(intended) > 2.0:
 					_jam(e)
+				if e.kind == DRIFTER and e.pos.distance_to(intended) > 1.0:
+					# no grip on anything: it bounces off the wall
+					e.vel = e.vel.bounce((e.pos - intended).normalized()) * 0.8
 				_contact(e, pl)
 		i += 1
 	queue_redraw()
@@ -774,7 +835,7 @@ func _gravity(e: E, dt: float) -> void:
 
 # Pulses move only on the beat: a hop toward you, then stillness.
 func _pulse(e: E, pl: Vector2, dt: float) -> void:
-	var bi := int(floor(game.sfx.beat()))
+	var bi := int(floor(game.sfx.beat() + (0.5 if e.shunt else 0.0)))
 	e.vel = Pal.damp2(e.vel, Vector2.ZERO, 9.0, dt)
 	if bi != e.last_beat:
 		e.last_beat = bi
@@ -1272,8 +1333,9 @@ func _poly(e: E) -> Array[Vector2]:
 			for k in 3:
 				pts.append(Vector2.from_angle(TAU * k / 3.0) * e.r)
 		PULSE:
-			var open: bool = game.sfx.beat_frac() < 0.35
-			var k6: float = 1.0 + (0.18 * (1.0 - game.sfx.beat_frac() / 0.35) if open else 0.0)
+			var pbf: float = fmod(game.sfx.beat_frac() + (0.5 if e.shunt else 0.0), 1.0)
+			var open: bool = pbf < 0.35
+			var k6: float = 1.0 + (0.18 * (1.0 - pbf / 0.35) if open else 0.0)
 			for k in 6:
 				pts.append(Vector2.from_angle(TAU * k / 6.0) * e.r * k6)
 		ECHO:
@@ -1352,6 +1414,27 @@ func _poly(e: E) -> Array[Vector2]:
 				pts.append(v * e.r)
 		PANTO:
 			for v in [Vector2(0.9, 0), Vector2(-0.75, 0.95), Vector2(-0.75, -0.95)]:
+				pts.append(v * e.r)
+		SUBWOOFER:
+			for k in 8:
+				pts.append(Vector2.from_angle(TAU * k / 8.0 + PI / 8.0) * e.r)
+		CHOIR:
+			for k in 6:
+				pts.append(Vector2.from_angle(TAU * k / 6.0) * e.r)
+		FORGER:
+			for k in 5:
+				pts.append(Vector2.from_angle(TAU * k / 5.0) * e.r)
+		REDACTOR:
+			# narrow: the one half-solid shape in the game
+			for v in [Vector2(1.15, -0.5), Vector2(1.15, 0.5), Vector2(-1.15, 0.5), Vector2(-1.15, -0.5)]:
+				pts.append(v * e.r)
+		DRIFTER:
+			pts = [Vector2(e.r * 1.25, 0), Vector2(-e.r * 0.85, -e.r * 0.85), Vector2(-e.r * 0.85, e.r * 0.85)]
+		BOOTMAN:
+			for v in [Vector2(0.8, -0.8), Vector2(0.8, 0.8), Vector2(-0.8, 0.8), Vector2(-0.8, -0.8)]:
+				pts.append(v * e.r)
+		TANK:
+			for v in [Vector2(1.0, -0.35), Vector2(1.0, 0.35), Vector2(0.7, 0.6), Vector2(-1.0, 0.6), Vector2(-1.0, -0.6), Vector2(0.7, -0.6)]:
 				pts.append(v * e.r)
 		SURGE:
 			# a hexagon with a ragged edge, swelling as it feeds
@@ -1553,6 +1636,8 @@ func _draw() -> void:
 	if not fixes.is_empty() or game.shelves.active():
 		_draw_fixes(dim)
 	_draw_zones(dim)
+	if not rings.is_empty() or not fakes.is_empty() or not blots.is_empty():
+		_draw_world789(dim)
 
 
 func _draw_fixes(dim: float) -> void:
@@ -2009,6 +2094,18 @@ func _died(e: E) -> void:
 		COUPLER:
 			if e.link != null and e.link.link == e:
 				e.link.link = null
+		CHOIR:
+			if choirs.has(e.pass_hits):
+				# the others sing it back at the next beat, unless they are gone too
+				var spb: float = 60.0 / game.sfx.bpm()
+				choirs[e.pass_hits].dead.append([int(e.orbit_a), 0.3 + (1.0 - game.sfx.beat_frac()) * spb])
+		FORGER:
+			for f in fakes:
+				if f.by == e:
+					game.fx.ring(f.p, 4.0, 26.0, 0.25, acc(FORGER, 0.6, 1.4), 1.5)
+			fakes = fakes.filter(func(f): return f.by != e)
+		TANK:
+			_jet(e)
 		CONSIST, CAR:
 			for o in list:
 				if o.state == ALIVE and o.link == e and o.kind == CAR:
@@ -2090,6 +2187,8 @@ func _draw_extra(e: E, tr: Transform2D, dim: float) -> void:
 			_draw_line5(e, tr, dim)
 		SURGE, CABLER:
 			_draw_bureau(e, tr, dim)
+		SUBWOOFER, CHOIR, FORGER, REDACTOR, DRIFTER, BOOTMAN, TANK:
+			_draw_789(e, tr, dim)
 		BYSTANDER:
 			# a head, a case in one hand; faint, and nothing red about it
 			var pc := acc(BYSTANDER, 0.5 * dim, 1.0)
@@ -2321,6 +2420,9 @@ func _armor(e: E) -> float:
 		SLED:
 			# stopped on a dead rail it is soft
 			return 1.5 if e.mode == 1 else 1.0
+		SUBWOOFER:
+			# its cone is open just after each beat
+			return 1.5 if game.sfx.beat_frac() < 0.25 else 1.0
 	return 1.0
 
 
@@ -2937,3 +3039,469 @@ func _draw_bureau(e: E, tr: Transform2D, dim: float) -> void:
 			for k in 3:
 				var a := e.t * 6.0 + TAU * k / 3.0
 				draw_line(rp, rp + Vector2.from_angle(a) * 0.5 * r, hi, 1.4)
+
+
+
+# ================================================================ chapters 7-9
+# ---- chapter 7: the subwoofer. Bolted to a wall; every other beat a ring of
+# sound rolls out of it. On the ring you are hit and thrown; a dash goes through.
+const RING_FROM := 40.0
+const RING_TO := 300.0
+const RING_T := 0.5
+
+
+func _subwoofer(e: E, dt: float) -> void:
+	e.vel = Vector2.ZERO
+	e.knock = Vector2.ZERO
+	var bi := int(floor(game.sfx.beat()))
+	if bi != e.last_beat:
+		e.last_beat = bi
+		if bi % 2 == 0:
+			rings.append({"c": e.pos, "t": 0.0, "hit": false})
+			e.squash = 1.0
+			e.squash_dir = Vector2.from_angle(e.rot)
+			game.sfx.play("slam", 0.5, -12.0)
+
+
+func _step_rings(dt: float, pl: Vector2) -> void:
+	var i := 0
+	while i < rings.size():
+		var g: Dictionary = rings[i]
+		g.t += dt
+		var rr := lerpf(RING_FROM, RING_TO, g.t / RING_T)
+		var d: float = pl.distance_to(g.c)
+		if not g.hit and absf(d - rr) < 6.0 + Player.R and game.player.dash_t <= 0.0:
+			g.hit = true
+			game.on_player_hit((pl - g.c).normalized(), null)
+		if g.t >= RING_T:
+			rings.remove_at(i)
+		else:
+			i += 1
+
+
+# ---- chapter 7: the choir. Four singers in a turning diamond; on the beat,
+# while all four live, the lines between them go red and cut. Kill one and
+# the others sing it back at the next beat: only all four in one beat ends it.
+func form_choir(members: Array) -> void:
+	var gid := next_choir
+	next_choir += 1
+	var c := Vector2.ZERO
+	for m in members:
+		c += m.pos
+	c /= maxf(1.0, members.size())
+	choirs[gid] = {"c": c, "a": 0.0, "f": -1, "dead": []}
+	for k in members.size():
+		members[k].pass_hits = gid
+		members[k].orbit_a = float(k)
+
+
+func _choir_slot(g: Dictionary, slot: int) -> Vector2:
+	return g.c + Vector2.from_angle(g.a + slot * PI * 0.5) * 48.0
+
+
+func _choir(e: E, pl: Vector2, dt: float) -> void:
+	if not choirs.has(e.pass_hits):
+		_chaser(e, pl, dt)
+		return
+	var g: Dictionary = choirs[e.pass_hits]
+	var want := _choir_slot(g, int(e.orbit_a))
+	e.vel = ((want - e.pos) * 8.0).limit_length(420.0)
+	var bi := int(floor(game.sfx.beat()))
+	if bi != e.last_beat:
+		e.last_beat = bi
+		e.squash = 1.0
+		e.squash_dir = Vector2.UP
+	e.rot = g.a + e.orbit_a * PI * 0.5
+
+
+func choir_alive(gid: int) -> int:
+	var n := 0
+	for o in list:
+		if o.kind == CHOIR and o.state == ALIVE and o.pass_hits == gid:
+			n += 1
+	return n
+
+
+# ---- chapter 8: the forger. Goes to one of your rounds, writes a moment, and
+# a false one appears on the far wall (three at most). When you recall, its
+# false rounds answer too: half a second of red, then they fly at you.
+const FORGE_T := 0.9
+const FAKE_WARN := 0.5
+
+
+func _forger(e: E, pl: Vector2, dt: float) -> void:
+	e.mode_t += dt
+	e.cool -= dt
+	if e.mode == 1:
+		e.vel = Pal.damp2(e.vel, Vector2.ZERO, 8.0, dt)
+		if e.anchor == null or e.anchor.state != Bullets.EMBED:
+			e.mode = 0
+			return
+		if e.mode_t >= FORGE_T:
+			var room := Arena.ROOM
+			var p: Vector2 = room.get_center() * 2.0 - e.anchor.pos
+			# onto the nearest wall
+			var d := [p.x - room.position.x, room.end.x - p.x, p.y - room.position.y, room.end.y - p.y]
+			var k := 0
+			for j in 4:
+				if d[j] < d[k]:
+					k = j
+			match k:
+				0:
+					p.x = room.position.x + 4.0
+				1:
+					p.x = room.end.x - 4.0
+				2:
+					p.y = room.position.y + 4.0
+				_:
+					p.y = room.end.y - 4.0
+			fakes.append({"p": p, "by": e, "fire": -1.0})
+			game.fx.ring(p, 4.0, 30.0, 0.3, acc(FORGER, 0.9, 1.6), 2.0)
+			game.sfx.play("tick", 0.8, -8.0)
+			e.mode = 0
+			e.cool = 1.5
+			e.anchor = null
+		return
+	var mine := 0
+	for f in fakes:
+		if f.by == e:
+			mine += 1
+	var target = null
+	if mine < 3 and e.cool <= 0.0:
+		var td := 1400.0
+		for b in game.bullets.list:
+			if b.state == Bullets.EMBED and not b.foe and b.dark_by == 0:
+				var d2: float = b.pos.distance_to(e.pos)
+				if d2 < td:
+					td = d2
+					target = b
+	var want := Vector2.ZERO
+	if target != null:
+		want = (target.pos - e.pos).normalized()
+		if e.pos.distance_to(target.pos) < e.r + 34.0:
+			e.mode = 1
+			e.mode_t = 0.0
+			e.anchor = target
+			game.sfx.play("tick", 1.4, -12.0)
+	else:
+		var away := e.pos - pl
+		want = away.normalized() if away.length() < 400.0 else Vector2.from_angle(sin(e.t * 0.4 + e.seed) * 3.0)
+	e.vel = Pal.damp2(e.vel, _steer(e, _seek(e, pl, want)) * e.speed, 3.0, dt)
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-6.0 * dt))
+
+
+# You let go of Q: every false round answers the call.
+func on_recall() -> void:
+	for f in fakes:
+		if f.fire < 0.0:
+			f.fire = 0.0
+
+
+func _step_fakes(dt: float, pl: Vector2) -> void:
+	var i := 0
+	while i < fakes.size():
+		var f: Dictionary = fakes[i]
+		if f.by.state != ALIVE:
+			fakes.remove_at(i)
+			continue
+		if f.fire >= 0.0:
+			f.fire += dt
+			if f.fire >= FAKE_WARN:
+				game.bullets.fire_foe(f.p, (pl - f.p).normalized())
+				game.sfx.play("dash_e", 1.5, -8.0)
+				fakes.remove_at(i)
+				continue
+		i += 1
+
+
+# ---- chapter 8: the redactor. Keeps its distance and lobs ink where you are
+# going: a red dot, then a black blot for seven seconds. Inside the ink no
+# round of yours touches anything.
+const INK_EVERY := 6.0
+const INK_WARN := 0.8
+const INK_R := 90.0
+const INK_LIFE := 7.0
+
+
+func _redactor(e: E, pl: Vector2, dt: float) -> void:
+	var to := pl - e.pos
+	var d := to.length()
+	var radial := to / maxf(d, 1.0) * clampf((d - 430.0) / 120.0, -1.0, 1.0)
+	var orbit := to.orthogonal().normalized() * (0.5 if fmod(e.seed, 2.0) < 1.0 else -0.5)
+	e.vel = Pal.damp2(e.vel, _steer(e, _seek(e, pl, (radial + orbit).normalized())) * e.speed, 2.5, dt)
+	e.rot = lerp_angle(e.rot, to.angle() + PI * 0.5, 1.0 - exp(-4.0 * dt))
+	e.cool -= dt
+	if e.cool <= 0.0 and d < 950.0:
+		e.cool = INK_EVERY
+		var at: Vector2 = pl + game.player.vel * 0.5
+		at = at.clamp(Arena.ROOM.position + Vector2(40, 40), Arena.ROOM.end - Vector2(40, 40))
+		blots.append({"c": at, "from": e.pos, "w": INK_WARN, "life": INK_LIFE})
+		e.squash = 1.0
+		e.squash_dir = to / maxf(d, 1.0)
+		game.sfx.play("p_hit", 0.6, -8.0)
+
+
+func _step_blots(dt: float) -> void:
+	var i := 0
+	while i < blots.size():
+		var b: Dictionary = blots[i]
+		if b.w > 0.0:
+			b.w -= dt
+			if b.w <= 0.0:
+				game.fx.ring(b.c, 10.0, INK_R, 0.3, acc(REDACTOR, 0.7, 1.2), 3.0)
+				game.sfx.play("stamp", 0.7, -6.0)
+		else:
+			b.life -= dt
+		if b.life <= 0.0:
+			blots.remove_at(i)
+		else:
+			i += 1
+
+
+func inked(p: Vector2) -> bool:
+	for b in blots:
+		if b.w <= 0.0 and p.distance_to(b.c) < INK_R:
+			return true
+	return false
+
+
+# ---- chapter 9: the drifter. Nothing to hold on to: it pushes toward you,
+# overshoots, bounces off the walls.
+func _drifter(e: E, pl: Vector2, dt: float) -> void:
+	var to := (pl - e.pos).normalized()
+	e.vel += to * 480.0 * dt
+	e.vel = e.vel.limit_length(e.speed) * exp(-0.25 * dt)
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, to.angle(), 1.0 - exp(-5.0 * dt))
+	if int(e.t * 30.0) % 4 == 0:
+		e.ghosts.append([e.pos, 0.0, e.rot])
+
+
+# ---- chapter 9: the bootman. Magnet boots: the draught does not move it. It
+# walks to the nearest airlock and, when that door opens, cranks it and holds
+# it open twice as long.
+func _bootman(e: E, pl: Vector2, dt: float) -> void:
+	e.mode = 0
+	if not game.vents.active():
+		e.vel = Pal.damp2(e.vel, _steer(e, _route(e, pl)) * e.speed, 3.0, dt)
+	else:
+		var best := 0
+		for k in game.vents.doors.size():
+			if game.vents.door_pos(k).distance_to(e.pos) < game.vents.door_pos(best).distance_to(e.pos):
+				best = k
+		var at: Vector2 = game.vents.door_pos(best) + game.vents.doors[best][1] * 95.0
+		if e.pos.distance_to(at) < 50.0:
+			e.vel = Pal.damp2(e.vel, Vector2.ZERO, 8.0, dt)
+			if game.vents.door == best:
+				e.mode = 1
+				game.vents.held = true
+		else:
+			e.vel = Pal.damp2(e.vel, _steer(e, _route(e, at)) * e.speed, 3.0, dt)
+	if e.vel.length() > 5.0:
+		e.rot = lerp_angle(e.rot, e.vel.angle(), 1.0 - exp(-6.0 * dt))
+
+
+# ---- chapter 9: the oxygen tank. Drifts near the airlocks and harms no one;
+# broken, it vents a jet the way the blow went, throwing all in its path.
+const JET_LEN := 300.0
+const JET_HALF := 0.22
+
+
+func _tank(e: E, dt: float) -> void:
+	var want := Vector2.from_angle(sin(e.t * 0.3 + e.seed) * 3.0)
+	e.vel = Pal.damp2(e.vel, want * e.speed, 1.0, dt)
+	e.rot += 0.3 * dt
+
+
+func _jet(e: E) -> void:
+	var dir: Vector2 = e.dash_dir.normalized() if e.dash_dir.length() > 0.1 else Vector2.RIGHT
+	for o in list:
+		if o.state != ALIVE or o == e:
+			continue
+		var d: Vector2 = o.pos - e.pos
+		if d.length() < JET_LEN and absf(dir.angle_to(d)) < JET_HALF + o.r / maxf(d.length(), 1.0):
+			o.knock += dir * 900.0
+			o.bounce = 0.6
+			blast_hit(o, dir, 15.0)
+	var pd: Vector2 = game.player.pos - e.pos
+	if pd.length() < JET_LEN and absf(dir.angle_to(pd)) < JET_HALF + 0.1:
+		game.player.pos = game.arena.push_circle(game.player.pos + dir * 140.0, Player.R)
+	for k in 14:
+		var a := dir.rotated(randf_range(-JET_HALF, JET_HALF))
+		game.fx.spark(e.pos, a * randf_range(600.0, 1100.0), 0.3, acc(TANK, 0.9, 1.8), 2.5, 30.0)
+	game.sfx.play("release", 1.3, -4.0)
+	game.cam.add_trauma(0.2)
+
+
+# ---- drawing chapters 7-9
+func _draw_789(e: E, tr: Transform2D, dim: float) -> void:
+	var r := e.r
+	var ac := acc(e.kind, dim, 1.3)
+	var hi := Pal.ink(0.85 * dim, 1.3)
+	match e.kind:
+		SUBWOOFER:
+			# the cone, thumping on the beat
+			var bf: float = game.sfx.beat_frac()
+			var thump := 1.0 + 0.18 * maxf(0.0, 1.0 - bf / 0.25)
+			draw_circle(e.pos, 0.62 * r * thump, Color(0.03, 0.03, 0.035, dim))
+			draw_arc(e.pos, 0.62 * r * thump, 0.0, TAU, 24, ac, 2.2)
+			draw_arc(e.pos, 0.36 * r * thump, 0.0, TAU, 18, hi, 1.6)
+			draw_circle(e.pos, 0.14 * r, ac)
+			draw_line(tr * Vector2(r * 0.95, -0.35 * r), tr * Vector2(r * 0.95, 0.35 * r), hi, 3.0)
+		CHOIR:
+			# a mouth that opens on the beat, and the line to the next singer
+			var bf2: float = game.sfx.beat_frac()
+			var open := 0.25 + 0.6 * maxf(0.0, 1.0 - bf2 / 0.3)
+			draw_arc(e.pos, r * 0.45, PI * 0.5 - open, PI * 0.5 + open, 10, hi, 1.8)
+			if choirs.has(e.pass_hits):
+				var all4 := choir_alive(e.pass_hits) == 4
+				for o in list:
+					if o.kind == CHOIR and o.state == ALIVE and o.pass_hits == e.pass_hits and int(o.orbit_a) == (int(e.orbit_a) + 1) % 4:
+						var red := all4 and bf2 < 0.2
+						var lc := Pal.red(0.95 * dim, 2.0) if red else acc(CHOIR, (0.5 if all4 else 0.2) * dim, 1.2)
+						draw_line(e.pos, o.pos, lc, 3.0 if red else 1.6)
+		FORGER:
+			# printed out of register: a second outline, off by how fast it moves
+			var off := e.vel.limit_length(120.0) * -0.04 + Vector2(2.5, 2.5)
+			var pts := _poly(e)
+			var tr2 := Transform2D(e.rot, e.pos + off)
+			for k in pts.size() - 1:
+				draw_line(tr2 * pts[k], tr2 * pts[k + 1], acc(FORGER, 0.55 * dim, 1.4), 1.5)
+			# the nib, writing over the round it copies
+			if e.mode == 1 and e.anchor != null:
+				var q: Vector2 = e.anchor.pos
+				var sl := PackedVector2Array()
+				var wk := clampf(e.mode_t / FORGE_T, 0.0, 1.0)
+				for j in 2 + int(wk * 10.0):
+					sl.append(q + Vector2(-12.0 + j * 2.4, sin(j * 2.1 + e.t * 20.0) * 5.0))
+				draw_polyline(sl, ac, 1.5)
+				draw_line(e.pos, q, acc(FORGER, 0.3 * dim, 1.0), 1.0)
+		REDACTOR:
+			# its lower half solid black, a bar of ink across the upper
+			draw_colored_polygon(_rect_pts(tr, -1.1 * r, 0.0, 1.1 * r, 0.46 * r), Color(0.0, 0.0, 0.0, dim))
+			draw_line(tr * Vector2(-0.7 * r, -0.22 * r), tr * Vector2(0.7 * r, -0.22 * r), hi, 3.0)
+		DRIFTER:
+			# two thrusters guttering at the back
+			var fl := 0.5 + 0.5 * sin(e.t * 40.0 + e.seed)
+			for sg: float in [-1.0, 1.0]:
+				draw_line(tr * Vector2(-0.85 * r, sg * 0.45 * r), tr * Vector2((-1.2 - 0.4 * fl) * r, sg * 0.45 * r), ac, 2.0)
+		BOOTMAN:
+			# the boot plate, and the handwheel it cranks the airlocks with
+			draw_line(tr * Vector2(-0.95 * r, -1.0 * r), tr * Vector2(-0.95 * r, 1.0 * r), ac, 6.0)
+			var wp := e.pos
+			var spin := e.t * (9.0 if e.mode == 1 else 1.0)
+			draw_arc(wp, 0.45 * r, 0.0, TAU, 16, hi, 2.0)
+			for k in 4:
+				draw_line(wp, wp + Vector2.from_angle(spin + TAU * k / 4.0) * 0.45 * r, hi, 1.4)
+			if e.mode == 1 and game.vents.door >= 0:
+				var dp: Vector2 = game.vents.door_pos(game.vents.door)
+				draw_arc(dp, 70.0, spin * 0.3, spin * 0.3 + TAU * 0.8, 24, Pal.red(0.85 * dim, 1.8), 3.0)
+		TANK:
+			# a band round the middle, the valve at its head
+			draw_line(tr * Vector2(-0.1 * r, -0.6 * r), tr * Vector2(-0.1 * r, 0.6 * r), ac, 3.0)
+			draw_circle(tr * Vector2(1.15 * r, 0.0), 0.22 * r, ac)
+			draw_arc(tr * Vector2(1.15 * r, 0.0), 0.22 * r, 0.0, TAU, 12, hi, 1.2)
+
+
+# The rings, the false rounds and the ink belong to the floor, not one body.
+func _draw_world789(dim: float) -> void:
+	for g in rings:
+		var k: float = g.t / RING_T
+		var rr := lerpf(RING_FROM, RING_TO, k)
+		draw_arc(g.c, rr, 0.0, TAU, 56, acc(SUBWOOFER, 0.18 * (1.0 - k) * dim, 1.2), 12.0)
+		draw_arc(g.c, rr, 0.0, TAU, 56, acc(SUBWOOFER, 0.85 * (1.0 - k * 0.6) * dim, 1.8), 2.5)
+	for f in fakes:
+		var p: Vector2 = f.p
+		var c := acc(FORGER, 0.85 * dim, 1.4)
+		if f.fire >= 0.0:
+			c = Pal.red(0.95 * dim, 2.0)
+			draw_arc(p, lerpf(30.0, 8.0, f.fire / FAKE_WARN), 0.0, TAU, 20, c, 2.0)
+		# a hollow round: the shape of yours, nothing in it
+		draw_arc(p, 6.0, 0.0, TAU, 12, c, 1.6)
+		draw_line(p - Vector2(4, 4), p + Vector2(4, 4), c, 1.0)
+		if game.focusing:
+			# holding Q: each false round shows the line it will fly
+			var to: Vector2 = game.player.pos
+			var n := (to - p).normalized()
+			var l := p.distance_to(to)
+			var segs := PackedVector2Array()
+			var s0 := 10.0
+			while s0 < l - 20.0:
+				segs.append(p + n * s0)
+				segs.append(p + n * minf(s0 + 10.0, l - 20.0))
+				s0 += 22.0
+			if segs.size() > 1:
+				draw_multiline(segs, Pal.red(0.6 * dim, 1.6), 1.5)
+	for b in blots:
+		var c2: Vector2 = b.c
+		if b.w > 0.0:
+			# in the air: a lob from the redactor and a red dot where it lands
+			var k2: float = 1.0 - b.w / INK_WARN
+			var from: Vector2 = b.from
+			var mid := from.lerp(c2, 0.5) + Vector2(0, -120.0)
+			var at := from.lerp(mid, k2).lerp(mid.lerp(c2, k2), k2)
+			draw_circle(at, 7.0, Color(0, 0, 0, dim))
+			draw_arc(at, 7.0, 0.0, TAU, 12, acc(REDACTOR, 0.8 * dim, 1.2), 1.4)
+			draw_circle(c2, 5.0, Pal.red(0.95 * dim, 2.0))
+			draw_arc(c2, INK_R * (0.4 + 0.6 * k2), 0.0, TAU, 32, Pal.red(0.4 * dim, 1.4), 1.5)
+		else:
+			var fade := clampf(b.life / 0.6, 0.0, 1.0)
+			draw_circle(c2, INK_R, Color(0.0, 0.0, 0.0, 0.88 * fade * dim))
+			draw_arc(c2, INK_R, 0.0, TAU, 40, acc(REDACTOR, 0.55 * fade * dim, 1.2), 2.0)
+			for j in 3:
+				var y := (j - 1) * 30.0
+				var hw := sqrt(maxf(0.0, INK_R * INK_R - y * y)) * 0.7
+				draw_line(c2 + Vector2(-hw, y), c2 + Vector2(hw, y), acc(REDACTOR, 0.25 * fade * dim, 1.0), 9.0)
+
+
+# Each choir, once a step: the diamond drifts and turns, the fallen are sung
+# back at their beat (if any singer is left), and on the beat the red lines cut.
+func _step_choirs(dt: float, pl: Vector2) -> void:
+	for gid in choirs.keys():
+		var g: Dictionary = choirs[gid]
+		var e: E = null
+		for o in list:
+			if o.kind == CHOIR and o.state == ALIVE and o.pass_hits == gid:
+				e = o
+				break
+		if e != null:
+			g.c = (g.c as Vector2).move_toward(pl, e.speed * game.enemy_speed() * dt)
+		g.a += 0.6 * dt
+		var alive: Array = []
+		var present := 0
+		for o in list:
+			if o.kind == CHOIR and o.pass_hits == gid and o.state in [WARN, SPAWN, ALIVE]:
+				present += 1
+				if o.state == ALIVE:
+					alive.append(o)
+		var j := 0
+		while j < g.dead.size():
+			g.dead[j][1] -= dt
+			if g.dead[j][1] <= 0.0:
+				var slot: int = g.dead[j][0]
+				g.dead.remove_at(j)
+				if not alive.is_empty():
+					var n := spawn(CHOIR, _choir_slot(g, slot), 0.0)
+					n.state = ALIVE
+					n.t = 0.0
+					n.hp *= 0.5
+					n.pass_hits = gid
+					n.orbit_a = float(slot)
+					game.fx.ring(n.pos, 4.0, 40.0, 0.35, acc(CHOIR, 0.9, 2.0), 2.0)
+					game.sfx.play("lit", 1.6, -8.0)
+					alive.append(n)
+			else:
+				j += 1
+		if present == 0 and g.dead.is_empty():
+			choirs.erase(gid)
+		elif alive.size() == 4 and game.sfx.beat_frac() < 0.2 and game.player.dash_t <= 0.0:
+			# the red lines on the beat
+			for o in alive:
+				var nx = null
+				for o2 in alive:
+					if int(o2.orbit_a) == (int(o.orbit_a) + 1) % 4:
+						nx = o2
+				if nx != null and Geometry2D.get_closest_point_to_segment(pl, o.pos, nx.pos).distance_to(pl) < Player.R + 2.0:
+					game.on_player_hit((pl - o.pos).normalized().orthogonal(), o)
+					break

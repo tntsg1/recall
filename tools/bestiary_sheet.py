@@ -39,7 +39,14 @@ META=[("CHASER","追击者","chaser","第1章 调车场","shell_k0",""),
 ("CONSIST","编组车队","","第5章 超导运输","shell_k24","note_consist"),
 ("PANTO","受电弓","","第5章 超导运输","shell_k26","note_panto"),
 ("SURGE","浪涌体","","第6章 能源分配","shell_k27","note_surge"),
-("CABLER","缆线工","","第6章 能源分配","shell_k28","note_cabler")]
+("CABLER","缆线工","","第6章 能源分配","shell_k28","note_cabler"),
+("SUBWOOFER","低音炮","","第7章 意识管理","shell_k29","note_subwoofer"),
+("CHOIR","合唱团","","第7章 意识管理","shell_k30","note_choir"),
+("FORGER","伪造者","","第8章 档案库","shell_k31","note_forger"),
+("REDACTOR","涂黑者","","第8章 档案库","shell_k32","note_redactor"),
+("DRIFTER","漂流者","","第9章 轨道电梯","shell_k33","note_drifter"),
+("BOOTMAN","锚靴工","","第9章 轨道电梯","shell_k34","note_bootman"),
+("TANK","氧气罐","","第9章 轨道电梯","shell_k35","note_tank")]
 by={}
 for s in shots: by.setdefault(s['kind'],{})[s['tag']]=s
 S=300

@@ -32,12 +32,19 @@ const V := Enemies.CONSIST
 const Z := Enemies.PANTO
 const S := Enemies.SURGE
 const O := Enemies.CABLER
+const WF := Enemies.SUBWOOFER
+const CR := Enemies.CHOIR
+const FG := Enemies.FORGER
+const RD := Enemies.REDACTOR
+const DF := Enemies.DRIFTER
+const BT := Enemies.BOOTMAN
+const TK := Enemies.TANK
 const COUNT := 7
 const BOSS := 6
-const COST := {C: 1, G: 5, H: 4, P: 3, L: 3, U: 4, E: 3, I: 3, W: 3, X: 2, F: 3, K: 4, N: 3, Q: 5, R: 4, T: 5, D: 4, B: 3, Y: 0, A: 6, J: 5, M: 5, V: 7, Z: 4, S: 4, O: 3}
+const COST := {C: 1, G: 5, H: 4, P: 3, L: 3, U: 4, E: 3, I: 3, W: 3, X: 2, F: 3, K: 4, N: 3, Q: 5, R: 4, T: 5, D: 4, B: 3, Y: 0, A: 6, J: 5, M: 5, V: 7, Z: 4, S: 4, O: 3, WF: 5, CR: 9, FG: 5, RD: 5, DF: 1, BT: 5, TK: 2}
 const BUDGET := [16, 22, 28, 32, 40, 48]
 # the waves' own notes, by enemy pool (the boss wave's note comes from Chapters)
-const NOTES := [{2: "note_guard", 3: "note_charger", 4: "note_coupler", 5: "note_signal"}, {0: "note_mirror", 1: "note_queue", 2: "note_turnstile", 3: "note_registrar", 4: "note_prism"}, {0: "note_arms", 1: "note_leech", 2: "note_hopper", 3: "note_forklift"}, {0: "note_rings", 1: "note_pulse"}, {0: "note_nodes"}, {0: "note_rails", 1: "note_sled", 2: "note_consist", 3: "note_panto"}, {0: "note_lasers", 1: "note_echo", 2: "note_hound", 3: "note_dud", 4: "note_bystander"}, {0: "note_arcs", 1: "note_inspector", 2: "note_surge", 3: "note_cabler"}, {0: "note_shelves", 1: "note_proofreader"}, {0: "note_vents"}, {0: "note_plates", 1: "note_escort"}, {0: "note_stasis", 1: "note_phase"}]
+const NOTES := [{2: "note_guard", 3: "note_charger", 4: "note_coupler", 5: "note_signal"}, {0: "note_mirror", 1: "note_queue", 2: "note_turnstile", 3: "note_registrar", 4: "note_prism"}, {0: "note_arms", 1: "note_leech", 2: "note_hopper", 3: "note_forklift"}, {0: "note_rings", 1: "note_pulse", 2: "note_subwoofer", 3: "note_choir"}, {0: "note_nodes"}, {0: "note_rails", 1: "note_sled", 2: "note_consist", 3: "note_panto"}, {0: "note_lasers", 1: "note_echo", 2: "note_hound", 3: "note_dud", 4: "note_bystander"}, {0: "note_arcs", 1: "note_inspector", 2: "note_surge", 3: "note_cabler"}, {0: "note_shelves", 1: "note_proofreader", 2: "note_forger", 3: "note_redactor"}, {0: "note_vents", 1: "note_drifter", 2: "note_bootman", 3: "note_tank"}, {0: "note_plates", 1: "note_escort"}, {0: "note_stasis", 1: "note_phase"}]
 const SIDES := ["T", "B", "L", "R"]
 
 var game
@@ -201,6 +208,45 @@ func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
 			kinds.append(O)
 			kinds.append(I)
 			left -= COST[S] + COST[O] + COST[I]
+		2 when pool == 3:
+			kinds.append(WF)
+			kinds.append(WF)
+			left -= COST[WF] * 2
+		3 when pool == 3:
+			kinds.append(CR)
+			left -= COST[CR]
+		4 when pool == 3:
+			kinds.append(CR)
+			kinds.append(WF)
+			left -= COST[CR] + COST[WF]
+		2 when pool == 8:
+			kinds.append(FG)
+			kinds.append(FG)
+			left -= COST[FG] * 2
+		3 when pool == 8:
+			kinds.append(RD)
+			kinds.append(RD)
+			left -= COST[RD] * 2
+		4 when pool == 8:
+			kinds.append(FG)
+			kinds.append(W)
+			left -= COST[FG] + COST[W]
+		1 when pool == 9:
+			for k in 6:
+				kinds.append(DF)
+			left -= COST[DF] * 6
+		2 when pool == 9:
+			kinds.append(BT)
+			kinds.append(TK)
+			kinds.append(TK)
+			left -= COST[BT] + COST[TK] * 2
+		3 when pool == 9:
+			kinds.append(TK)
+			kinds.append(TK)
+			kinds.append(BT)
+			for k in 4:
+				kinds.append(DF)
+			left -= COST[TK] * 2 + COST[BT] + COST[DF] * 4
 		1:
 			pass
 		2 when pool == 0:
@@ -220,15 +266,15 @@ func _wave_plan(i: int, more: float, elite: bool) -> Dictionary:
 			elif pool == 5:
 				mix = [G, H, P, M, M, V, Z]
 			elif pool == 3:
-				mix = [G, H, L, U, U]
+				mix = [G, H, L, U, U, WF, CR]
 			elif pool == 6:
 				mix = [G, H, P, E, D, D, B]
 			elif pool == 7:
 				mix = [G, H, L, I, S, S, O, O]
 			elif pool == 8:
-				mix = [G, H, P, L, E, W, W]
+				mix = [G, H, L, E, W, FG, RD]
 			elif pool == 9:
-				mix = [G, H, H, P, L, U, E, I, W]
+				mix = [G, H, P, L, DF, DF, DF, BT, TK, TK]
 			elif pool == 10:
 				mix = [G, G, H, P, L, U, E, X, X, X]
 			elif pool == 11:
@@ -455,6 +501,13 @@ func _spawn_group(kind: int, count: int, side: String, elite := false) -> void:
 				var sg = game.enemies.spawn(Enemies.QSEG, (p + back * (26.0 + 22.0 * j)).clamp(room.position, room.end), i * 0.07 + 0.05 * (j + 1))
 				sg.link = ahead
 				ahead = sg
+		elif kind == CR:
+			# the choir: four singers in a diamond round this one
+			var members: Array = [e]
+			for j in 3:
+				var at2: Vector2 = (p + Vector2.from_angle((j + 1) * PI * 0.5) * 48.0).clamp(room.position, room.end)
+				members.append(game.enemies.spawn(CR, at2, i * 0.07 + 0.05 * (j + 1)))
+			game.enemies.form_choir(members)
 		elif kind == V:
 			# the consist: three cars behind the engine
 			var back2: Vector2 = (p - pl).normalized()

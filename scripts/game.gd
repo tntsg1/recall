@@ -1115,6 +1115,7 @@ func _release() -> void:
 	var held := focus_time
 	var n := bullets.recall(player.pos)
 	possess.on_recall_release()
+	enemies.on_recall()
 	if n <= 0:
 		return
 	pass_focus = has("focus_lens") and held >= 0.8

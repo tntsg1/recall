@@ -26,6 +26,7 @@ var door := -1               # the door marked or open, -1 none
 var door_t := 0.0            # 0..WARN warning, WARN..WARN+OPEN open
 var turn := 0
 var streaks: Array = []      # [pos, life]: air rushing to the door
+var held := false            # a bootman is cranking the open door: it stays open twice as long
 
 
 func _init() -> void:
@@ -118,7 +119,8 @@ func step(dt: float) -> void:
 			game.sfx.play("windup", 0.45, -6.0)
 	else:
 		var was := door_t
-		door_t += dt
+		door_t += dt * (0.5 if held and door_t > WARN else 1.0)
+		held = false
 		if was < WARN and door_t >= WARN:
 			game.sfx.play("release", 0.4, -2.0)
 			game.cam.add_trauma(0.25)
@@ -154,7 +156,7 @@ func _draught(dt: float, k: float) -> void:
 			game.player.pos = dp + n * 140.0
 	# enemies are drawn out through it
 	for e in game.enemies.list:
-		if e.state != Enemies.ALIVE:
+		if e.state != Enemies.ALIVE or e.kind == Enemies.BOOTMAN:
 			continue
 		e.pos = game.arena.push_circle(e.pos + force_at(e.pos) * dt * 1.3, e.r)
 		if e.pos.distance_to(dp) < MOUTH + e.r:

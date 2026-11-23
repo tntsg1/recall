@@ -21,6 +21,9 @@ const KINDS := [
 	["HOPPER", 150, Vector2(300, 0)], ["FORKLIFT", 60, Vector2(0, 260)], ["SLED", 90, Vector2(0, 300)],
 	["CONSIST", 60, Vector2(300, 300)], ["PANTO", 150, Vector2(0, 300)], ["SURGE", 60, Vector2(300, 0)],
 	["CABLER", 120, Vector2(300, 0)],
+	["SUBWOOFER", 70, Vector2(300, 0)], ["CHOIR", 60, Vector2(200, 0)], ["FORGER", 60, Vector2(300, 0)],
+	["REDACTOR", 80, Vector2(450, 0)], ["DRIFTER", 60, Vector2(300, 0)], ["BOOTMAN", 60, Vector2(300, 0)],
+	["TANK", 40, Vector2(300, 0)],
 ]
 
 
@@ -95,6 +98,13 @@ func _run() -> void:
 			b.link = e
 			b.seed = e.seed + 1.0
 			extra.append(b)
+		elif kind == Enemies.CHOIR:
+			var mem: Array = [e]
+			for j in 3:
+				var m = put(kind, c + Vector2.from_angle((j + 1) * PI * 0.5) * 48.0)
+				mem.append(m)
+				extra.append(m)
+			game.enemies.form_choir(mem)
 		elif kind == Enemies.CONSIST:
 			var ahead2 = e
 			for j in 3:
